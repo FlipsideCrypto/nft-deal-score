@@ -7,7 +7,7 @@ from sklearn.ensemble import RandomForestRegressor
 ctx = snowflake.connector.connect(
     user='USER',
     password='PASSWORD',
-    account='vna27887.us-east-1'
+    account='ACCOUNT'
 )
 import pandas as pd
 
