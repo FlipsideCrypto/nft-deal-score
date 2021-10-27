@@ -1,0 +1,57 @@
+
+body {
+  background: url('Background_03.png');
+  background-attachment:fixed;
+  background-size: auto 100%;
+  background-position: center;
+  padding-left: 10%;
+  padding-right: 10%;
+}
+
+body {
+        font-family: 'Roboto Mono', serif;
+        margin: auto;
+        margin-top: 10%;
+        text-align: center;
+}
+
+.heading {
+  font-size: 2rem;
+  display: flex;
+   align-items: center; 
+   justify-content: center;
+}
+.notheading {
+  font-size: 1.5rem;
+}
+.links {
+  font-size: 1rem;
+  display: flex;
+   align-items: center; 
+   justify-content: center;
+}
+img {
+  padding-right: 15px;
+}
+
+/* unvisited link */
+a:link {
+  color: #01c3b3;
+}
+
+/* visited link */
+a:visited {
+  color: #01c3b3;
+}
+
+/* mouse over link */
+a:hover {
+  color: #01c3b3;
+}
+
+/* selected link */
+a:active {
+  color: #01c3b3;
+}
+
+
