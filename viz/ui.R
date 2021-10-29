@@ -37,12 +37,12 @@ fluidPage(
 		class="grey8row"
 		, fluidRow(
 			column(6
-				, div(class = "inputtitle", "Select an NFT")
-				, fluidRow(uiOutput("nftselect"))
+				, div(class = "inputtitle", "Select a Collection")
+				, fluidRow(uiOutput("collectionselect"))
 			)
 			, column(6
-				, div(class = "inputtitle", "Set the Price ($)")
-				, fluidRow(uiOutput("priceinput"))
+				, div(class = "inputtitle", "Select an NFT")
+				, fluidRow(uiOutput("nftselect"))
 			)
 		)
 		, fluidRow(
@@ -60,6 +60,7 @@ fluidPage(
 		class="grey8row"
 		, h2("NFT Rankings")
 		, div(class = "table", reactableOutput("nftstable"))
+		# , div(class = "table", DT::dataTableOutput("nftstable"))
 	)
 	, fluidRow(
 		class="grey8row"

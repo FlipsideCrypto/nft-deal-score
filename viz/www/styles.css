@@ -35,6 +35,40 @@
   padding-bottom: 0px;
 }
 
+.ReactTable {
+  background-color: #212B36;
+  color: #C4CDD5;
+  border: none;
+}
+.rt-page-button-current  {
+  color: #FFF;
+}
+.rt-thead {
+  background-color: #10151A;
+  color: #FFFFFF;
+}
+.ReactTable {
+  color: #C4CDD5;
+  border: none;
+}
+.ReactTable .rt-table {
+  background-color: #171e25;
+}
+.rt-th {
+  border: 0px solid #000000 !important;
+  padding-top: 15px;
+  padding-bottom: 15px;
+  font-weight: 400;
+  font-family: Inter;
+}
+.rt-pagination {
+  margin: 0;
+  background: #171e25;
+  opacity: 0.5;
+  border-bottom: 1px solid #C4CDD5;
+  border-top: 1px solid #C4CDD5;
+}
+
 
 
 #tokenselect > .shiny-input-container {
@@ -109,40 +143,6 @@
     padding-right: 0;
 }
 
-.ReactTable {
-  background-color: #212B36;
-  color: #C4CDD5;
-  border: none;
-}
-.rt-page-button-current  {
-  color: #FFF;
-}
-.rt-thead {
-  background-color: #10151A;
-  color: #FFFFFF;
-}
-
-.ReactTable {
-  background-color: #171e25;
-  color: #C4CDD5;
-  border: none;
-}
-
-.rt-th {
-  border: 0px solid #000000 !important;
-  padding-top: 15px;
-  padding-bottom: 15px;
-  font-weight: 400;
-  font-family: Inter;
-}
-.rt-pagination {
-  margin: 0;
-  background: #171e25;
-  opacity: 0.5;
-  border-bottom: 1px solid #C4CDD5;
-  border-top: 1px solid #C4CDD5;
-}
-
 body {
   background-color: #10151A;
   background-attachment:fixed;
@@ -157,7 +157,7 @@ body {
 
 .container-fluid {
   background-color: #10151A;
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
   height: 100%;
   padding-top: 48px;

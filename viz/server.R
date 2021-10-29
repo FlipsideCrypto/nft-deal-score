@@ -8,6 +8,16 @@ server <- function(input, output, session) {
 	# output the deal score
 	load('data.Rdata')
 
+	output$collectionselect <- renderUI({
+		selectInput(
+			inputId = 'collectionname'
+			, label = NULL
+			, selected = pred_price$collection[1]
+			, choices = unique(pred_price$collection)
+			, width = "100%"
+		)
+	})
+
 	output$nftselect <- renderUI({
 		selectInput(
 			inputId = 'tokenid'
@@ -19,6 +29,9 @@ server <- function(input, output, session) {
 	})
 	getTokenId <- reactive({
 		return(input$tokenid)
+	})
+	getCollection <- reactive({
+		return(input$collectionname)
 	})
 
 	output$tokenid <- renderText({
@@ -34,9 +47,10 @@ server <- function(input, output, session) {
 
 	output$tokenrank <- renderText({
 		id <- getTokenId()
+		selected <- getCollection()
 		t <- ""
-		if (!is.na(id)) {
-			cur <- pred_price[ token_id == eval(as.numeric(input$tokenid)) ]
+		if (!is.na(id) & !is.na(collection)) {
+			cur <- pred_price[ token_id == eval(as.numeric(input$tokenid)) & collection == eval(selected) ]
 			if (nrow(cur)) {
 				t <- paste0("Rank #", format(cur$rk[1], big.mark=",")," / ",format(nrow(pred_price), big.mark=","))
 			}
@@ -47,9 +61,11 @@ server <- function(input, output, session) {
 	})
 
 	output$fairmarketprice <- renderText({
+		id <- getTokenId()
+		selected <- getCollection()
 		t <- ""
 		if (!is.na(id)) {
-			cur <- pred_price[ token_id == eval(as.numeric(input$tokenid)) ]
+			cur <- pred_price[ token_id == eval(as.numeric(input$tokenid)) & collection == eval(selected) ]
 			if (nrow(cur)) {
 				t <- paste0("Fair Market Price: $", (format(cur$pred_price, digits=3, decimal.mark=".",big.mark=",")))
 			}
@@ -69,11 +85,18 @@ server <- function(input, output, session) {
 
 	output$tokenimg <- renderUI({
 		token_id <- getTokenId()
-		tags$img(src = paste0("img/",token_id,".png"))
+		collection <- getCollection()
+		t <- tags$img(src = paste0("img/",token_id,".png"))
+		if (TRUE | collection == 'Hashmasks') {
+			t <- tags$img(src = paste0("img/",token_id,".png"))
+		}
+		t
 	})
 
 	getAttributesTable <- reactive({
-		cur <- attributes[ token_id == eval(as.numeric(input$tokenid)) ]
+		id <- getTokenId()
+		selected <- getCollection()
+		cur <- attributes[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
 		cur <- merge( cur, feature_values[, list(feature, value, pct_vs_baseline) ] )
 		return(cur)
 	})
@@ -101,7 +124,10 @@ server <- function(input, output, session) {
 	})
 
 	output$featurestable <- renderReactable({
-		reactable(feature_values[, list( feature, value, rarity, pct_vs_baseline )],
+		selected <- getCollection()
+		data <- feature_values[ collection == eval(selected)]
+		print(unique(data$collection))
+		reactable(data[, list( feature, value, rarity, pct_vs_baseline )],
 			defaultColDef = colDef(
 				#align = "center",
 				headerStyle = list(background = "#10151A")
@@ -123,7 +149,10 @@ server <- function(input, output, session) {
 	})
 
 	output$nftstable <- renderReactable({
-		reactable(pred_price[, list( token_id, rk, pred_price, character, eyecolor, item, mask, skincolor )],
+		selected <- getCollection()
+		data <- pred_price[ collection == eval(selected), list( token_id, rk, pred_price, character, eyecolor, item, mask, skincolor )]
+		data[, pred_price := paste0('$',format(pred_price, digits=3, decimal.mark=".", big.mark=",")) ]
+		reactable(data,
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
 			),
@@ -133,9 +162,7 @@ server <- function(input, output, session) {
 			columns = list(
 				token_id = colDef(name = "Token ID", align = "left"),
 				rk = colDef(name = "Rank", align = "left"),
-				pred_price = colDef(name = "Est. Price", align = "left", cell = function(x) {
-					htmltools::tags$span(paste0('$',format(x, digits=3, decimal.mark=".", big.mark=",")))
-				}),
+				pred_price = colDef(name = "Est. Price", align = "left"),
 				character = colDef(name = "Character", align = "left"),
 				eyecolor = colDef(name = "Eye Color", align = "left"),
 				item = colDef(name = "Item", align = "left"),
@@ -146,7 +173,13 @@ server <- function(input, output, session) {
 	})
 
 	output$salestable <- renderReactable({
-		reactable(sales[, list( token_id, block_timestamp, price_usd, character, eyecolor, item, mask, skincolor )],
+		selected <- getCollection()
+		data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price_usd, pred, character, eyecolor, item, mask, skincolor )]
+		print(paste0('salestable collection = ', collection))
+		print(unique(data$collection))
+		data[, price_usd := paste0('$',format(price_usd, digits=3, decimal.mark=".", big.mark=","))]
+		data[, pred := paste0('$',format(pred, digits=3, decimal.mark=".", big.mark=","))]
+		reactable(data,
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
 			),
@@ -156,9 +189,8 @@ server <- function(input, output, session) {
 			columns = list(
 				token_id = colDef(name = "Token ID", align = "left"),
 				block_timestamp = colDef(name = "Sale Date", align = "left"),
-				price_usd = colDef(name = "Price", align = "left", cell = function(x) {
-					htmltools::tags$span(paste0('$',format(x, digits=3, decimal.mark=".", big.mark=",")))
-				}),
+				price_usd = colDef(name = "Price", align = "left"),
+				pred = colDef(name = "Fair Market Price", align = "left"),
 				character = colDef(name = "Character", align = "left"),
 				eyecolor = colDef(name = "Eye Color", align = "left"),
 				item = colDef(name = "Item", align = "left"),
@@ -169,7 +201,9 @@ server <- function(input, output, session) {
 	})
 
 	getPriceDistributionData <- reactive({
-		cur <- pred_price[ token_id == eval(as.numeric(input$tokenid)) ]
+		id <- getTokenId()
+		selected <- getCollection()
+		cur <- pred_price[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
 		mu <- cur$pred_price[1]
 		sd <- cur$pred_sd[1]
 
