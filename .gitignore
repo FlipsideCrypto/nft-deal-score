@@ -2,3 +2,5 @@
 *.usr
 *.Rdata
 *.csv
+*.DS_Store
+*.Rhistory
