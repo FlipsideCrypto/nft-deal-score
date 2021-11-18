@@ -193,7 +193,7 @@ def load_sales_data():
     api_1 = 'https://api.flipsidecrypto.com/api/v2/queries/4463197b-002c-48cc-bba6-634e717c7b62/data/latest'
     response = requests.get(api_1)
     sales_1 = pd.DataFrame(response.json())
-    sales_1 = clean_colnames(sales_0)
+    sales_1 = clean_colnames(sales_1)
     
     sales_1['collection'] = 'Galactic Punks'
     sales_1.head()
@@ -217,9 +217,9 @@ def pick_most_sales(using_art_blocks, sales, metadata):
         collection_name = df.collection_name.values[0]
         print('Collection with most sales is {}'.format(collection_name))
 
-######################################################
-#     Create Dataframe with Requisite Collection     #
-######################################################
+############################
+## Prepare model features ##
+############################
 def model_data(using_art_blocks, metadata, sales, collection=None):
     # pred_cols = {}
     if False and using_art_blocks:
@@ -244,6 +244,9 @@ def model_data(using_art_blocks, metadata, sales, collection=None):
         'Hashmasks': [ 'character','eyecolor','item','mask','skincolor' ]
         , 'Galactic Punks': [ 'backgrounds','hair','species','suits','jewelry','headware','glasses' ]
         }
+        
+        alldata = {}
+        dummy_features = {}
         for p in metadata.keys():
             features = collection_features[p]
             cur = metadata[p]
@@ -257,8 +260,8 @@ def model_data(using_art_blocks, metadata, sales, collection=None):
             metadata[p] = cur
             # pred_cols[p] = ['pct','timestamp','mn_20','log_mn_20'] + list(dummies.columns)
             
-            p_metadata = metadata[collection]    
-            p_sales = sales[collection]
+            p_metadata = metadata[p]    
+            p_sales = sales[p]
 
             p_sales['token_id'] = p_sales.token_id.apply(lambda x: re.sub("\"", "", str(x)) )
             p_metadata['token_id'] = p_metadata.token_id.apply(lambda x: re.sub("\"", "", str(x)) )
@@ -268,16 +271,26 @@ def model_data(using_art_blocks, metadata, sales, collection=None):
 
             ## Create token level unique sales data
             p_sales_unique = pd.DataFrame({'sale_count': p_sales.groupby(['token_id']).size()})
-            p_sales_unique['price_median'] = p_sales.groupby('token_id').price_usd.median()
-            p_sales_unique['price_min'] = p_sales.groupby('token_id').price_usd.min()
-            p_sales_unique['price_max'] = p_sales.groupby('token_id').price_usd.max()
+            p_sales_unique['price_usd_median'] = p_sales.groupby('token_id').price_usd.median()
+            p_sales_unique['price_usd_min'] = p_sales.groupby('token_id').price_usd.min()
+            p_sales_unique['price_usd_max'] = p_sales.groupby('token_id').price_usd.max()
             
-            alldata = p_metadata.merge(p_sales_unique, on='token_id', how='left')
+            if p_sales['price'].isnull().all():
+                print("*** " + p + " prices are all None! Use price USD! ***")
+            else:
+                p_sales_unique['price_median'] = p_sales.groupby('token_id').price.median()
+                p_sales_unique['price_min'] = p_sales.groupby('token_id').price.min()
+                p_sales_unique['price_max'] = p_sales.groupby('token_id').price.max()
+            
+            alldata[p] = p_metadata.merge(p_sales_unique, on='token_id', how='left')
+            alldata[p].set_index('token_id', inplace = True)
+            
+            dummy_features[p] = dummies.columns
 
     
-    return(alldata)
+    return alldata, dummy_features
 
-    
+
     
     
 
