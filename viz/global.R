@@ -1,35 +1,17 @@
-# setwd("~/git/nft-deal-score/viz")
-# runApp()
 source("~/data_science/util/util_functions.R")
-library(DT)
 library(data.table)
 library(shiny)
 library(ggplot2)
-library(scales)
 library(tools)
-library(shinyWidgets)
 library(plotly)
 library(shinyBS)
 library(tippy)
-library(bslib)
 library(shinyjs)
-require(reshape2)
 require(dplyr)
-require(RPostgreSQL)
-library(RJSONIO)
 library(htmlwidgets)
-library(stringr)
-library(showtext)
-library(fmsb)
 library(reactable)
-font_add_google(name = "Roboto Condensed", family = "roboto-condensed")
-font_add_google(name = "Roboto Mono", family = "roboto-mono")
-showtext_auto()
 
 plotly.style <- list(
-  fig_bgcolor = "rgb(255, 255, 255)", 
   plot_bgcolor = "rgba(0, 0, 0, 0)", 
-  paper_bgcolor = "rgba(0, 0, 0, 0)",
-  font = list(
-    color = '#919EAB', family = "Roboto Mono")
+  paper_bgcolor = "rgba(0, 0, 0, 0)"
 )
