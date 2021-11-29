@@ -7,6 +7,7 @@ fluidPage(
 	    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Roboto+Mono"),
 	    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Inter")
 	),
+	tags$head(tags$script(src = "mixpanel.js")),
 	tags$style(type="text/css",
 		".shiny-output-error { visibility: hidden; }",
 		".shiny-output-error:before { visibility: hidden; }"
@@ -14,12 +15,12 @@ fluidPage(
 	withTags({
 		header(class="top-banner",
 		  section(
-		    a(class="fs-logo", href="https://www.flipsidecrypto.com", "Powered by Flipside Crypto"),
+		    a(class="fs-logo", href="https://www.flipsidecrypto.com", "Powered by Flipside Crypto", onclick = "mixpanel.track('nft-click-flipside-icon')"),
 		    section(class="socials",
-		      a(class="twitter", href="https://twitter.com/flipsidecrypto", "Twitter"),
-		      a(class="linkedin", href="https://www.linkedin.com/company/flipside-crypto", "LinkedIn"),
-		      a(class="discord", href="https://flipsidecrypto.com/discord", "Discord"),
-		      a(href="https://app.flipsidecrypto.com/auth/signup/velocity", "Sign Up")
+		      a(class="twitter", href="https://twitter.com/flipsidecrypto", "Twitter", onclick = "mixpanel.track('nft-click-twitter-icon')"),
+		      a(class="linkedin", href="https://www.linkedin.com/company/flipside-crypto", "LinkedIn", onclick = "mixpanel.track('nft-click-linkedin-icon')"),
+		      a(class="discord", href="https://flipsidecrypto.com/discord", "Discord", onclick = "mixpanel.track('nft-click-discord-icon')"),
+		      a(href="https://app.flipsidecrypto.com/auth/signup/velocity", "Sign Up", onclick = "mixpanel.track('nft-click-signup-icon')")
 		    )
 		  )
 		)
