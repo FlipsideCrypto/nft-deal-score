@@ -46,6 +46,7 @@ def scrape_listings():
 		sleep(5)
 		has_more = True
 		page = 1
+		seen = []
 		while has_more:
 			# scroll = browser.find_element_by_class_name('ag-center-cols-viewport')
 			print('{} page #{} ({})'.format(collection, page, len(data)))
@@ -67,7 +68,10 @@ def scrape_listings():
 							token_id = row.find_all('div', {'col-id':'tokenId'})
 							price = row.find_all('div', {'col-id':'price'})
 							if len(token_id) and len(price):
-								data += [[ collection, int(token_id[0].text), float(price[0].text) ]]
+								token_id = int(token_id[0].text)
+								if not token_id in seen:
+									data += [[ collection, token_id, price ]]
+									seen.append(token_id)
 						# else:
 						# 	print(row.text)
 					scroll = browser.find_elements_by_class_name('ag-row-even')
@@ -90,6 +94,7 @@ def scrape_listings():
 def scrape_solanafloor():
 	data = []
 	collections = [ 'aurory','thugbirdz','smb','degenapes' ]
+	collections = [ 'degenapes' ]
 	d = {
 		'smb': 'solana-monkey-business'
 		, 'degenapes': 'degen-ape-academy'
@@ -101,6 +106,7 @@ def scrape_solanafloor():
 		sleep(5)
 		has_more = True
 		page = 1
+		seen = []
 		while has_more:
 			# scroll = browser.find_element_by_class_name('ag-center-cols-viewport')
 			print('{} page #{} ({})'.format(collection, page, len(data)))
@@ -121,9 +127,12 @@ def scrape_solanafloor():
 						if len(cell) > 4:
 							token_id = row.find_all('div', {'col-id':'tokenId'})
 							image = row.find_all('div', {'col-id':'image'})
-							if len(token_id) and len(image):
+							if len(token_id) and len(image) and len(image[0].find_all('img')):
 								image_url = image[0].find_all('img')[0].attrs['src']
-								data += [[ collection, int(token_id[0].text), image_url ]]
+								token_id = int(token_id[0].text)
+								if not token_id in seen:
+									data += [[ collection, token_id, image_url ]]
+									seen.append(token_id)
 						# else:
 						# 	print(row.text)
 					scroll = browser.find_elements_by_class_name('ag-row-even')
@@ -138,10 +147,10 @@ def scrape_solanafloor():
 			else:
 				has_more = False
 				break
-	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
-	listings[ listings.collection == 'smb' ].head()
-	print(listings.groupby('collection').token_id.count())
-	listings.to_csv('./data/listings.csv', index=False)
+	tokens = pd.DataFrame(data, columns=['collection','token_id','image_url']).drop_duplicates()
+	tokens[ tokens.collection == 'degenapes' ].sort_values('token_id')
+	print(tokens.groupby('collection').token_id.count())
+	tokens.to_csv('./data/tokens.csv', index=False)
 
 
 def scrape_solana_explorer():

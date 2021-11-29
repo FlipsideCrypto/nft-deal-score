@@ -1,11 +1,4 @@
 server <- function(input, output, session) {
-	# load
-	# list of token_ids
-	# price distribution and average
-
-	# select the token id
-	# input the price
-	# output the deal score
 	load('data.Rdata')
 
 	with_tooltip <- function(value, tooltip) {
@@ -17,7 +10,13 @@ server <- function(input, output, session) {
 		selected <- getCollection()
 		floor_1 <- as.numeric(input$floorprice)
 		floor_0 <- coefsdf[ collection == eval(selected) ]$floor_price[1]
-		if (is.na(floor_1)) {
+		if (length(floor_0) == 0 | is.na(floor_0)) {
+			l <- c(1, 1)
+			return(l)
+		}
+		if (length(floor_1) == 0) {
+			floor_1 <- floor_0
+		} else if (is.na(floor_1)) {
 			floor_1 <- floor_0
 		}
 		floors <- c( floor_0, floor_1 )
@@ -26,10 +25,12 @@ server <- function(input, output, session) {
 
 	output$floorpriceinput <- renderUI({
 		selected <- getCollection()
+		if( length(selected) == 0 ) {
+			return(NULL)
+		}
 		textInput(
 			inputId = 'floorprice'
 			, label = NULL
-			# , value = ""
 			, width = "100%"
 			, placeholder = coefsdf[ collection == eval(selected) ]$floor_price[1]
 		)
@@ -39,7 +40,6 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			# , selected = pred_price$collection[1]
 			, selected = 'smb'
 			, choices = unique(pred_price$collection)
 			, width = "100%"
@@ -48,11 +48,13 @@ server <- function(input, output, session) {
 
 	output$nftselect <- renderUI({
 		selected <- getCollection()
+		if( length(selected) == 0 ) {
+			return(NULL)
+		}
 		selectInput(
 			inputId = 'tokenid'
 			, label = NULL
 			, selected = NULL
-			# , selected = '1'
 			, choices = pred_price[collection == eval(selected)]$token_id
 			, width = "100%"
 		)
@@ -68,12 +70,13 @@ server <- function(input, output, session) {
 		id <- getTokenId()
 		t <- ""
 		selected <- getCollection()
+		if( length(id) == 0 | length(selected) == 0 ) {
+			return(t)
+		}
 		title <- ifelse(selected == 'smb', toupper(selected), toTitleCase(selected))
 		if (!is.na(id)) {
 			t <- paste0(title," #", id)
 		}
-		# print("output$tokenid")
-		# print(paste0(id, t))
 		paste0(t)
 	})
 
@@ -81,6 +84,9 @@ server <- function(input, output, session) {
 		id <- getTokenId()
 		selected <- getCollection()
 		t <- ""
+		if( length(id) == 0 | length(selected) == 0 ) {
+			return(t)
+		}
 		if (!is.na(id) & !is.na(selected)) {
 			cur_0 <- pred_price[collection == eval(selected) ]
 			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
@@ -107,6 +113,9 @@ server <- function(input, output, session) {
 
 	getConvertedPrice <- reactive({
 		selected <- getCollection()
+		if( length(selected) == 0 ) {
+			return(NULL)
+		}
 		log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
 		lin_coef <- coefsdf[ collection == eval(selected) ]$lin_coef[1]
 		tot <- log_coef + lin_coef
@@ -133,13 +142,14 @@ server <- function(input, output, session) {
 		selected <- getCollection()
 
 		t <- ""
-		if (!is.na(id)) {
+		if( length(id) == 0 ) {
+			return(t)
+		}
+		if ( !is.na(id) ) {
 			cur <- pred_price[ token_id == eval(as.numeric(input$tokenid)) & collection == eval(selected) ]
 			p_0 <- cur$pred_price[1]
 			tuple <- getConvertedPrice()
 			p_1 <- adjust_price(p_0, tuple)
-			# p_1 <- (p_0 + tuple[1]) + (p_0 * tuple[2])
-			# print(paste0("f_0=",f_0,". f_1=",f_1,". p_0=",p_0,". pct_chg=",pct_chg,". abs_chg=",abs_chg,". rat=",rat,". p_1=",p_1,""))
 			if (nrow(cur)) {
 				t <- paste0("Fair Market Price: ", (format(p_1, digits=3, decimal.mark=".",big.mark=",")))
 			}
@@ -148,29 +158,33 @@ server <- function(input, output, session) {
 	})
 
 	output$tokenimg <- renderUI({
-		token_id <- getTokenId()
-		collection <- getCollection()
-		t <- tags$img(src = paste0("img/",token_id,".png"))
-		if (TRUE | collection == 'Hashmasks') {
-			t <- tags$img(src = paste0("img/",collection,"/",token_id,".png"))
-		}
+		id <- getTokenId()
+		selected <- getCollection()
+		src <- tokens[ (collection == eval(selected)) & (token_id == eval(id)) ]$image_url[1]
+		t <- tags$img(src = src)
 		t
 	})
 
 	getAttributesTable <- reactive({
 		id <- getTokenId()
 		selected <- getCollection()
+		if( length(id) == 0 | length(selected) == 0 ) {
+			return(head(attributes, 0))
+		}
 		cur <- attributes[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
 		cur <- merge( cur, feature_values[collection == eval(selected), list(feature, value, pct_vs_baseline) ], all.x=TRUE )
+		cur <- cur[order(rarity)]
 		return(cur)
 	})
 
 	output$attributestable <- renderReactable({
 		data <- getAttributesTable()
+		if( nrow(data) == 0 ) {
+			return(NULL)
+		}
 		data[, rarity := paste0(format(round(rarity*100, 2), digits=4, decimal.mark="."),'%') ]
 		reactable(data[, list( feature, value, rarity, pct_vs_baseline )],
 			defaultColDef = colDef(
-				#align = "center",
 				headerStyle = list(background = "#10151A")
 			),
 			defaultPageSize = 5,
@@ -194,11 +208,12 @@ server <- function(input, output, session) {
 
 	output$featurestable <- renderReactable({
 		selected <- getCollection()
+		if( length(selected) == 0 ) {
+			return(NULL)
+		}
 		data <- feature_values[ collection == eval(selected)]
-		print(unique(data$collection))
 		reactable(data[, list( feature, value, rarity, pct_vs_baseline )],
 			defaultColDef = colDef(
-				#align = "center",
 				headerStyle = list(background = "#10151A")
 			),
 			borderless = TRUE,
@@ -219,9 +234,10 @@ server <- function(input, output, session) {
 
 	output$nftstable <- renderReactable({
 		selected <- getCollection()
-		# data <- pred_price[ collection == eval(selected), list( token_id, rk, pred_price, attribute_count, type, clothes, ears, mouth, eyes, hat, background )]
+		if( length(selected) == 0 ) {
+			return(NULL)
+		}
 		data <- pred_price[ collection == eval(selected), list( token_id, rk, pred_price )]
-		# data[, pred_price := paste0(format(pred_price, digits=3, decimal.mark=".", big.mark=",")) ]
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
 		data[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
@@ -238,21 +254,16 @@ server <- function(input, output, session) {
 				token_id = colDef(name = "Token ID", align = "left"),
 				rk = colDef(name = "Rank", align = "left"),
 				pred_price = colDef(name = "Fair Market Price", align = "left")
-				# character = colDef(name = "Character", align = "left"),
-				# eyecolor = colDef(name = "Eye Color", align = "left"),
-				# item = colDef(name = "Item", align = "left"),
-				# mask = colDef(name = "Mask", align = "left"),
-				# skincolor = colDef(name = "Skin Color", align = "left")
 			)
 	    )
 	})
 
 	output$salestable <- renderReactable({
 		selected <- getCollection()
-		# data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred, attribute_count, type, clothes, ears, mouth, eyes, hat, background )]
+		if( length(selected) == 0 ) {
+			return(NULL)
+		}
 		data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred )]
-		print(paste0('salestable collection = ', selected))
-		print(unique(data$collection))
 		data[, price := paste0(format(price, scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
 		data[, pred := paste0(format(round(pred, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
 		reactable(data,
@@ -267,11 +278,6 @@ server <- function(input, output, session) {
 				block_timestamp = colDef(name = "Sale Date", align = "left"),
 				price = colDef(name = "Price", align = "left"),
 				pred = colDef(name = "Fair Market Price", align = "left")
-				# character = colDef(name = "Character", align = "left"),
-				# eyecolor = colDef(name = "Eye Color", align = "left"),
-				# item = colDef(name = "Item", align = "left"),
-				# mask = colDef(name = "Mask", align = "left"),
-				# skincolor = colDef(name = "Skin Color", align = "left")
 			)
 	    )
 	})
@@ -280,6 +286,9 @@ server <- function(input, output, session) {
 		id <- getTokenId()
 		selected <- getCollection()
 		tuple <- getConvertedPrice()
+		if( length(id) == 0 | length(selected) == 0 ) {
+			return(data.table())
+		}
 		cur <- pred_price[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
 		mu_0 <- cur$pred_price[1]
 		sd <- cur$pred_sd[1]
@@ -291,6 +300,10 @@ server <- function(input, output, session) {
 		r <- (mx - mn) / 100
 
 		plot_data <- data.table()
+
+		if( is.na(mu) ) {
+			return(plot_data)
+		}
 
 		for (i in c(.2, .4, .6, .8)) {
 			x <- round(qnorm(i, mean = mu, sd = sd), 1)
@@ -362,6 +375,9 @@ server <- function(input, output, session) {
 	output$pricedistributionplot <- renderPlotly({
 
 		plot_data <- getPriceDistributionData()
+		if( nrow(plot_data) == 0 ) {
+			return(NULL)
+		}
 
 		fig <- plot_ly(
 			data = plot_data,
@@ -373,9 +389,6 @@ server <- function(input, output, session) {
 			fillcolor = ~fillcolor,
 			alpha_stroke = 0.0,
 			hoveron = 'points+fills',
-			# line = list(
-			#   color = fillcolor
-			# ),
 			text = ~points_hover,
 			hoverinfo = 'text'
 		)
@@ -408,15 +421,15 @@ server <- function(input, output, session) {
 
 	getListingData <- reactive({
 		selected <- getCollection()
+		if( length(selected) == 0 ) {
+			return(data.table())
+		}
 
 		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd) ])
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
 		df[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
 		df[, pred_price := pmax( eval(floors[2]), pred_price) ]
-		# df[, pred_price := pred_price + eval(tuple[1]) + (pred_price * eval(tuple[2])) ]
-		# df[, pred_price := pmax( floor, pred_price) ]
-		# df[, pred_price := mapply( adjust_price, pred_price, eval(tuple))  ]
 		df[, deal_score := ((pred_price - price) * 50 / (4 * pred_sd)) + 50  ]
 		df[, deal_score := round(pmin( 100, pmax(0, deal_score) ))  ]
 		df[, pred_price := round(pred_price) ]
@@ -427,7 +440,11 @@ server <- function(input, output, session) {
 
 
 	output$listingplot <- renderPlotly({
+		req(input$tokenid)
 		df <- getListingData()
+		if( nrow(df) == 0 ) {
+			return(NULL)
+		}
 		df <- df[ deal_score >= 10 ]
 		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
 
@@ -440,17 +457,10 @@ server <- function(input, output, session) {
 			text = ~hover_text,
 			hoverinfo = 'text',
 			type = 'scatter',
+			mode = 'markers',
 			marker = list(
 				size = 10,
-				# opacity = 0.5,
-				# fillcolor = ~deal_score,
 				color = ~deal_score,
-				# color = 'rgba(255, 182, 193, .9)',
-				# line = list(
-				# 	color = ~deal_score,
-				# 	width = 2,
-				# 	opacity = 1.0
-				# ),
 				colorbar=list(
 					title = list(
 						text = 'Deal Score',
@@ -463,13 +473,10 @@ server <- function(input, output, session) {
 				colorscale = list(
 					c(0, 'rgb(237, 41, 56)'), 
 					list(1, 'rgb(0, 255, 127)')
-					# c(0, 'rgb(255, 0, 0)'), 
-					# list(1, 'rgb(0, 255, 0)')
 				),
 				cauto = F,
 				cmin = 0,
 				cmax = 100
-				# reversescale = TRUE
 			)
 		) %>% onRender("
 			function(el, x) {
@@ -491,40 +498,20 @@ server <- function(input, output, session) {
 
 		fig <- fig %>% layout(
 			showlegend = FALSE
-			# legend = list(
-			# 	title = "Deal Score",
-			# 	font = list(
-			# 		color = 'white'
-			# 	)
-			# )
 			, xaxis = list(
 				title = "Listed Price"
-				# , showgrid = FALSE
-				# , tickprefix = "$"
-				# , font = list(family = "Inter")
-				# , fixedrange = TRUE
 				, color = 'white'
-				# , rangemode = "tozero"
-				# , type = "log"
 			)
 			, yaxis= list(
 				title = "Fair Market Price"
-				# , showticklabels = FALSE
-				# , visible = FALSE
-				# , automargin = FALSE
-				# , showgrid = FALSE
-				# , zeroline = FALSE
-				# , dividerwidth = 0
-				# , standoff = 0
 				, color = 'white'
-				# , rangemode = "tozero"
-				# , type = "log"
 			)
 			, plot_bgcolor = plotly.style$plot_bgcolor
 			, paper_bgcolor = plotly.style$paper_bgcolor
 		) %>%
 		plotly::config(displayModeBar = FALSE) %>%
 		plotly::config(modeBarButtonsToRemove = c("zoomIn2d", "zoomOut2d"))
+		event_register(fig, 'plotly_click')
 	})
 
 	output$listingurl <- renderUI({
@@ -542,6 +529,9 @@ server <- function(input, output, session) {
 	output$howrareisurl <- renderUI({
 		id <- getTokenId()
 		selected <- getCollection()
+		if( length(id) == 0 | length(selected) == 0 ) {
+			return(NULL)
+		}
 		if (selected == 'thugbirdz') {
 			id <- str_pad(id, 4, pad='0')
 		}
@@ -551,6 +541,7 @@ server <- function(input, output, session) {
     })
 
 	observe({
+		req(input$tokenid)
 		ed <- event_data("plotly_click", source = "listingLink")
 		if(!is.null(ed$key[1])) {
 			updateTextInput(session = session, inputId = "tokenid", value = ed$key[1])
@@ -560,6 +551,9 @@ server <- function(input, output, session) {
 
 	output$listingtable <- renderReactable({
 		df <- getListingData()
+		if( nrow(df) == 0 ) {
+			return(NULL)
+		}
 
 		reactable(df,
 			defaultColDef = colDef(

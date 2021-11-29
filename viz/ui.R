@@ -26,12 +26,9 @@ fluidPage(
 	}),
 	withTags({
 		section(class="hero",
-			# img(src = 'fliptrans.png', width = '100px'),
-			# img(src = 'img/14555.png', width = '100px'),
 			img(class = "barcode", src = 'barcode.png', width = '100px'),
-			h1(class="thorchain-header", "NFT Deal Score App", span(class="beta", "beta")),
+			h1(class="header", "NFT Deal Score App", span(class="beta", "beta")),
 			p("Check if an NFT listing is a deal, a steal, or a rip-off"),
-			# uiOutput("updatedat")
 		)
 	})
 	, fluidRow(
@@ -63,7 +60,6 @@ fluidPage(
 				class = "title"
 				, textOutput("tokenid")
 				, div(class = "subtitle", textOutput("tokenrank") )
-				# , div(class = "subtitle", a(href="https://howrare.is/", textOutput("hrirank")) )
 			)
 			, fluidRow(
 				column(6
@@ -103,7 +99,6 @@ fluidPage(
 		, h2("NFT Rankings", icon(class="padding-left-10", id="nft-rankings-tooltip", "info-circle"))
 		, bsTooltip(id = "nft-rankings-tooltip", title = "Fair market price is based on training a machine learning model on historical sales data", placement = "bottom", trigger = "hover")
 		, div(class = "table", reactableOutput("nftstable"))
-		# , div(class = "table", DT::dataTableOutput("nftstable"))
 		, div(class = "description", 'Fair market price is based on training a machine learning model on historical sales data')
 	)
 	, fluidRow(
