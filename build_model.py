@@ -37,7 +37,7 @@ def clean_colnames(df):
 
 def standardize_df(df, cols, usedf=None):
     for c in cols:
-        print(c)
+        # print(c)
         if type(usedf) != type(pd.DataFrame()):
             usedf = df
         mu = usedf[c].mean()
