@@ -40,7 +40,9 @@ fluidPage(
 		, column(4
 			, div(
 				class = "inputtitle"
-				, "Select an NFT"
+				, "Select a Token ID"
+				, icon(id="select-token-tooltip", "info-circle")
+				, bsTooltip(id = "select-token-tooltip", title = "To search for a token, delete and then type in the desired token", placement = "bottom", trigger = "hover")
 			)
 			, fluidRow(uiOutput("nftselect"))
 		)
