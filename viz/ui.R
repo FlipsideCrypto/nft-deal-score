@@ -1,11 +1,13 @@
 fluidPage(
 	title = "Flipside: NFT Deal Score App",
+    useShinyjs(),
 	tags$head(
 		tags$link(rel = "stylesheet", type = "text/css", href = "styles.css"),
 		tags$link(rel = "icon", href = "fliptrans.png"),
 	    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Roboto+Mono"),
 	    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Inter")
 	),
+	tags$head(tags$script(src = "mixpanel.js")),
 	tags$style(type="text/css",
 		".shiny-output-error { visibility: hidden; }",
 		".shiny-output-error:before { visibility: hidden; }"
@@ -13,62 +15,105 @@ fluidPage(
 	withTags({
 		header(class="top-banner",
 		  section(
-		    a(class="fs-logo", href="https://www.flipsidecrypto.com", "Powered by Flipside Crypto"),
+		    a(class="fs-logo", href="https://www.flipsidecrypto.com", "Powered by Flipside Crypto", onclick = "mixpanel.track('nft-click-flipside-icon')"),
 		    section(class="socials",
-		      a(class="twitter", href="https://twitter.com/flipsidecrypto", "Twitter"),
-		      a(class="linkedin", href="https://www.linkedin.com/company/flipside-crypto", "LinkedIn"),
-		      a(class="discord", href="https://flipsidecrypto.com/discord", "Discord"),
-		      a(href="https://app.flipsidecrypto.com/auth/signup/velocity", "Sign Up")
+		      a(class="twitter", href="https://twitter.com/flipsidecrypto", "Twitter", onclick = "mixpanel.track('nft-click-twitter-icon')"),
+		      a(class="linkedin", href="https://www.linkedin.com/company/flipside-crypto", "LinkedIn", onclick = "mixpanel.track('nft-click-linkedin-icon')"),
+		      a(class="discord", href="https://flipsidecrypto.com/discord", "Discord", onclick = "mixpanel.track('nft-click-discord-icon')"),
+		      a(href="https://app.flipsidecrypto.com/auth/signup/velocity", "Sign Up", onclick = "mixpanel.track('nft-click-signup-icon')")
 		    )
 		  )
 		)
 	}),
 	withTags({
 		section(class="hero",
-			# img(src = 'fliptrans.png', width = '100px'),
-			# img(src = 'img/14555.png', width = '100px'),
 			img(class = "barcode", src = 'barcode.png', width = '100px'),
-			h1(class="thorchain-header", "NFT Deal Score App", span(class="beta", "beta")),
+			h1(class="header", "NFT Deal Score App", span(class="beta", "beta")),
 			p("Check if an NFT listing is a deal, a steal, or a rip-off"),
-			# uiOutput("updatedat")
 		)
 	})
 	, fluidRow(
+		column(4
+			, div(class = "inputtitle", "Select a Collection")
+			, fluidRow(uiOutput("collectionselect"))
+		)
+		, column(4
+			, div(
+				class = "inputtitle"
+				, "Select an NFT"
+			)
+			, fluidRow(uiOutput("nftselect"))
+		)
+		, column(4
+			, div(
+				class = "inputtitle"
+				, "Floor Price"
+				, icon(id="floor-price-tooltip", "info-circle")
+				, bsTooltip(id = "floor-price-tooltip", title = "Update this number to the current floor price of the collection, which will update the rest of the numbers on this page", placement = "bottom", trigger = "hover")
+			)
+			, fluidRow(uiOutput("floorpriceinput"))
+		)
+	)
+	, fluidRow(
 		class="grey8row"
 		, fluidRow(
-			column(6
-				, div(class = "inputtitle", "Select an NFT")
-				, fluidRow(uiOutput("nftselect"))
+			div(
+				class = "title"
+				, textOutput("tokenid")
+				, div(class = "subtitle", textOutput("tokenrank") )
 			)
-			, column(6
-				, div(class = "inputtitle", "Set the Price ($)")
-				, fluidRow(uiOutput("priceinput"))
-			)
-		)
-		, fluidRow(
-			div(class = "title", textOutput("tokenid"), div(class = "subtitle", textOutput("tokenrank")))
-			
 			, fluidRow(
-				column(4, div(class = "token-img", uiOutput("tokenimg")))
-				, column(8, div(class = "table", reactableOutput("attributestable")))
+				column(6
+					, div(class = "token-img", uiOutput("tokenimg"))
+				)
+				, column(6, div(
+					class = "table"
+					, reactableOutput("attributestable")
+					, bsTooltip(id = "value-tooltip", title = "Represents the dollar impact this feature has on the price vs the floor", placement = "bottom", trigger = "hover")
+					)
+				)
 			)
-			, div(class = "title", textOutput("fairmarketprice"))
-			, plotlyOutput("pricedistributionplot", height = 250)
+			, div(
+				class = 'light-container'
+				, div(class = "title", textOutput("fairmarketprice"))
+				, plotlyOutput("pricedistributionplot", height = 250)
+			)
+			, div(class = "link", uiOutput('howrareisurl'))
 		)
 	)
 	, fluidRow(
 		class="grey8row"
-		, h2("NFT Rankings")
+		, h2("Listings", icon(class="padding-left-10", id="listings-tooltip", "info-circle"))
+		, bsTooltip(id = "listings-tooltip", title = "Plot only shows listings with deal score > 10; Click a dot to select the token", placement = "bottom", trigger = "hover")
+		, div(
+			class = "listing-plot"
+			, plotlyOutput("listingplot", height = 500)
+			, div(class='description', 'Plot only shows listings with deal score > 10')
+			, div(class='description', 'Click a dot to select the token')
+		)
+		, div(class = "table", reactableOutput("listingtable"))
+		, div(class = "description", 'This app is still in beta - listings may not be up-to-date')
+		, div(class = "link", uiOutput('listingurl'))
+	)
+	, fluidRow(
+		class="grey8row"
+		, h2("NFT Rankings", icon(class="padding-left-10", id="nft-rankings-tooltip", "info-circle"))
+		, bsTooltip(id = "nft-rankings-tooltip", title = "Fair market price is based on training a machine learning model on historical sales data", placement = "bottom", trigger = "hover")
 		, div(class = "table", reactableOutput("nftstable"))
+		, div(class = "description", 'Fair market price is based on training a machine learning model on historical sales data')
 	)
 	, fluidRow(
 		class="grey8row"
-		, h2("Historical Sales")
+		, h2("Historical Sales", icon(class="padding-left-10", id="historical-sales-tooltip", "info-circle"))
+		, bsTooltip(id = "historical-sales-tooltip", title = "This app is still in beta - sales data may be incomplete or delayed", placement = "bottom", trigger = "hover")
 		, div(class = "table", reactableOutput("salestable"))
+		, div(class = "description", 'This app is still in beta - sales data may be incomplete or delayed')
 	)
 	, fluidRow(
 		class="grey8row"
-		, h2("Feature Summary")
+		, h2("Feature Summary", icon(class="padding-left-10", id="feature-summary-tooltip", "info-circle"))
+		, bsTooltip(id = "feature-summary-tooltip", title = "Shows the rarity and estimated price impact of each feature", placement = "bottom", trigger = "hover")
 		, div(class = "table", reactableOutput("featurestable"))
+		, div(class = "description", 'Shows the rarity and estimated price impact of each feature')
 	)
 )

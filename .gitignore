@@ -3,3 +3,5 @@
 *.Rdata
 *.csv
 .Rproj.user
+*.DS_Store
+*.Rhistory
