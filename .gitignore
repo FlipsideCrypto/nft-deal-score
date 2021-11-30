@@ -2,3 +2,4 @@
 *.usr
 *.Rdata
 *.csv
+.Rproj.user
