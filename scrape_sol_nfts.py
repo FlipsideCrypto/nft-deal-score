@@ -34,7 +34,6 @@ def scrape_listings():
 	data = []
 	# collections = [ 'aurory','thugbirdz','meerkatmillionaires','aurory','degenapes' ]
 	collections = [ 'aurory','thugbirdz','smb','degenapes' ]
-	# collections = [ 'smb' ]
 	d = {
 		'smb': 'solana-monkey-business'
 		, 'degenapes': 'degen-ape-academy'
@@ -69,6 +68,7 @@ def scrape_listings():
 							price = row.find_all('div', {'col-id':'price'})
 							if len(token_id) and len(price):
 								token_id = int(token_id[0].text)
+								price = float(price[0].text)
 								if not token_id in seen:
 									data += [[ collection, token_id, price ]]
 									seen.append(token_id)
@@ -87,6 +87,10 @@ def scrape_listings():
 				has_more = False
 				break
 	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
+	pred_price = pd.read_csv('./data/pred_price.csv')
+	df = listings.merge(pred_price[['collection','token_id','pred_price']])
+	df['ratio'] = df.pred_price / df.price
+	print(df[df.collection == 'smb'].sort_values('ratio', ascending=0).head())
 	listings[ listings.collection == 'smb' ].head()
 	print(listings.groupby('collection').token_id.count())
 	listings.to_csv('./data/listings.csv', index=False)
@@ -358,3 +362,4 @@ def scratch():
 	o_sales.head()
 	o_sales.to_csv('./data/md_sales.csv', index=False)
 
+scrape_listings()

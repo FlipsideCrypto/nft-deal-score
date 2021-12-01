@@ -33,6 +33,7 @@ server <- function(input, output, session) {
 			, label = NULL
 			, width = "100%"
 			, placeholder = coefsdf[ collection == eval(selected) ]$floor_price[1]
+			, value = min(listings[ collection == eval(selected) ]$price)
 		)
 	})
 
@@ -54,7 +55,6 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'tokenid'
 			, label = NULL
-			, selected = NULL
 			, choices = pred_price[collection == eval(selected)]$token_id
 			, width = "100%"
 		)

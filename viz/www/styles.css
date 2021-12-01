@@ -1,6 +1,9 @@
 /******************/
 /*     Header     */
 /******************/
+#tokenid {
+  padding-bottom: 5px;
+}
 .beta {
   opacity: 0.3;
   font-size: 14px;
