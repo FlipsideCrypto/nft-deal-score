@@ -99,7 +99,7 @@ fluidPage(
 			, div(class='description', 'Click a dot to select the token')
 		)
 		, div(class = "table", reactableOutput("listingtable"))
-		, div(class = "description", 'This app is still in beta - listings may not be up-to-date')
+		, div(class = "description", 'This app is still in beta - listings updates will be periodic (but at least 3x a week)')
 		, div(class = "link", uiOutput('listingurl'))
 	)
 	, fluidRow(
