@@ -1,5 +1,5 @@
 fluidPage(
-	title = "Flipside: NFT Deal Score App",
+	title = "Solana NFT Deal Score",
     useShinyjs(),
 	tags$head(
 		tags$link(rel = "stylesheet", type = "text/css", href = "styles.css"),
@@ -28,7 +28,12 @@ fluidPage(
 	withTags({
 		section(class="hero",
 			img(class = "barcode", src = 'barcode.png', width = '100px'),
-			h1(class="header", "NFT Deal Score App", span(class="beta", "beta")),
+			h1(
+				class="header", 
+				"Solana NFT Deal Score", 
+				span(id="beta-text-tooltip", class="beta", "beta")
+				, bsTooltip(id = "beta-text-tooltip", title = "This is a pilot app with 4 collections; plan is to expand to more collections and more chains!", placement = "right", trigger = "hover")
+			),
 			p("Check if an NFT listing is a deal, a steal, or a rip-off"),
 		)
 	})
@@ -42,7 +47,7 @@ fluidPage(
 				class = "inputtitle"
 				, "Select a Token ID"
 				, icon(id="select-token-tooltip", "info-circle")
-				, bsTooltip(id = "select-token-tooltip", title = "To search for a token, delete and then type in the desired token", placement = "bottom", trigger = "hover")
+				, bsTooltip(id = "select-token-tooltip", title = "To search for a token, delete and then type in the desired token id", placement = "bottom", trigger = "hover")
 			)
 			, fluidRow(uiOutput("nftselect"))
 		)
@@ -94,7 +99,7 @@ fluidPage(
 			, div(class='description', 'Click a dot to select the token')
 		)
 		, div(class = "table", reactableOutput("listingtable"))
-		, div(class = "description", 'This app is still in beta - listings may not be up-to-date')
+		, div(class = "description", 'This app is still in beta - listings updates will be periodic (but at least 3x a week)')
 		, div(class = "link", uiOutput('listingurl'))
 	)
 	, fluidRow(
