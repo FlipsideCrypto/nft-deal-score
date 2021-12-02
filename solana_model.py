@@ -343,7 +343,7 @@ for collection in s_df.collection.unique():
     pe_sd = df[ (df.pct_err > -.9) & (df.pct_err < 0.9) ].pct_err.std()
     pe_sd = df[ (df.pct_err > -.9) & (df.pct_err < 0.9) & (df.days_ago<=50) ].pct_err.std()
     df['pred_price'] = df.pred#.apply(lambda x: x*(1+pe_mu) )
-    df['pred_sd'] = pe_sd
+    df['pred_sd'] = df.pred * pe_sd
     print(df.groupby('q')[['err','pred',target_col]].mean())
     print(df[df.weight >= df.weight.median()].groupby('q')[['err','pred',target_col]].mean())
     # df.err.mean()

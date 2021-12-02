@@ -16,18 +16,6 @@ os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
 browser = webdriver.Chrome()
-'''
-sudo cp ~/nft-deal-score/viz/ui.R /srv/shiny-server/nft-deal-score/
-sudo cp ~/nft-deal-score/viz/server.R /srv/shiny-server/nft-deal-score/
-sudo cp ~/nft-deal-score/viz/www/styles.css /srv/shiny-server/nft-deal-score/www/
-sudo cp ~/nft-deal-score/viz/data.Rdata /srv/shiny-server/nft-deal-score/
-
-sudo touch /srv/shiny-server/nft-deal-score/ui.R
-sudo touch /srv/shiny-server/nft-deal-score/server.R
-sudo touch /srv/shiny-server/nft-deal-score/www/styles.css
-sudo touch /srv/shiny-server/nft-deal-score/data.Rdata
-
-'''
 
 def scrape_recent_sales():
 	o_sales = pd.read_csv('./data/sales.csv')
@@ -378,5 +366,5 @@ def scratch():
 	o_sales.head()
 	o_sales.to_csv('./data/md_sales.csv', index=False)
 
-scrape_listings(['smb'])
-scrape_listings(['smb','aurory','degenapes','thugbirdz'])
+# scrape_listings(['smb'])
+# scrape_listings(['smb','aurory','degenapes','thugbirdz'])
