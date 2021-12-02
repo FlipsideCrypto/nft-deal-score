@@ -153,7 +153,7 @@ server <- function(input, output, session) {
 			tuple <- getConvertedPrice()
 			p_1 <- adjust_price(p_0, tuple)
 			if (nrow(cur)) {
-				t <- paste0("Fair Market Price: ", (format(p_1, digits=3, decimal.mark=".",big.mark=",")))
+				t <- paste0("Fair Market Price: ", (format(p_1, digits=3, decimal.mark=".",big.mark=",")), " SOL")
 			}
 		}
 		paste0(t)
@@ -369,7 +369,7 @@ server <- function(input, output, session) {
 			)
 		)]
 
-		plot_data[, points_hover := paste0("<b>$", format(x, big.mark=","), "</b><br>",deal,"<br>Deal Score: ",deal_score,"")]
+		plot_data[, points_hover := paste0("<b>", format(x, big.mark=","), "</b><br>",deal,"<br>Deal Score: ",deal_score,"")]
 		plot_data <- plot_data[ x > 0 ]
 		return( plot_data )
 	})
