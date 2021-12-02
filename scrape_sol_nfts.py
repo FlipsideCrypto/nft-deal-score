@@ -16,6 +16,18 @@ os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
 browser = webdriver.Chrome()
+'''
+sudo cp ~/nft-deal-score/viz/ui.R /srv/shiny-server/nft-deal-score/
+sudo cp ~/nft-deal-score/viz/server.R /srv/shiny-server/nft-deal-score/
+sudo cp ~/nft-deal-score/viz/www/styles.css /srv/shiny-server/nft-deal-score/www/
+sudo cp ~/nft-deal-score/viz/data.Rdata /srv/shiny-server/nft-deal-score/
+
+sudo touch /srv/shiny-server/nft-deal-score/ui.R
+sudo touch /srv/shiny-server/nft-deal-score/server.R
+sudo touch /srv/shiny-server/nft-deal-score/www/styles.css
+sudo touch /srv/shiny-server/nft-deal-score/data.Rdata
+
+'''
 
 def scrape_recent_sales():
 	o_sales = pd.read_csv('./data/sales.csv')
@@ -30,10 +42,11 @@ def scrape_recent_sales():
 		cur['sale_date'] = cur.date.apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S.000Z'))
 		sales = sales.append( cur[['collection','token_id','price','sale_date']] )
 
-def scrape_listings():
+def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ]):
 	data = []
 	# collections = [ 'aurory','thugbirdz','meerkatmillionaires','aurory','degenapes' ]
-	collections = [ 'aurory','thugbirdz','smb','degenapes' ]
+	# collections = [ 'aurory','thugbirdz','smb','degenapes' ]
+	# collections = [ 'smb' ]
 	d = {
 		'smb': 'solana-monkey-business'
 		, 'degenapes': 'degen-ape-academy'
@@ -86,13 +99,16 @@ def scrape_listings():
 			else:
 				has_more = False
 				break
+	old = pd.read_csv('./data/listings.csv')
 	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
+	old = old[ -(old.collection.isin(listings.collection.unique())) ]
 	pred_price = pd.read_csv('./data/pred_price.csv')
 	df = listings.merge(pred_price[['collection','token_id','pred_price']])
 	df['ratio'] = df.pred_price / df.price
 	print(df[df.collection == 'smb'].sort_values('ratio', ascending=0).head())
 	listings[ listings.collection == 'smb' ].head()
 	print(listings.groupby('collection').token_id.count())
+	listings = listings.append(old)
 	listings.to_csv('./data/listings.csv', index=False)
 
 def scrape_solanafloor():
@@ -362,4 +378,5 @@ def scratch():
 	o_sales.head()
 	o_sales.to_csv('./data/md_sales.csv', index=False)
 
-scrape_listings()
+scrape_listings(['smb'])
+scrape_listings(['smb','aurory','degenapes','thugbirdz'])
