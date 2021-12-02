@@ -1,6 +1,8 @@
 server <- function(input, output, session) {
 	load('data.Rdata')
 
+	SD_MULT = 3
+
 	with_tooltip <- function(value, tooltip) {
 		div(style = "text-decoration: underline; text-decoration-style: dotted; cursor: help",
 		tippy(value, tooltip))
@@ -295,8 +297,8 @@ server <- function(input, output, session) {
 		mu <- adjust_price(mu_0, tuple)
 		sd <- sd * (mu / mu_0)
 
-		mn <- as.integer(max(0, mu - (sd * 4)))
-		mx <- as.integer(mu + (sd * 4))
+		mn <- as.integer(max(0, mu - (sd * SD_MULT)))
+		mx <- as.integer(mu + (sd * SD_MULT))
 		r <- (mx - mn) / 100
 
 		plot_data <- data.table()
@@ -338,7 +340,7 @@ server <- function(input, output, session) {
 		plot_data <- plot_data[order(x)]
 
 		plot_data[, deal_score := round(100 * (1 - y))]
-		plot_data[, deal_score := ((mu - x) * 50 / (4 * eval(sd))) + 50  ]
+		plot_data[, deal_score := ((mu - x) * 50 / (SD_MULT * eval(sd))) + 50  ]
 		plot_data[, deal_score := round(pmin( 100, pmax(0, deal_score) ))  ]
 		plot_data[, deal := ifelse(
 			y < 0.2, 'Great Deal'
@@ -430,7 +432,7 @@ server <- function(input, output, session) {
 		floors <- getFloors()
 		df[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
 		df[, pred_price := pmax( eval(floors[2]), pred_price) ]
-		df[, deal_score := ((pred_price - price) * 50 / (4 * pred_sd)) + 50  ]
+		df[, deal_score := ((pred_price - price) * 50 / (SD_MULT * pred_sd)) + 50  ]
 		df[, deal_score := round(pmin( 100, pmax(0, deal_score) ))  ]
 		df[, pred_price := round(pred_price) ]
 		df <- df[, list(token_id, price, pred_price, deal_score)]

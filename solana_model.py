@@ -50,6 +50,8 @@ s_df['timestamp'] = s_df.block_timestamp.astype(int)
 s_df = s_df.sort_values(['collection','block_timestamp'])
 s_df['mn_20'] = s_df.groupby('collection').price.shift(1)
 s_df = s_df.sort_values(['collection','block_timestamp'])
+s_df['days_ago'] = s_df.block_timestamp.apply(lambda x: (datetime.today() - x).days ).astype(int)
+s_df[[ 'block_timestamp','days_ago' ]].drop_duplicates(subset=['days_ago'])
 
 s_df['av_20'] = s_df.groupby('collection')['mn_20'].rolling(20).mean().reset_index(0,drop=True)
 s_df = s_df.sort_values(['collection','block_timestamp'])
@@ -339,6 +341,7 @@ for collection in s_df.collection.unique():
     df['pct_err'] = (df[target_col] / df.pred) - 1
     pe_mu = df.pct_err.mean()
     pe_sd = df[ (df.pct_err > -.9) & (df.pct_err < 0.9) ].pct_err.std()
+    pe_sd = df[ (df.pct_err > -.9) & (df.pct_err < 0.9) & (df.days_ago<=50) ].pct_err.std()
     df['pred_price'] = df.pred#.apply(lambda x: x*(1+pe_mu) )
     df['pred_sd'] = df.pred * pe_sd
     print(df.groupby('q')[['err','pred',target_col]].mean())
