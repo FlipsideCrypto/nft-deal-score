@@ -83,7 +83,7 @@ fluidPage(
 			, div(
 				class = 'light-container'
 				, div(class = "title", textOutput("fairmarketprice"))
-				, plotlyOutput("pricedistributionplot", height = 250)
+				, plotlyOutput("pricedistributionplot", height = 280)
 			)
 			, div(class = "link", uiOutput('howrareisurl'))
 		)

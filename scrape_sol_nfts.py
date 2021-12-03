@@ -7,7 +7,7 @@ import collections
 import pandas as pd
 import urllib.request
 from time import sleep
-from datetime import datetime
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from selenium import webdriver
 
@@ -16,6 +16,7 @@ os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
 browser = webdriver.Chrome()
+
 
 def scrape_recent_sales():
 	o_sales = pd.read_csv('./data/sales.csv')
@@ -30,7 +31,7 @@ def scrape_recent_sales():
 		cur['sale_date'] = cur.date.apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S.000Z'))
 		sales = sales.append( cur[['collection','token_id','price','sale_date']] )
 
-def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ]):
+def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ], alerted = []):
 	data = []
 	# collections = [ 'aurory','thugbirdz','meerkatmillionaires','aurory','degenapes' ]
 	# collections = [ 'aurory','thugbirdz','smb','degenapes' ]
@@ -47,13 +48,13 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ]):
 		has_more = True
 		page = 1
 		seen = []
-		while has_more:
+		while has_more and page < 20:
 			# scroll = browser.find_element_by_class_name('ag-center-cols-viewport')
 			print('{} page #{} ({})'.format(collection, page, len(data)))
 			sleep(3)
 			page += 1
-			for j in [20, 25, 30, 25] * 3:
-				for _ in range(3):
+			for j in [25, 30, 35, 30, 25] * 1:
+				for _ in range(1):
 					soup = BeautifulSoup(browser.page_source)
 					# for row in browser.find_elements_by_class_name('ag-row'):
 					# 	cells = row.find_elements_by_class_name('ag-cell')
@@ -98,6 +99,78 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ]):
 	print(listings.groupby('collection').token_id.count())
 	listings = listings.append(old)
 	listings.to_csv('./data/listings.csv', index=False)
+
+	listings = listings.sort_values('price')
+	t1 = listings.groupby('collection').head(1).rename(columns={'price':'t1'})
+	t2 = listings.groupby('collection').head(2).groupby('collection').tail(1).rename(columns={'price':'t2'})
+	t = t1.merge(t2, on=['collection'])
+	t['pct'] = t.t2 / t.t1
+	t['dff'] = t.t2 - t.t1
+	t = t[ (t.pct >= 1.15) | (t.dff >= 10 ) ]
+
+	pred_price = pd.read_csv('./data/pred_price.csv')[['collection','token_id','pred_price','pred_sd']]
+	pred_price = pred_price.merge(listings)
+
+	coefsdf = pd.read_csv('./data/coefsdf.csv')
+	coefsdf['tot'] = coefsdf.lin_coef + coefsdf.log_coef
+	coefsdf['lin_coef'] = coefsdf.lin_coef / coefsdf.tot
+	coefsdf['log_coef'] = coefsdf.log_coef / coefsdf.tot
+	pred_price = pred_price.merge(coefsdf)
+	floor = listings.groupby('collection').price.min().reset_index().rename(columns={'price':'floor'})
+	pred_price = pred_price.merge(floor)
+
+	pred_price['abs_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.lin_coef
+	pred_price['pct_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.log_coef
+	pred_price['pred_price'] = pred_price.apply( lambda x: x['pred_price'] + x['abs_chg'] + ( x['pct_chg'] * x['pred_price'] / x['floor_price'] ), 1 )
+	pred_price['pred_price'] = pred_price.apply( lambda x: max( x['pred_price'], x['floor']), 1 )
+	pred_price['deal_score'] = pred_price.apply( lambda x: (( x['pred_price'] - x['price'] ) * 50 / ( 3 * x['pred_sd'])) + 50  , 1 )
+	pred_price['deal_score'] = pred_price.deal_score.apply( lambda x: min(max(0, x), 100) )
+	pred_price = pred_price.sort_values(['deal_score'], ascending=[0])
+	g = pred_price.groupby('collection').head(4)[['collection','token_id','deal_score','price']]
+	n1 = g.groupby('collection').head(2).groupby('collection').head(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_1'})
+	n2 = g.groupby('collection').head(2).groupby('collection').tail(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_2'})
+	n3 = g.groupby('collection').head(3).groupby('collection').tail(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_3'})
+	g = g.merge(n1)
+	g = g.merge(n2)
+	g = g.merge(n3)
+	g['m2'] = g.ds_1 - g.ds_2
+	g['m3'] = g.ds_1 - g.ds_3
+	m1 = g.deal_score.max()
+	m2 = g.m2.max()
+	m3 = g.m3.max()
+	print(g)
+	g.to_csv('./data/tmp.csv', index=False)
+	g['id'] = g.collection+'.'+g.token_id.astype(str)
+	t['id'] = t.collection+'.'+t.token_id_x.astype(str)
+	a = list(g[ (g.m2 >= 8) | (g.m3 >= 15) ].groupby('collection').head(1).id.unique())
+	b = list(g[ (g.deal_score >= 90) ].id.unique())
+	c = list(t.id.unique())
+
+	# collections = t[ (t.pct >= 1.15) | (t.dff >= 1) ].collection.unique()
+	collections = t.id.unique()
+	to_alert = list(set(a + b + c))
+	to_alert = [ x for x in to_alert if not x in alerted ]
+	alerted += to_alert
+
+	s = '@here\n' if len(to_alert) else ''
+	if len(collections):
+		s += ', '.join(collections)
+		s += 'are listings far below floor\n'
+	s += '```'
+	g = g.sort_values('deal_score', ascending=0)
+	for row in g.iterrows():
+		row = row[1]
+		txt = '{} | {} | ${} | {}'.format( str(row['collection']).ljust(10), str(row['token_id']).ljust(5), str(round(row['price'])).ljust(3), round(row['deal_score']) )
+		s += '{}\n'.format(txt)
+	s += '```'
+	print(s)
+
+	mUrl = 'https://discord.com/api/webhooks/916027651397914634/_zrDNThkwu2ZYB4F503JNRtwhPh9EJ642rIdENawlJu1Di0dpfKT_ba045xXGCefAFvI'
+
+	data = {"content": s}
+	response = requests.post(mUrl, json=data)
+
+	return alerted
 
 def scrape_solanafloor():
 	data = []
@@ -367,4 +440,9 @@ def scratch():
 	o_sales.to_csv('./data/md_sales.csv', index=False)
 
 # scrape_listings(['smb'])
-# scrape_listings(['smb','aurory','degenapes','thugbirdz'])
+alerted = []
+for i in range(10):
+	alerted = scrape_listings(alerted = alerted)
+	sleep_to = (datetime.today() + timedelta(minutes=15)).strftime("%H:%M %p")
+	print('Sleeping until {}'.format(sleep_to))
+	sleep(60 * 15)
