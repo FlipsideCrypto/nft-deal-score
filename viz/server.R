@@ -2,6 +2,7 @@ server <- function(input, output, session) {
 	load('data.Rdata')
 
 	SD_MULT = 3
+	SD_SCALE = 2
 
 	with_tooltip <- function(value, tooltip) {
 		div(style = "text-decoration: underline; text-decoration-style: dotted; cursor: help",
@@ -295,7 +296,7 @@ server <- function(input, output, session) {
 		mu_0 <- cur$pred_price[1]
 		sd <- cur$pred_sd[1]
 		mu <- adjust_price(mu_0, tuple)
-		sd <- sd * (mu / mu_0)
+		sd <- sd * (mu / mu_0) * SD_SCALE
 
 		mn <- as.integer(max(0, mu - (sd * SD_MULT)))
 		mx <- as.integer(mu + (sd * SD_MULT))
@@ -308,19 +309,19 @@ server <- function(input, output, session) {
 		}
 
 		for (i in c(.2, .4, .6, .8)) {
-			x <- round(qnorm(i, mean = mu, sd = sd), 1)
-			if (mu >= 25) {
-				x <- ceiling(qnorm(i, mean = mu, sd = sd))
-			}
+			x <- ceiling(100*qnorm(i, mean = mu, sd = sd)) / 100
+			# if (mu >= 100) {
+			# 	x <- ceiling(qnorm(i, mean = mu, sd = sd))
+			# }
 			y <- pnorm(x, mu, sd)
 			cur <- data.table(x = x, y = y )
 			plot_data <- rbind( plot_data, cur )
 
-			if (mu >= 25) {
-				x <- x - 1
+			if (mu >= 100) {
+				x <- x - 0.01
 			}
 			else {
-				x <- x - 0.1
+				x <- x - 0.01
 			}
 			y <- pnorm(x, mu, sd)
 			cur <- data.table(x = x, y = y )
@@ -329,7 +330,7 @@ server <- function(input, output, session) {
 
 		for (i in seq(1:100)) {
 			x <- round(mn+((i-1) * r), 1)
-			if (mu >= 25) {
+			if (mu >= 100) {
 				x <- as.integer(x)
 			}
 			y <- pnorm(x, mu, sd)
@@ -337,10 +338,11 @@ server <- function(input, output, session) {
 			plot_data <- rbind( plot_data, cur )
 		}
 
+		plot_data <- unique(plot_data)
 		plot_data <- plot_data[order(x)]
 
 		plot_data[, deal_score := round(100 * (1 - y))]
-		plot_data[, deal_score := ((mu - x) * 50 / (SD_MULT * eval(sd))) + 50  ]
+		# plot_data[, deal_score := ((mu - x) * 50 / (SD_MULT * eval(sd))) + 50  ]
 		plot_data[, deal_score := round(pmin( 100, pmax(0, deal_score) ))  ]
 		plot_data[, deal := ifelse(
 			y < 0.2, 'Great Deal'
@@ -370,7 +372,7 @@ server <- function(input, output, session) {
 		)]
 
 		plot_data[, points_hover := paste0("<b>", format(x, big.mark=","), "</b><br>",deal,"<br>Deal Score: ",deal_score,"")]
-		plot_data <- plot_data[ x > 0 ]
+		plot_data <- plot_data[ x > 0 & y >= 0.004 & y <= 0.996 ]
 		return( plot_data )
 	})
 
@@ -387,31 +389,46 @@ server <- function(input, output, session) {
 			y = ~y,
 			type = 'scatter',
 			mode = 'lines',
+
+			# type = 'scatter',
+			# mode = 'markers'
 			fill = 'tozeroy',
 			fillcolor = ~fillcolor,
 			alpha_stroke = 0.0,
-			hoveron = 'points+fills',
+			# hoveron = 'points+fills',
 			text = ~points_hover,
 			hoverinfo = 'text'
 		)
 		fig <- fig %>% layout(
 			showlegend = FALSE
+			, margin = list(
+				# l = 200,
+				# r = 50,
+				# b = 100,
+				# t = 100,
+				pad = 5
+			)
 			, xaxis = list(
 				title = "Price"
 				, showgrid = FALSE
-				, tickprefix = "$"
-				, font = list(family = "Inter")
-				, fixedrange = TRUE
+				# , font = list(family = "Inter")
+				# , fixedrange = TRUE
 				, color = 'white'
+				, zeroline = TRUE
+				, nticks = 6
 			)
 			, yaxis= list(
-				showticklabels = FALSE
-				, visible = FALSE
-				, automargin = FALSE
-				, showgrid = FALSE
-				, zeroline = FALSE
-				, dividerwidth = 0
-				, standoff = 0
+				title = "Deal Score",
+				ticktext = list("100", "80", "60", "40", "20", "0"), 
+				tickvals = list(0, .2, .4, .6, .8, 1),
+				# showticklabels = FALSE
+				color = 'white'
+				# , visible = FALSE
+				# , automargin = FALSE
+				# , showgrid = FALSE
+				, zeroline = TRUE
+				# , dividerwidth = 0
+				# , standoff = 0
 			)
 			, plot_bgcolor = plotly.style$plot_bgcolor
 			, paper_bgcolor = plotly.style$paper_bgcolor
@@ -430,10 +447,13 @@ server <- function(input, output, session) {
 		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd) ])
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
+		df[, pred_price_0 := pred_price ]
 		df[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
 		df[, pred_price := pmax( eval(floors[2]), pred_price) ]
 		df[, deal_score := ((pred_price - price) * 50 / (SD_MULT * pred_sd)) + 50  ]
 		df[, deal_score := round(pmin( 100, pmax(0, deal_score) ))  ]
+		df[, deal_score := pnorm(price, pred_price, eval(SD_SCALE) * pred_sd * pred_price / pred_price_0), by = seq_len(nrow(df)) ]
+		df[, deal_score := round(100 * (1 - deal_score)) ]
 		df[, pred_price := round(pred_price) ]
 		df <- df[, list(token_id, price, pred_price, deal_score)]
 		df <- df[order(-deal_score)]
@@ -480,11 +500,7 @@ server <- function(input, output, session) {
 				cmin = 0,
 				cmax = 100
 			)
-		) %>% onRender("
-			function(el, x) {
-				Plotly.d3.select('.cursor-crosshair').style('cursor', 'pointer')
-			}
-		")
+		)
 		fig <- fig %>% add_trace(
 			data = df,
 			marker = NULL,

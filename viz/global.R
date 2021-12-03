@@ -1,3 +1,4 @@
+# setwd('~/git/nft-deal-score/viz')
 source("~/data_science/util/util_functions.R")
 library(data.table)
 library(shiny)
