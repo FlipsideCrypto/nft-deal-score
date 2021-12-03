@@ -7,9 +7,10 @@ import collections
 import pandas as pd
 import urllib.request
 from time import sleep
-from datetime import datetime, timedelta
+from scipy.stats import norm
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from datetime import datetime, timedelta
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 # os.chdir('/Users/kellenblumberg/git/nft-deal-score/viz/www/img/aurory/')
@@ -121,10 +122,13 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ], al
 
 	pred_price['abs_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.lin_coef
 	pred_price['pct_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.log_coef
+	pred_price['pred_price_0'] = pred_price.pred_price
 	pred_price['pred_price'] = pred_price.apply( lambda x: x['pred_price'] + x['abs_chg'] + ( x['pct_chg'] * x['pred_price'] / x['floor_price'] ), 1 )
 	pred_price['pred_price'] = pred_price.apply( lambda x: max( x['pred_price'], x['floor']), 1 )
-	pred_price['deal_score'] = pred_price.apply( lambda x: (( x['pred_price'] - x['price'] ) * 50 / ( 3 * x['pred_sd'])) + 50  , 1 )
-	pred_price['deal_score'] = pred_price.deal_score.apply( lambda x: min(max(0, x), 100) )
+	# pred_price['deal_score'] = pred_price.apply( lambda x: (( x['pred_price'] - x['price'] ) * 50 / ( 3 * x['pred_sd'])) + 50  , 1 )
+	# pred_price['deal_score'] = pred_price.deal_score.apply( lambda x: min(max(0, x), 100) )
+	pred_price['deal_score'] = pred_price.apply( lambda x: 100 * (1 - norm.cdf( x['price'], x['pred_price'], 2 * x['pred_sd'] * x['pred_price'] / x['pred_price_0'] )) , 1 )
+
 	pred_price = pred_price.sort_values(['deal_score'], ascending=[0])
 	g = pred_price.groupby('collection').head(4)[['collection','token_id','deal_score','price']]
 	n1 = g.groupby('collection').head(2).groupby('collection').head(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_1'})
@@ -233,7 +237,6 @@ def scrape_solanafloor():
 	print(tokens.groupby('collection').token_id.count())
 	tokens.to_csv('./data/tokens.csv', index=False)
 
-
 def scrape_solana_explorer():
 	url = 'https://explorer.solana.com/address/9uBX3ASjxWvNBAD1xjbVaKA74mWGZys3RGSF7DdeDD3F/tokens'
 	browser.get(url)
@@ -307,9 +310,12 @@ def scrape_tx():
         df = pd.DataFrame(data)
         t_df = pd.DataFrame(t_data, columns=['address','sol','details'])
 
-
 def scrape_how_rare():
 	o_metadata = pd.read_csv('./data/metadata.csv')
+
+	o_metadata[ (o_metadata.collection == 'smb') & (o_metadata.feature_name == 'type') ]
+	ts = o_metadata[ (o_metadata.collection == 'smb') & (o_metadata.feature_name == 'type') & (o_metadata.feature_value == 'Zombie (7.28%)')].token_id.unique()
+	len(ts)
 
 	errors = []
 	data = []
@@ -321,7 +327,7 @@ def scrape_how_rare():
 		'thugbirdz': 3333,
 		'meerkatmillionaires': 10000
 	}
-	k = 'degenapes'
+	k = 'smb'
 	v = 10000
 	seen = o_metadata[ (o_metadata.collection == k) ].token_id.unique()
 	opener = urllib.request.build_opener()
@@ -329,14 +335,17 @@ def scrape_how_rare():
 	urllib.request.install_opener(opener)
 	i = 1
 	j = i
-	for i in range(j, v + 1):
+	# for i in range(j, v + 1):
+	# ts = [ x[1] for x in errors ]
+	for i in ts:
 		if i in seen:
 			continue
 		t_0 = time.time()
 		print('Token ID #{}: {}'.format(i, datetime.fromtimestamp(t_0)))
-		if i> 0 and i % 25 == 1:
-			print(i, len(data))
-			sleep(20)
+		print(i, len(data))
+		# if i> 0 and i % 25 == 1:
+		# 	print(i, len(data))
+		# 	sleep(20)
 		url = 'https://howrare.is/{}/{}/'.format(k, i)
 		if k == 'thugbirdz':
 			url = 'https://howrare.is/{}/{}/'.format(k, str(i).zfill(4))
@@ -377,11 +386,11 @@ def scrape_how_rare():
 			# pass
 		data += [atts]
 		table = soup.find_all('table', class_='table')
-		img = soup.find_all('img')
-		if len(img):
-			src = img[0].attrs['src']
-			urllib.request.urlretrieve(src, './viz/www/img/{}/{}.png'.format(k, i))
-		print('Took {} seconds to load image'.format(round(time.time() - t_1, 1)))
+		# img = soup.find_all('img')
+		# if len(img):
+		# 	src = img[0].attrs['src']
+		# 	urllib.request.urlretrieve(src, './viz/www/img/{}/{}.png'.format(k, i))
+		# print('Took {} seconds to load image'.format(round(time.time() - t_1, 1)))
 		if len(table):
 			table = table[0]
 			for tr in table.find_all('tbody')[0].find_all('tr'):
@@ -390,12 +399,14 @@ def scrape_how_rare():
 				s_data += [[ k, i, td[0].text, td[2].text, td[3].find_all('a')[0].attrs['href'], td[4].find_all('a')[0].attrs['href'], tx_id ]]
 		# except:
 	df = pd.DataFrame(data)
+	# seen = list(df.token_id.unique())
 	s_df = pd.DataFrame(s_data, columns=['collection','token_id','sale_date','price','seller','buyer','tx_id'])
 	s_df['price'] = s_df.price.apply(lambda x: re.sub('SOL', '', x).strip() ).astype(float)
 	s_df['seller'] = s_df.seller.apply(lambda x: re.split('=', x)[-1] )
 	s_df['buyer'] = s_df.buyer.apply(lambda x: re.split('=', x)[-1] )
 	s_df['tx_id'] = s_df.tx_id.apply(lambda x: re.split('/', x)[-1] if x and x == x else None )
 	s_df.sort_values('price').tail(30)
+	# s_df[[ 'token_id','sale_date','price' ]].to_csv('~/Downloads/smb_zombie_sales.csv', index=False)
 
 	def reshape_df(df):
 		r_data = []
@@ -423,6 +434,8 @@ def scrape_how_rare():
 	len(s_df)
 	s_df = s_df.drop_duplicates()
 	s_df.to_csv('./data/sales.csv', index=False)
+	sales = pd.read_csv('./data/sales.csv')
+	sales[sales.collection == 'smb'][['token_id','sale_date','price']].to_csv('~/Downloads/historical_monke_sales.csv', index=False)
 
 def save_img():
 	i = 1
@@ -445,4 +458,4 @@ for i in range(10):
 	alerted = scrape_listings(alerted = alerted)
 	sleep_to = (datetime.today() + timedelta(minutes=15)).strftime("%H:%M %p")
 	print('Sleeping until {}'.format(sleep_to))
-	sleep(60 * 15)
+	sleep(60 * 25)
