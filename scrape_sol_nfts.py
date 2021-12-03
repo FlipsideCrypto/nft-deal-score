@@ -456,6 +456,6 @@ def scratch():
 alerted = []
 for i in range(10):
 	alerted = scrape_listings(alerted = alerted)
-	sleep_to = (datetime.today() + timedelta(minutes=15)).strftime("%H:%M %p")
+	sleep_to = (datetime.today() + timedelta(minutes=25)).strftime("%H:%M %p")
 	print('Sleeping until {}'.format(sleep_to))
 	sleep(60 * 25)
