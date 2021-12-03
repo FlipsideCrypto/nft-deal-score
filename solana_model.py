@@ -394,6 +394,7 @@ for collection in s_df.collection.unique():
     for a, b, c in zip(p_pred_cols, clf_lin.coef_, clf_log.coef_):
         coefs += [[ collection, a, b, c ]]
     coefs = pd.DataFrame(coefs, columns=['collection','col','lin_coef','log_coef'])
+    coefs['feature'] = coefs.col.apply(lambda x:  )
 
     data = []
     for c0 in std_pred_cols_0:
@@ -410,10 +411,12 @@ for collection in s_df.collection.unique():
         if r == r and s == s:
             datum = [ c0, rarity ]
             for c1 in std_pred_cols:
-                datum.append(1 if c1 == c0 else r if c1 == 'std_rank' else s if c1 == 'std_score' else 0)
+                datum.append(1 if c1 == c0 else r if c1 == 'std_rank' else s if c1 == 'std_score' else df[c1].mean() )
             data += [ datum ]
 
     importance = pd.DataFrame(data, columns=['feature','rarity']+std_pred_cols)
+    sorted(importance.feature.unique())
+    importance[importance.feature == 'std_fur_/_skin_Leopard']
     if 'std_timestamp' in df.columns:
         importance['std_timestamp'] = df.std_timestamp.max()
     # importance['pred_lin'] = clf_lin.predict( importance[std_pred_cols].values )
@@ -421,13 +424,16 @@ for collection in s_df.collection.unique():
 
     importance['pred_lin'] = clf_lin.predict(importance[std_pred_cols].values)
     importance['pred_lin'] = importance.pred_lin.apply(lambda x: max(0, x) + l)
+    # importance['pred_lin'] = importance.pred_lin.apply(lambda x: x + l)
     importance['pred_log'] = clf_log.predict(importance[std_pred_cols].values)
     importance['pred_log'] = importance.pred_log.apply(lambda x: max(1, x)) * l
+    # importance['pred_log'] = importance.pred_log.apply(lambda x: x) * l
 
     importance['pred'] = clf.predict( importance[[ 'pred_lin','pred_log' ]].values )
     # importance['pred'] = np.exp( (sd * model.predict(importance[std_pred_cols].values)) + mu)
     importance = importance.sort_values('pred', ascending=0)
     importance.head()[['feature','pred']]
+    importance[importance.feature == 'std_fur_/_skin_Leopard']
     importance['feature'] = importance.feature.apply(lambda x: re.sub('std_', '', x))
     importance['value'] = importance.feature.apply(lambda x: re.split('_', x)[-1])
     importance['feature'] = importance.feature.apply(lambda x: '_'.join(re.split('_', x)[:-1]))
@@ -435,6 +441,7 @@ for collection in s_df.collection.unique():
     importance = importance.merge(mn)
     importance['pred_vs_baseline'] = importance.pred - importance.baseline
     importance['pct_vs_baseline'] = (importance.pred / importance.baseline) - 1
+    importance[(importance.feature == 'fur_/_skin')].sort_values('pred')[['value','rarity','pred','pred_lin','pred_log','std_rank','std_score']].sort_values('rarity')
     importance['collection'] = collection
     importance.sort_values('pct_vs_baseline')[['feature','value','pct_vs_baseline']]
     tmp = importance[std_pred_cols].mean().reset_index()

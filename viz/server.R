@@ -175,8 +175,14 @@ server <- function(input, output, session) {
 			return(head(attributes, 0))
 		}
 		cur <- attributes[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
-		cur <- merge( cur, feature_values[collection == eval(selected), list(feature, value, pct_vs_baseline) ], all.x=TRUE )
+		cur <- merge( cur, feature_values[collection == eval(selected), list(feature, value, pred_vs_baseline, pct_vs_baseline) ], all.x=TRUE )
 		cur <- cur[order(rarity)]
+		floor <- getFloors()[2]
+		log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
+		lin_coef <- coefsdf[ collection == eval(selected) ]$lin_coef[1]
+		cur[, vs_baseline := round((pred_vs_baseline * eval(lin_coef)) + (pct_vs_baseline * eval(floor) * eval(log_coef) ), 1) ]
+		cur[, pred_vs_baseline := round(pred_vs_baseline, 1) ]
+		# cur[, vs_baseline := round(pred_vs_baseline + (pct_vs_baseline * eval(floor)), 1) ]
 		return(cur)
 	})
 
@@ -186,6 +192,7 @@ server <- function(input, output, session) {
 			return(NULL)
 		}
 		data[, rarity := paste0(format(round(rarity*100, 2), digits=4, decimal.mark="."),'%') ]
+		# reactable(data[, list( feature, value, rarity, vs_baseline, pred_vs_baseline, pct_vs_baseline )],
 		reactable(data[, list( feature, value, rarity, pct_vs_baseline )],
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
@@ -328,14 +335,22 @@ server <- function(input, output, session) {
 			plot_data <- rbind( plot_data, cur )
 		}
 
-		for (i in seq(1:100)) {
-			x <- round(mn+((i-1) * r), 1)
-			if (mu >= 100) {
-				x <- as.integer(x)
+		if (mx - mn > 100) {
+			for (x in seq(mn:mx)) {
+				y <- pnorm(x, mu, sd)
+				cur <- data.table(x = x, y = y )
+				plot_data <- rbind( plot_data, cur )
 			}
-			y <- pnorm(x, mu, sd)
-			cur <- data.table(x = x, y = y )
-			plot_data <- rbind( plot_data, cur )
+		} else {
+			for (i in seq(1:100)) {
+				x <- round(mn+((i-1) * r), 1)
+				if (mu >= 100) {
+					x <- as.integer(x)
+				}
+				y <- pnorm(x, mu, sd)
+				cur <- data.table(x = x, y = y )
+				plot_data <- rbind( plot_data, cur )
+			}
 		}
 
 		plot_data <- unique(plot_data)
