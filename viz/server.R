@@ -143,7 +143,6 @@ server <- function(input, output, session) {
 	output$fairmarketprice <- renderText({
 		id <- getTokenId()
 		selected <- getCollection()
-		print('fairmarketprice')
 
 		t <- ""
 		if( length(id) == 0 ) {
@@ -151,15 +150,9 @@ server <- function(input, output, session) {
 		}
 		if ( !is.na(id) ) {
 			cur <- pred_price[ token_id == eval(as.numeric(input$tokenid)) & collection == eval(selected) ]
-			print(input$tokenid)
-			print(selected)
-			print(cur)
 			p_0 <- cur$pred_price[1]
 			tuple <- getConvertedPrice()
 			p_1 <- adjust_price(p_0, tuple)
-			print(p_0)
-			print(tuple)
-			print(p_1)
 			if (nrow(cur)) {
 				t <- paste0("Fair Market Price: ", (format(p_1, digits=3, decimal.mark=".",big.mark=",")), " SOL")
 			}
