@@ -335,7 +335,7 @@ server <- function(input, output, session) {
 			plot_data <- rbind( plot_data, cur )
 		}
 
-		if (mx - mn > 100) {
+		if (TRUE | mx - mn > 100) {
 			for (x in seq(mn:mx)) {
 				y <- pnorm(x, mu, sd)
 				cur <- data.table(x = x, y = y )
