@@ -17,7 +17,37 @@ warnings.filterwarnings('ignore')
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
-import models
+CHECK_EXCLUDE = False
+
+###################################
+#     Define Helper Functions     #
+###################################
+def standardize_df(df, cols, usedf=None):
+    for c in cols:
+        # print(c)
+        if type(usedf) != type(pd.DataFrame()):
+            usedf = df
+        mu = usedf[c].mean()
+        sd = usedf[c].std()
+        # print(c)
+        if len(df[c].unique()) == 2 and df[c].max() == 1 and df[c].min() == 0:
+            df['std_{}'.format(c)] = df[c].apply(lambda x: (x*2) - 1 )
+        else:
+            df['std_{}'.format(c)] = (df[c] - mu) / sd
+    return(df)
+
+def calculate_percentages(df, cols=[]):
+    if not len(cols):
+        cols = df.columns
+    df['pct'] = 1
+    for c in cols:
+        g = df[c].value_counts().reset_index()
+        g.columns = [ c, 'N' ]
+        col = '{}_pct'.format(c)
+        g[col] = g.N / g.N.sum()
+        df = df.merge( g[[ c, col ]] )
+        df['pct'] = df.pct * df[col]
+    return(df)
 
 exclude = [
     # (collection, token_id, price)
@@ -35,7 +65,7 @@ s_df = s_df[[ 'collection','token_id','block_timestamp','price' ]]
 s_df = s_df[ -((s_df.collection == 'smb') & (s_df.price < 1)) ]
 
 # exclude wierd data points
-if True:
+if not CHECK_EXCLUDE:
     exclude = pd.read_csv('./data/exclude.csv')
     s_df = s_df.merge(exclude, how='left')
     s_df = s_df[s_df.exclude.isnull()]
@@ -84,6 +114,7 @@ metadata = {}
 sales = {}
 collection_features = {}
 for c in s_df.collection.unique():
+    print('Building {} model'.format(c))
     sales[c] = s_df[ s_df.collection == c ]
     pred_cols[c] = sorted(m_df[ m_df.collection == c ].feature_name.unique())
     collection_features[c] = [ c for c in pred_cols[c] if not c in ['score','rank'] ]
@@ -291,7 +322,7 @@ for collection in s_df.collection.unique():
     # df['pred_log'] = np.exp(clf_log.predict(X))
     df['pred_log'] = clf_log.predict(X)
     df['pred_log'] = df.pred_log.apply(lambda x: max(1, x)) * df.mn_20
-    clf = RidgeCV(alphas=[1.5**x for x in range(20)])
+    clf = LinearRegression(fit_intercept=False)
     clf.fit( df[['pred_lin','pred_log']].values, df[target_col].values, df.weight.values )
     print('Price = {} * lin + {} * log'.format( round(clf.coef_[0], 2), round(clf.coef_[1], 2) ))
     l = df.sort_values('block_timestamp', ascending=0).mn_20.values[0]
@@ -394,8 +425,11 @@ for collection in s_df.collection.unique():
     for a, b, c in zip(p_pred_cols, clf_lin.coef_, clf_log.coef_):
         coefs += [[ collection, a, b, c ]]
     coefs = pd.DataFrame(coefs, columns=['collection','col','lin_coef','log_coef'])
-    coefs['feature'] = coefs.col.apply(lambda x:  )
 
+    # TODO: pick the most common one and have that be the baseline
+    most_common = attributes[(attributes.collection == collection)].sort_values('rarity', ascending=0).groupby('feature').head(1)
+    most_common['col'] = most_common.apply(lambda x: 'std_{}_{}'.format( re.sub(' ', '_', x['feature'].lower()), x['value'] ), 1 )
+    mc = most_common.col.unique()
     data = []
     for c0 in std_pred_cols_0:
         if c0 in ['std_rank','std_score','std_pct','std_timestamp','std_mn_20','std_log_mn_20']:
@@ -411,7 +445,7 @@ for collection in s_df.collection.unique():
         if r == r and s == s:
             datum = [ c0, rarity ]
             for c1 in std_pred_cols:
-                datum.append(1 if c1 == c0 else r if c1 == 'std_rank' else s if c1 == 'std_score' else df[c1].mean() )
+                datum.append(1 if c1 == c0 else r if c1 == 'std_rank' else s if c1 == 'std_score' else 1 if c1 in mc else 0 )
             data += [ datum ]
 
     importance = pd.DataFrame(data, columns=['feature','rarity']+std_pred_cols)
@@ -452,6 +486,8 @@ for collection in s_df.collection.unique():
 attributes['feature'] = attributes.feature.apply(lambda x: re.sub('_', ' ', x).title() )
 feature_values['feature'] = feature_values.feature.apply(lambda x: re.sub('_', ' ', x).title() )
 
+pred_price = pred_price[[ 'collection', 'contract_address', 'token_id', 'hri_rank', 'rk', 'pred_price', 'pred_sd' ]]
+
 coefsdf.to_csv('./data/coefsdf.csv', index=False)
 salesdf.to_csv('./data/model_sales.csv', index=False)
 pred_price.to_csv('./data/pred_price.csv', index=False)
@@ -467,7 +503,7 @@ tmp['token_id'] = tmp.token_id.astype(int)
 tmp = tmp.merge(listings[['collection','token_id','price']])
 tmp.sort_values('pred_price', ascending=0)
 
-if False:
+if CHECK_EXCLUDE:
     salesdf['rat'] = salesdf.price / salesdf.pred
     salesdf['dff'] = salesdf.price - salesdf.pred
     salesdf['exclude_1'] = (((salesdf.dff >= 20) & (salesdf.rat > 4)) | ((salesdf.dff >= 40) & (salesdf.rat > 3)) | ((salesdf.dff >= 60) & (salesdf.rat > 2)) | ((salesdf.dff >= 80) & (salesdf.rat > 1))).astype(int)
@@ -485,3 +521,4 @@ attributes[ (attributes.collection == 'thugbirdz') & (attributes.token_id == '18
 feature_values[ (feature_values.collection == 'thugbirdz') & (feature_values.feature == 'position_in_gang') ]
 sorted(feature_values[ (feature_values.collection == 'thugbirdz') ].feature.unique())
 
+pred_price[pred_price.collection == 'peskypenguinclub'].head()

@@ -32,7 +32,7 @@ def scrape_recent_sales():
 		cur['sale_date'] = cur.date.apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S.000Z'))
 		sales = sales.append( cur[['collection','token_id','price','sale_date']] )
 
-def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ], alerted = []):
+def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = []):
 	data = []
 	# collections = [ 'aurory','thugbirdz','meerkatmillionaires','aurory','degenapes' ]
 	# collections = [ 'aurory','thugbirdz','smb','degenapes' ]
@@ -40,6 +40,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ], al
 	d = {
 		'smb': 'solana-monkey-business'
 		, 'degenapes': 'degen-ape-academy'
+		, 'peskypenguinclub': 'pesky-penguins'
 	}
 	for collection in collections:
 		c = d[collection] if collection in d.keys() else collection
@@ -54,7 +55,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ], al
 			print('{} page #{} ({})'.format(collection, page, len(data)))
 			sleep(3)
 			page += 1
-			for j in [25, 30, 35, 30, 25] * 1:
+			for j in [25, 30, 35, 30, 25] * 2:
 				for _ in range(1):
 					soup = BeautifulSoup(browser.page_source)
 					# for row in browser.find_elements_by_class_name('ag-row'):
@@ -120,6 +121,10 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ], al
 	floor = listings.groupby('collection').price.min().reset_index().rename(columns={'price':'floor'})
 	pred_price = pred_price.merge(floor)
 
+	metadata = pd.read_csv('./data/metadata.csv')
+	solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'skin') & (metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
+	pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 8 if x['token_id'] in solana_blob and x['collection'] == 'aurory' else x['pred_price'], 1 )
+
 	pred_price['abs_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.lin_coef
 	pred_price['pct_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.log_coef
 	pred_price['pred_price_0'] = pred_price.pred_price
@@ -178,11 +183,12 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes' ], al
 
 def scrape_solanafloor():
 	data = []
-	collections = [ 'aurory','thugbirdz','smb','degenapes' ]
-	collections = [ 'degenapes' ]
+	collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ]
+	collections = [ 'peskypenguinclub' ]
 	d = {
 		'smb': 'solana-monkey-business'
 		, 'degenapes': 'degen-ape-academy'
+		, 'peskypenguinclub': 'pesky-penguins'
 	}
 	for collection in collections:
 		c = d[collection] if collection in d.keys() else collection
@@ -197,8 +203,8 @@ def scrape_solanafloor():
 			print('{} page #{} ({})'.format(collection, page, len(data)))
 			sleep(3)
 			page += 1
-			for j in [20, 25, 30, 25] * 3:
-				for _ in range(3):
+			for j in [25, 30, 35, 30, 25] * 2:
+				for _ in range(1):
 					soup = BeautifulSoup(browser.page_source)
 					# for row in browser.find_elements_by_class_name('ag-row'):
 					# 	cells = row.find_elements_by_class_name('ag-cell')
@@ -233,7 +239,10 @@ def scrape_solanafloor():
 				has_more = False
 				break
 	tokens = pd.DataFrame(data, columns=['collection','token_id','image_url']).drop_duplicates()
+	len(tokens.token_id.unique())
 	tokens[ tokens.collection == 'degenapes' ].sort_values('token_id')
+	old = pd.read_csv('./data/tokens.csv')
+	tokens = old.append(tokens).drop_duplicates()
 	print(tokens.groupby('collection').token_id.count())
 	tokens.to_csv('./data/tokens.csv', index=False)
 
@@ -312,9 +321,9 @@ def scrape_tx():
 
 def scrape_how_rare():
 	o_metadata = pd.read_csv('./data/metadata.csv')
-
-	o_metadata[ (o_metadata.collection == 'smb') & (o_metadata.feature_name == 'type') ]
-	ts = o_metadata[ (o_metadata.collection == 'smb') & (o_metadata.feature_name == 'type') & (o_metadata.feature_value == 'Zombie (7.28%)')].token_id.unique()
+	o_metadata[ (o_metadata.collection == 'aurory') ].feature_name.unique()
+	sorted(o_metadata[ (o_metadata.collection == 'aurory') & (o_metadata.feature_name == 'skin') ].feature_value.unique())
+	ts = o_metadata[ (o_metadata.collection == 'aurory') & (o_metadata.feature_name == 'skin') & (o_metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
 	len(ts)
 
 	errors = []
@@ -325,10 +334,11 @@ def scrape_how_rare():
 		'aurory': 10000,
 		'degenapes': 10000,
 		'thugbirdz': 3333,
-		'meerkatmillionaires': 10000
+		'meerkatmillionaires': 10000,
+		'peskypenguinclub': 8888,
 	}
-	k = 'smb'
-	v = 10000
+	k = 'peskypenguinclub'
+	v = 8888
 	seen = o_metadata[ (o_metadata.collection == k) ].token_id.unique()
 	opener = urllib.request.build_opener()
 	opener.addheaders = [('User-Agent','Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1941.0 Safari/537.36')]
@@ -337,6 +347,7 @@ def scrape_how_rare():
 	j = i
 	# for i in range(j, v + 1):
 	# ts = [ x[1] for x in errors ]
+	# for i in range(j, v):
 	for i in ts:
 		if i in seen:
 			continue
@@ -430,12 +441,12 @@ def scrape_how_rare():
 
 	o_sales = pd.read_csv('./data/sales.csv').rename(columns={'block_timestamp':'sale_date'})[[ 'collection','token_id','sale_date','price' ]]
 	s_df = o_sales.append(s_df).drop_duplicates()
+	s_df = s_df.drop_duplicates()
 	print(s_df.groupby('collection').token_id.count())
 	len(s_df)
-	s_df = s_df.drop_duplicates()
 	s_df.to_csv('./data/sales.csv', index=False)
 	sales = pd.read_csv('./data/sales.csv')
-	sales[sales.collection == 'smb'][['token_id','sale_date','price']].to_csv('~/Downloads/historical_monke_sales.csv', index=False)
+	# sales[sales.collection == 'smb'][['token_id','sale_date','price']].to_csv('~/Downloads/historical_monke_sales.csv', index=False)
 
 def save_img():
 	i = 1
@@ -454,8 +465,8 @@ def scratch():
 
 # scrape_listings(['smb'])
 alerted = []
-for i in range(10):
+for i in range(1):
 	alerted = scrape_listings(alerted = alerted)
-	sleep_to = (datetime.today() + timedelta(minutes=25)).strftime("%H:%M %p")
+	sleep_to = (datetime.today() + timedelta(minutes=15)).strftime("%H:%M %p")
 	print('Sleeping until {}'.format(sleep_to))
-	sleep(60 * 25)
+	sleep(60 * 15)
