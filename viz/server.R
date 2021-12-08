@@ -44,7 +44,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'smb'
+			, selected = 'Solana Monkey Business'
 			, choices = unique(pred_price$collection)
 			, width = "100%"
 		)
@@ -76,7 +76,18 @@ server <- function(input, output, session) {
 		if( length(id) == 0 | length(selected) == 0 ) {
 			return(t)
 		}
-		title <- ifelse(selected == 'smb', toupper(selected), toTitleCase(selected))
+		title <- ifelse(
+			selected == 'Aurory'
+			, 'Aurorian', ifelse(
+				selected == 'Thugbirdz'
+				, 'THUG'
+				, ifelse(
+					selected == 'Solana Monkey Business'
+					, selected
+					, substr(selected, 1, nchar(selected) - 1)
+				)
+			)
+		)
 		if (!is.na(id)) {
 			t <- paste0(title," #", id)
 		}
@@ -547,14 +558,19 @@ server <- function(input, output, session) {
 		event_register(fig, 'plotly_click')
 	})
 
+	convertCollectionName <- function(x) {
+		if (x == 'Solana Monkey Business') x <- 'solana-monkey-business'
+		if (x == 'Degen Apes') x <- 'degen-ape-academy'
+		if (x == 'Pesky Penguins') x <- 'peskypenguinclub'
+		x <- tolower(x)
+		return(x)
+	}
+
 	output$listingurl <- renderUI({
 		selected <- getCollection()
-		selected <- ifelse(
-			selected == 'smb', 'solana-monkey-business', ifelse(
-				selected == 'degenapes', 'degen-ape-academy', selected
-			)
-		)
-		href <- paste0('https://solanafloor.com/nft/',selected,'/listed')
+		name <- convertCollectionName(selected)
+		if (name == 'peskypenguinclub') name <- 'pesky-penguins'
+		href <- paste0('https://solanafloor.com/nft/',name,'/listed')
 		url <- span("*Listings from ", a("solanafloor.com", href=href))
 		HTML(paste(url))
     })
@@ -565,10 +581,13 @@ server <- function(input, output, session) {
 		if( length(id) == 0 | length(selected) == 0 ) {
 			return(NULL)
 		}
-		if (selected == 'thugbirdz') {
+		if (selected == 'Thugbirdz') {
 			id <- str_pad(id, 4, pad='0')
 		}
-		href <- paste0('https://howrare.is/',selected,'/',id)
+		name <- convertCollectionName(selected)
+		if (name == 'solana-monkey-business') name <- 'smb'
+		if (name == 'degen-ape-academy') name <- 'degenapes'
+		href <- paste0('https://howrare.is/',name,'/',id)
 		url <- span("*Rarity from ", a("howrare.is", href=href)," used in the model")
 		HTML(paste(url))
     })

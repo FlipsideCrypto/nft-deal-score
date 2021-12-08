@@ -18,6 +18,20 @@ os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
 browser = webdriver.Chrome()
 
+def convert_collection_names():
+	d = {
+		'aurory': 'Aurory'
+		,'thugbirdz': 'Thugbirdz'
+		,'smb': 'Solana Monkey Business'
+		,'degenapes': 'Degen Apes'
+		,'peskypenguinclub': 'Pesky Penguins'
+		,'meerkatmillionaires': 'Meerkat Millionaires'
+	}
+	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
+		df = pd.read_csv('./data/{}.csv'.format(c))
+		df['collection'] = df.collection.apply(lambda x: d[x] )
+		df.to_csv('./data/{}.csv'.format(c), index=False)
+
 
 def scrape_recent_sales():
 	o_sales = pd.read_csv('./data/sales.csv')
