@@ -29,7 +29,7 @@ def convert_collection_names():
 	}
 	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
 		df = pd.read_csv('./data/{}.csv'.format(c))
-		df['collection'] = df.collection.apply(lambda x: d[x] )
+		df['collection'] = df.collection.apply(lambda x: d[x] if x in d.keys() else x )
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
 
@@ -106,6 +106,15 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 				break
 	old = pd.read_csv('./data/listings.csv')
 	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
+	d = {
+		'aurory': 'Aurory'
+		,'thugbirdz': 'Thugbirdz'
+		,'smb': 'Solana Monkey Business'
+		,'degenapes': 'Degen Apes'
+		,'peskypenguinclub': 'Pesky Penguins'
+		,'meerkatmillionaires': 'Meerkat Millionaires'
+	}
+	listings['collection'] = listings.collection.apply(lambda x: d[x])
 	old = old[ -(old.collection.isin(listings.collection.unique())) ]
 	pred_price = pd.read_csv('./data/pred_price.csv')
 	df = listings.merge(pred_price[['collection','token_id','pred_price']])
