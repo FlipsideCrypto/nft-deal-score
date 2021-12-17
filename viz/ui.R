@@ -1,5 +1,5 @@
 fluidPage(
-	title = "Solana NFT Deal Score",
+	title = "NFT Deal Score",
     useShinyjs(),
 	tags$head(
 		tags$link(rel = "stylesheet", type = "text/css", href = "styles.css"),
@@ -26,11 +26,17 @@ fluidPage(
 		)
 	}),
 	withTags({
-		section(class="hero",
-			img(class = "barcode", src = 'barcode.png', width = '100px'),
-			h1(
+		section(
+			class="hero"
+			, fluidRow(
+				class = "header-images",
+				column(4, uiOutput("solanaimg")),
+				column(4, uiOutput("terraimg")),
+				column(4, uiOutput("ethereumimg"))
+			)
+			, h1(
 				class="header", 
-				"Solana NFT Deal Score", 
+				"NFT Deal Score", 
 				span(id="beta-text-tooltip", class="beta", "beta")
 				, bsTooltip(id = "beta-text-tooltip", title = "This is a pilot app with 4 collections; plan is to expand to more collections and more chains!", placement = "right", trigger = "hover")
 			),

@@ -30,8 +30,6 @@ def clean_colnames(df):
 	df.columns = names
 	return(df)
 
-def mayc():
-
 def levana():
 	query = '''
 		WITH legendary_traits AS (
@@ -204,7 +202,7 @@ def levana():
 			, 'contract_address': 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg'
 			, 'contract_name': 'levana_dragon_eggs'
 			, 'created_at_block_id': 0
-			, 'created_at_timestamp': None
+			, 'created_at_timestamp': str(row['block_timestamp'])
 			, 'created_at_tx_id': row['tx_id']
 			, 'creator_address': 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg'
 			, 'creator_name': 'levana_dragon_eggs'
@@ -250,11 +248,11 @@ def bayc():
 			, 'contract_address': '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d'
 			, 'contract_name': 'bayc'
 			, 'created_at_block_id': row['blockNumber']
-			, 'created_at_timestamp': None
+			, 'created_at_timestamp': '2021-04-30 14:21:08.000'
 			, 'created_at_tx_id': row['transactionHash']
 			, 'creator_address': '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d'
 			, 'creator_name': 'bayc'
-			, 'image_url': ''
+			, 'image_url': row['metadata']['image']
 			, 'project_name': 'bored_ape_yacht_club'
 			, 'token_id': row['id']
 			, 'token_metadata': token_metadata

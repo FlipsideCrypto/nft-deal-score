@@ -1,0 +1,24 @@
+WITH meteor_traits AS (
+
+select  block_timestamp,
+        block_id,
+        tx_id,
+        msg_value:execute_msg:mint:extension:name::string                as name,
+        msg_value:execute_msg:mint:token_id::float                       as tokenid,
+        msg_value:execute_msg:mint:extension:attributes[0]:value::string as rarity,
+        msg_value:execute_msg:mint:extension:attributes[1]:value::string as rank,
+        msg_value:execute_msg:mint:extension:attributes[2]:value::string as shower,
+        msg_value:execute_msg:mint:extension:attributes[3]:value::string as distance,
+        msg_value:execute_msg:mint:extension:attributes[4]:value::string as crystal1,
+        msg_value:execute_msg:mint:extension:attributes[5]:value::string as crystal2,
+        msg_value:execute_msg:mint:extension:attributes[6]:value::string as crystal3,
+        msg_value:execute_msg:mint:extension:attributes[7]:value::string as weight,
+        msg_value:execute_msg:mint:extension:attributes[8]:value::string as origin,
+        msg_value:execute_msg:mint:extension:attributes[9]:value::string as essence
+  from  terra.msgs 
+  where msg_value:contract::string = 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' 
+  and   msg_value:sender::string = 'terra1v7v2nqs7flrpqqam7l5ulvnva8ly8j653sw4n3'
+  and   msg_value:execute_msg:mint is not null
+  and   tx_status = 'SUCCEEDED')
+  
+select * from meteor_traits order by tokenid 

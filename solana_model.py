@@ -18,13 +18,15 @@ warnings.filterwarnings('ignore')
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
 CHECK_EXCLUDE = False
+# CHECK_EXCLUDE = True
+
+# Using sales from howrare.is - the last sale that was under 300 was when the floor was at 72. Filtering for when the floor is >100, the lowest sale was 400
 
 ###################################
 #     Define Helper Functions     #
 ###################################
 def standardize_df(df, cols, usedf=None):
     for c in cols:
-        # print(c)
         if type(usedf) != type(pd.DataFrame()):
             usedf = df
         mu = usedf[c].mean()
@@ -37,16 +39,19 @@ def standardize_df(df, cols, usedf=None):
     return(df)
 
 def calculate_percentages(df, cols=[]):
+    add_pct = not 'pct' in df.columns
     if not len(cols):
         cols = df.columns
-    df['pct'] = 1
+    if add_pct:
+        df['pct'] = 1
     for c in cols:
         g = df[c].value_counts().reset_index()
         g.columns = [ c, 'N' ]
         col = '{}_pct'.format(c)
         g[col] = g.N / g.N.sum()
         df = df.merge( g[[ c, col ]] )
-        df['pct'] = df.pct * df[col]
+        if add_pct:
+            df['pct'] = df.pct * df[col]
     return(df)
 
 exclude = [
@@ -59,9 +64,12 @@ exclude = [
     # ( 'aurory', 3323, 138 )
 ]
 s_df = pd.read_csv('./data/sales.csv').rename(columns={'sale_date':'block_timestamp'})
+s_df.collection.unique()
+s_df = s_df[-s_df.collection.isin(['Levana Dragons'])]
+s_df = s_df[[ 'chain','collection','block_timestamp','token_id','price','tx_id' ]]
+s_df = s_df[ -s_df.collection.isin(['boryokudragonz', 'Boryoku Dragonz']) ]
 for e in exclude:
     s_df = s_df[-( (s_df.collection == e[0]) & (s_df.token_id == e[1]) & (s_df.price == e[2]) )]
-s_df = s_df[[ 'collection','token_id','block_timestamp','price' ]]
 s_df = s_df[ -((s_df.collection == 'smb') & (s_df.price < 1)) ]
 
 # exclude wierd data points
@@ -72,8 +80,9 @@ if not CHECK_EXCLUDE:
     del s_df['exclude']
 
 m_df = pd.read_csv('./data/metadata.csv')
+m_df.head()
 # s_df['block_timestamp'] = s_df.block_timestamp.apply(lambda x: datetime.strptime(x[:10], '%Y-%m-%d %H:%M:%S') )
-s_df['block_timestamp'] = s_df.block_timestamp.apply(lambda x: datetime.strptime(x, '%Y-%m-%d %H:%M:%S') if len(x) > 10 else datetime.strptime(x[:10], '%Y-%m-%d') )
+s_df['block_timestamp'] = s_df.block_timestamp.apply(lambda x: datetime.strptime(str(x)[:19], '%Y-%m-%d %H:%M:%S') if len(x) > 10 else datetime.strptime(x[:10], '%Y-%m-%d') )
 s_df['timestamp'] = s_df.block_timestamp.astype(int)
 # del metadata['price']
 # del metadata['last_sale']
@@ -92,6 +101,11 @@ s_df['mn_20'] = s_df.groupby('collection').price.shift(1)
 s_df['mn_20'] = s_df.groupby('collection')['mn_20'].rolling(20).quantile(.1).reset_index(0,drop=True)
 s_df[['price','mn_20','block_timestamp']].head(40).tail(40)
 s_df['tmp'] = s_df.mn_20 / s_df.md_20
+
+tmp = s_df[s_df.collection=='smb'][['mn_20','block_timestamp']]
+tmp['date'] = tmp.block_timestamp.apply(lambda x: str(x)[:10] )
+tmp = tmp.groupby('date').mn_20.median().reset_index()
+tmp.to_csv('~/Downloads/tmp.csv', index=False)
 
 s_df['tmp'] = s_df.price / s_df.mn_20
 s_df[s_df.collection == 'smb'].sort_values('block_timestamp')[['token_id','price','mn_20']]
@@ -113,11 +127,13 @@ pred_cols = {}
 metadata = {}
 sales = {}
 collection_features = {}
+m_df[(m_df.collection == 'Galactic Punks') & (m_df.feature_name == 'pct')].sort_values('token_id')
+c = 'Galactic Punks'
 for c in s_df.collection.unique():
     print('Building {} model'.format(c))
     sales[c] = s_df[ s_df.collection == c ]
     pred_cols[c] = sorted(m_df[ m_df.collection == c ].feature_name.unique())
-    collection_features[c] = [ c for c in pred_cols[c] if not c in ['score','rank'] ]
+    collection_features[c] = [ c for c in pred_cols[c] if not c in ['score','rank','pct'] ]
     metadata[c] = m_df[ m_df.collection == c ]
 
     # tmp = pd.pivot_table( metadata[c], ['collection','token_id'], columns=['feature_name'], values=['feature_value'] )
@@ -128,9 +144,11 @@ for c in s_df.collection.unique():
     cur = metadata[c]
     cur = cur.dropna(subset=features)
     for f in features:
-        cur[f] = cur[f].apply(lambda x: re.sub("\"", "", x ))
-        cur[f] = cur[f].apply(lambda x: re.split("\(", x )[0].strip())
+        if type(cur[f].values[0] == str):
+            cur[f] = cur[f].apply(lambda x: re.sub("\"", "", str(x) ) )
+            cur[f] = cur[f].apply(lambda x: re.split("\(", x )[0].strip())
     cur = cur.replace('', 'Default')
+    # if not 'pct' in cur.columns:
     cur = calculate_percentages( cur, features )
     dummies = pd.get_dummies(cur[features])
     feature_cols = dummies.columns
@@ -156,13 +174,15 @@ attributes = pd.DataFrame()
 pred_price = pd.DataFrame()
 feature_values = pd.DataFrame()
 collections = sorted(metadata.keys())
+collection = 'Galactic Punks'
+tokens = pd.read_csv('./data/tokens.csv')
 for collection in s_df.collection.unique():
     # collection = 'smb'
     # collection = 'aurory'
     # collection = 'meerkatmillionaires'
     print('Working on collection {}'.format(collection))
     p_metadata = metadata[collection]
-    p_metadata['attribute_count'] = p_metadata.attribute_count.astype(int)
+    p_metadata['attribute_count'] = p_metadata.attribute_count.astype(float).astype(int)
     
     p_sales = sales[collection]
     # specify the predictive features
@@ -171,7 +191,7 @@ for collection in s_df.collection.unique():
     p_sales['token_id'] = p_sales.token_id.apply(lambda x: re.sub("\"", "", str(x)) )
     p_metadata['token_id'] = p_metadata.token_id.apply(lambda x: re.sub("\"", "", str(x)) )
     for c in [ 'rank','score' ]:
-        p_metadata[c] = p_metadata[c].astype(int)
+        p_metadata[c] = p_metadata[c].astype(float)
     # p_sales['contract_address'] = p_sales.token_id.apply(lambda x: re.sub("\"", "", str(x)) )
     # p_metadata['contract_address'] = p_metadata.token_id.apply(lambda x: re.sub("\"", "", str(x)) )
     p_sales['contract_address'] = ''
@@ -186,8 +206,12 @@ for collection in s_df.collection.unique():
     df = p_sales.merge(p_metadata, on=['token_id','contract_address'])
     df = df[df.mn_20.notnull()]
     target_col = 'adj_price'
-    df[target_col] = df.apply(lambda x: max(0.9 * (x['mn_20'] - 0.2), x['price']), 1 )
+    df[target_col] = df.apply(lambda x: max(0.8 * (x['mn_20'] - 0.2), x['price']), 1 )
     df['mn_20'] = df.apply(lambda x: min(x[target_col], x['mn_20']), 1 )
+    # tmp = df[['block_timestamp','mn_20']].copy()
+    # tmp['tmp'] = tmp.block_timestamp.apply(lambda x: str(x)[:10] )
+    # tmp = tmp.groupby('tmp').mn_20.median().reset_index()
+    # tmp.sort_values('tmp').to_csv('~/Downloads/tmp.csv', index=False)
     # df['timestamp'] = df.block_timestamp.astype(int)
     df = df[df[target_col].notnull()]
     df = df.reset_index(drop=True)
@@ -220,7 +244,7 @@ for collection in s_df.collection.unique():
     std_pred_cols = [ c for c in std_pred_cols if not c in rem ]
     mn = df.timestamp.min()
     mx = df.timestamp.max()
-    df['weight'] = df.timestamp.apply(lambda x: 1.1 ** (2 * ((x - mn) / (mx - mn))) )
+    df['weight'] = df.timestamp.apply(lambda x: 2.5 ** ((x - mn) / (mx - mn)) )
     X = df[std_pred_cols].values
     mu = df.log_price.mean()
     sd = df.log_price.std()
@@ -342,8 +366,12 @@ for collection in s_df.collection.unique():
         df['pred'] = clf.predict( df[['pred_lin','pred_log']].values )
     coefsdf = coefsdf.append(tmp)
     df['err'] = (df.pred / df[target_col]).apply(lambda x: abs(x-1) )
-    df[df.block_timestamp>='2021-10-01'].sort_values('err', ascending=0).head(20)[[ 'pred',target_col,'token_id','block_timestamp','err','mn_20' ]]
+    df[df.block_timestamp>='2021-10-01'].sort_values('err', ascending=0).head(10)[[ 'pred',target_col,'token_id','block_timestamp','err','mn_20' ]]
     # df[df.block_timestamp>='2021-10-01'].err.mean()
+    df.merge(tokens[['collection','token_id','clean_token_id']]).sort_values('err', ascending=0).head(10)[[ 'pred',target_col,'clean_token_id','rank','block_timestamp','err','mn_20','tx_id' ]]
+    df.sort_values('price', ascending=0).head(20)[[ 'price','pred',target_col,'token_id','block_timestamp','err','mn_20','tx_id' ]]
+    df.sort_values('price', ascending=0).tail(40)[[ 'price','pred',target_col,'token_id','block_timestamp','err','mn_20','tx_id' ]]
+    df.sort_values('price', ascending=0).head(20).tx_id.values
 
     # print(np.mean(y))
     # print(np.mean(clf.predict(X)))
@@ -494,22 +522,22 @@ pred_price.to_csv('./data/pred_price.csv', index=False)
 attributes.to_csv('./data/attributes.csv', index=False)
 feature_values.to_csv('./data/feature_values.csv', index=False)
 # excludedf.to_csv('./data/excludedf.csv', index=False)
-listings = pd.read_csv('./data/listings.csv')
-listings['token_id'] = listings.token_id.astype(int)
+# listings = pd.read_csv('./data/listings.csv')
+# listings['token_id'] = listings.token_id.astype(int)
 
-tmp = salesdf.merge(attributes[ (attributes.collection == 'thugbirdz') & (attributes.feature == 'Position In Gang') & (attributes.value == 'Underboss') ])
-tmp = pred_price.merge(attributes[ (attributes.collection == 'thugbirdz') & (attributes.feature == 'Position In Gang') & (attributes.value == 'Underboss') ])
-tmp['token_id'] = tmp.token_id.astype(int)
-tmp = tmp.merge(listings[['collection','token_id','price']])
-tmp.sort_values('pred_price', ascending=0)
+# tmp = salesdf.merge(attributes[ (attributes.collection == 'thugbirdz') & (attributes.feature == 'Position In Gang') & (attributes.value == 'Underboss') ])
+# tmp = pred_price.merge(attributes[ (attributes.collection == 'thugbirdz') & (attributes.feature == 'Position In Gang') & (attributes.value == 'Underboss') ])
+# tmp['token_id'] = tmp.token_id.astype(int)
+# tmp = tmp.merge(listings[['collection','token_id','price']])
+# tmp.sort_values('pred_price', ascending=0)
 
 if CHECK_EXCLUDE:
     salesdf['rat'] = salesdf.price / salesdf.pred
     salesdf['dff'] = salesdf.price - salesdf.pred
-    salesdf['exclude_1'] = (((salesdf.dff >= 20) & (salesdf.rat > 4)) | ((salesdf.dff >= 40) & (salesdf.rat > 3)) | ((salesdf.dff >= 60) & (salesdf.rat > 2)) | ((salesdf.dff >= 80) & (salesdf.rat > 1))).astype(int)
+    salesdf['exclude_1'] = (((salesdf.dff >= 20) & (salesdf.rat > 4)) | ((salesdf.dff >= 40) & (salesdf.rat > 3)) | ((salesdf.dff >= 60) & (salesdf.rat > 2)) | ((salesdf.dff >= 80) & (salesdf.rat > 2))).astype(int)
     salesdf['rat'] = salesdf.pred / salesdf.price
     salesdf['dff'] = salesdf.pred - salesdf.price
-    salesdf['exclude_2'] = (((salesdf.dff >= 20) & (salesdf.rat > 4)) | ((salesdf.dff >= 40) & (salesdf.rat > 3)) | ((salesdf.dff >= 60) & (salesdf.rat > 2)) | ((salesdf.dff >= 80) & (salesdf.rat > 1))).astype(int)
+    salesdf['exclude_2'] = (((salesdf.dff >= 20) & (salesdf.rat > 4)) | ((salesdf.dff >= 40) & (salesdf.rat > 3)) | ((salesdf.dff >= 60) & (salesdf.rat > 2)) | ((salesdf.dff >= 80) & (salesdf.rat > 2))).astype(int)
     salesdf['exclude'] = (salesdf.exclude_1 + salesdf.exclude_2).apply(lambda x: int(x>0))
     print(salesdf.exclude_1.mean())
     print(salesdf.exclude_2.mean())

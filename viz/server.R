@@ -41,11 +41,12 @@ server <- function(input, output, session) {
 	})
 
 	output$collectionselect <- renderUI({
+		choices <- sort(unique(pred_price$collection))
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Solana Monkey Business'
-			, choices = unique(pred_price$collection)
+			, selected = 'Galactic Punks'
+			, choices = choices
 			, width = "100%"
 		)
 	})
@@ -55,10 +56,11 @@ server <- function(input, output, session) {
 		if( length(selected) == 0 ) {
 			return(NULL)
 		}
+		choices <- sort(pred_price[collection == eval(selected)]$token_id)
 		selectInput(
 			inputId = 'tokenid'
 			, label = NULL
-			, choices = pred_price[collection == eval(selected)]$token_id
+			, choices = choices
 			, width = "100%"
 		)
 	})
@@ -67,6 +69,11 @@ server <- function(input, output, session) {
 	})
 	getCollection <- reactive({
 		return(input$collectionname)
+	})
+	getChain <- reactive({
+		selected <- getCollection()
+		chain <- tokens[collection == eval(selected) ]$chain[1]
+		return(chain)
 	})
 
 	output$tokenid <- renderText({
@@ -113,9 +120,12 @@ server <- function(input, output, session) {
 
 	output$hrirank <- renderText({
 		id <- getTokenId()
+		id <- getTokenId()
 		selected <- getCollection()
+		chain <- getChain()
+		print(chain)
 		t <- ""
-		if (!is.na(id) & !is.na(selected)) {
+		if ( chain == 'Solana' & !is.na(id) & !is.na(selected)) {
 			cur_0 <- pred_price[collection == eval(selected) ]
 			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
 			if (nrow(cur_1)) {
@@ -164,8 +174,10 @@ server <- function(input, output, session) {
 			p_0 <- cur$pred_price[1]
 			tuple <- getConvertedPrice()
 			p_1 <- adjust_price(p_0, tuple)
+			chain <- getChain()
+			currency <- ifelse( chain == 'Solana', 'SOL', 'LUNA' )
 			if (nrow(cur)) {
-				t <- paste0("Fair Market Price: ", (format(p_1, digits=3, decimal.mark=".",big.mark=",")), " SOL")
+				t <- paste0("Fair Market Price: ", (format(p_1, digits=3, decimal.mark=".",big.mark=",")), " ", currency)
 			}
 		}
 		paste0(t)
@@ -371,10 +383,10 @@ server <- function(input, output, session) {
 			, ifelse(
 				y < 0.4, 'Good Deal'
 				, ifelse(
-					y < 0.6, 'Reasonable Deal'
+					y < 0.6, 'Okay Deal'
 					, ifelse(
-						y < 0.8, 'Bad Deal'
-						, 'Terrible Deal'
+						y < 0.8, 'Moderate Price'
+						, 'Premium Price'
 					)
 				)
 			)
@@ -541,10 +553,14 @@ server <- function(input, output, session) {
 			, xaxis = list(
 				title = "Listed Price"
 				, color = 'white'
+				, nticks = 7
+				, showgrid = FALSE
 			)
 			, yaxis= list(
 				title = "Fair Market Price"
 				, color = 'white'
+				, nticks = 7
+				, showgrid = FALSE
 			)
 			, plot_bgcolor = plotly.style$plot_bgcolor
 			, paper_bgcolor = plotly.style$paper_bgcolor
@@ -555,6 +571,9 @@ server <- function(input, output, session) {
 	})
 
 	convertCollectionName <- function(x) {
+		if (length(x) == 0 ) {
+			return('')
+		}
 		if (x == 'Solana Monkey Business') x <- 'solana-monkey-business'
 		if (x == 'Degen Apes') x <- 'degen-ape-academy'
 		if (x == 'Pesky Penguins') x <- 'peskypenguinclub'
@@ -564,6 +583,10 @@ server <- function(input, output, session) {
 
 	output$listingurl <- renderUI({
 		selected <- getCollection()
+		chain <- getChain()
+		if(chain == 'Terra') {
+			return(NULL)
+		}
 		name <- convertCollectionName(selected)
 		if (name == 'peskypenguinclub') name <- 'pesky-penguins'
 		href <- paste0('https://solanafloor.com/nft/',name,'/listed')
@@ -571,10 +594,41 @@ server <- function(input, output, session) {
 		HTML(paste(url))
     })
 
+	output$solanaimg <- renderUI({
+		chain <- getChain()
+		class = ''
+		if(chain != 'Solana') {
+			class <- 'opacity50'
+		}
+		t <- tags$img(src = 'Solana.png', class = class)
+		t
+    })
+
+	output$terraimg <- renderUI({
+		chain <- getChain()
+		class = ''
+		if(chain != 'Terra') {
+			class <- 'opacity50'
+		}
+		t <- tags$img(src = 'Terra.png', class = class)
+		t
+    })
+
+	output$ethereumimg <- renderUI({
+		chain <- getChain()
+		class = ''
+		if(chain != 'Ethereum') {
+			class <- 'opacity50'
+		}
+		t <- tags$img(src = 'Ethereum.png', class = class)
+		t
+    })
+
 	output$howrareisurl <- renderUI({
 		id <- getTokenId()
 		selected <- getCollection()
-		if( length(id) == 0 | length(selected) == 0 ) {
+		chain <- getChain()
+		if( chain != 'Solana' | length(id) == 0 | length(selected) == 0 ) {
 			return(NULL)
 		}
 		if (selected == 'Thugbirdz') {
