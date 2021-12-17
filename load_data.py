@@ -119,6 +119,7 @@ def add_terra_metadata():
 	metadata = clean_colnames(metadata)
 	glitches = [ 'messy pink','messy blue','ponytail red','messy brown','neat brown','ponytail black','neat red','messy blonde','neat black','neat blonde','ponytail blonde' ]
 	metadata['glitch_trait'] = metadata.hair.apply(lambda x: 'Yes' if x in glitches else 'No' )
+	metadata[metadata.glitch_trait == 'Yes']
 	sorted(metadata[metadata.glitch_trait=='Yes'].hair.unique())
 	sorted(metadata[metadata.glitch_trait=='No'].hair.unique())
 	metadata.head()
@@ -126,13 +127,13 @@ def add_terra_metadata():
 	metadata['attribute_count'] = 0
 	l = len(metadata)
 	for c in list(metadata.columns) + ['attribute_count']:
-		if c in ['token_id','collection']:
+		if c in ['token_id','collection','pct']:
 			continue
 		g = metadata.groupby(c).token_id.count().reset_index()
 		g['cur_pct'] = g.token_id / l
 		metadata = metadata.merge(g[[c, 'cur_pct']])
 		metadata['pct'] = metadata.pct * metadata.cur_pct
-		if c != 'attribute_count':
+		if not c in ['attribute_count','glitch_trait']:
 			metadata['attribute_count'] = metadata.attribute_count + metadata[c].apply(lambda x: int(x != none_col) )
 		del metadata['cur_pct']
 		# cur = metadata[[ 'collection','token_id', c ]].rename(columns={c: 'feature_value'})
@@ -167,6 +168,10 @@ def add_terra_metadata():
 	print(old.groupby(['chain','collection']).token_id.count())
 	old = old.drop_duplicates()
 	old.to_csv('./data/metadata.csv', index=False)
+
+	tokens = pd.read_csv('./data/tokens.csv')
+	old[ (old.feature_name == 'glitch_trait') & (old.feature_value == 'Yes') ].merge(tokens)
+	old[ (old.feature_name == 'attribute_count') ].merge(tokens[tokens.clean_token_id == 5326])
 
 
 def add_terra_sales():
