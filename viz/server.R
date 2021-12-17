@@ -123,7 +123,6 @@ server <- function(input, output, session) {
 		id <- getTokenId()
 		selected <- getCollection()
 		chain <- getChain()
-		print(chain)
 		t <- ""
 		if ( chain == 'Solana' & !is.na(id) & !is.na(selected)) {
 			cur_0 <- pred_price[collection == eval(selected) ]
@@ -203,9 +202,19 @@ server <- function(input, output, session) {
 		floor <- getFloors()[2]
 		log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
 		lin_coef <- coefsdf[ collection == eval(selected) ]$lin_coef[1]
+		s <- sum(cur$pct_vs_baseline)
+		p <- getPredPrice()
+		p <- as.numeric(p[ token_id == eval(as.numeric(id)) ]$pred_price)
+		# p <- pred_price[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]$pred_price
+		ratio <- (p / floor) - 1
+		ratio <- pmax(0, ratio)
+		if (ratio > 0 & length(ratio) > 0) {
+			mult <- ratio / s
+			cur[, pct_vs_baseline := pct_vs_baseline * eval(mult) ]
+		}
 		cur[, vs_baseline := round((pred_vs_baseline * eval(lin_coef)) + (pct_vs_baseline * eval(floor) * eval(log_coef) ), 1) ]
 		cur[, pred_vs_baseline := round(pred_vs_baseline, 1) ]
-		# cur[, vs_baseline := round(pred_vs_baseline + (pct_vs_baseline * eval(floor)), 1) ]
+		cur[, vs_baseline := round(pred_vs_baseline + (pct_vs_baseline * eval(floor)), 1) ]
 		return(cur)
 	})
 
@@ -216,7 +225,8 @@ server <- function(input, output, session) {
 		}
 		data[, rarity := paste0(format(round(rarity*100, 2), digits=4, decimal.mark="."),'%') ]
 		# reactable(data[, list( feature, value, rarity, vs_baseline, pred_vs_baseline, pct_vs_baseline )],
-		reactable(data[, list( feature, value, rarity, pct_vs_baseline )],
+		data <- data[, list( feature, value, rarity, pct_vs_baseline )]
+		reactable(data,
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
 			),
@@ -232,7 +242,7 @@ server <- function(input, output, session) {
 					, html = TRUE
 					, align = "left"
 					, cell = function(x) {
-						htmltools::tags$span(paste0('+', format(round(x*100), digits=4, decimal.mark=".", big.mark=","), '%'))
+						htmltools::tags$span(paste0('+', format(round(x*1000)/10, digits=4, decimal.mark=".", big.mark=","), '%'))
 					}
 				)
 			)
@@ -265,16 +275,22 @@ server <- function(input, output, session) {
 	    )
 	})
 
-	output$nftstable <- renderReactable({
+	getPredPrice <- reactive({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
-			return(NULL)
-		}
 		data <- pred_price[ collection == eval(selected), list( token_id, rk, pred_price )]
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
 		data[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
 		data[, pred_price := pmax( eval(floors[2]), pred_price) ]
+		return(data)
+	})
+
+	output$nftstable <- renderReactable({
+		selected <- getCollection()
+		if( length(selected) == 0 ) {
+			return(NULL)
+		}
+		data <- getPredPrice()
 		data[, pred_price := paste0(format(pred_price, digits=3, decimal.mark=".", big.mark=",")) ]
 		reactable(data,
 			defaultColDef = colDef(
