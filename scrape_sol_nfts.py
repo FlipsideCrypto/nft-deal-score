@@ -14,17 +14,13 @@ from selenium import webdriver
 from datetime import datetime, timedelta
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
-# os.chdir('/Users/kellenblumberg/git/nft-deal-score/viz/www/img/aurory/')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
 browser = webdriver.Chrome()
 
-cookies = {
-	'_ga':'GA1.1.1163336421.1631570500'
-	,'XSRF-TOKEN':'eyJpdiI6IkVPWStLdjlmdHZDd0dXSTJoUC9LTGc9PSIsInZhbHVlIjoiUzN1V2tDaDBlOFdORlNNY242YXJSeWhxOERSdVVoR1ByZ2pLbWExMmt2RVdGRTZkcXdZc2hTQWE5S0gwY2JreTB1cG1yQ0pJU01IMDNCeTBlUnBJUVIwaVBhTzkwYk9SNkhZRUl5bFNpWDZ6ekY1c1Z5T056OTF4M3ZwNmlNaVAiLCJtYWMiOiI5Mjk5MzAyMDI2MjU3ZTkxZTRmZDZjMmU4NDBjMzljYTNlMWY1ZWY1ZDk0NzQ4NWYxODA5MGJiZmNiYjY0ZjBkIiwidGFnIjoiIn0='
-	,'howrareis_session':'eyJpdiI6ImVDYU9ld3JvMURxNldZK3BiOUdJa1E9PSIsInZhbHVlIjoiZjNFa0s0MVkyY2FaSkd1RWpUZ0l1bG5aMDR2Z2hsY1JWdWJpNzhLbk5pNSs4bTVqMzg4N3pmbEY5b1BxQkhqZmd1a1pIQ2hkSVZ1V2ZMWTJhTDlIS1dIbjZ1RkJGayszL09TQmR1OWVBRXYxY1VBWDZISkpObmdoYkFrQmFnRHgiLCJtYWMiOiI4NjE3MDk5MzI5N2MyY2VhZWI3NmM1MGUzZjcxZTA4NDQ2ZDI0YTMwMGNhMWI0YjQyOTE5MTUxZDYzMjhiZGM5IiwidGFnIjoiIn0='
-	,'_ga_RSXEMJDEZW':'GS1.1.1639426379.166.1.1639427138.0'
-}
+# old = pd.read_csv('./data/tokens.csv')
+# metadata[(metadata.collection == 'Galactic Punks') & (metadata.feature_name=='attribute_count')].drop_duplicates(subset=['feature_value']).merge(old)
+
 clean_names = {
 	'aurory': 'Aurory'
 	,'thugbirdz': 'Thugbirdz'
@@ -294,6 +290,10 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 	listings['collection'] = listings.collection.apply(lambda x: clean_name(x))
 	old = old[ -(old.collection.isin(listings.collection.unique())) ]
 	pred_price = pd.read_csv('./data/pred_price.csv')
+	listings.token_id.values[:3]
+	pred_price.token_id.values[:3]
+	listings['token_id'] = listings.token_id.astype(str)
+	pred_price['token_id'] = pred_price.token_id.astype(str)
 	df = listings.merge(pred_price[['collection','token_id','pred_price']])
 	df['ratio'] = df.pred_price / df.price
 	print(df[df.collection == 'smb'].sort_values('ratio', ascending=0).head())
@@ -368,7 +368,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 		s += ', '.join(collections)
 		s += 'are listings far below floor\n'
 	s += '```'
-	g = g.sort_values('deal_score', ascending=0)
+	g = g.sort_values(['collection','deal_score'], ascending=[1,0])
 	for row in g.iterrows():
 		row = row[1]
 		txt = '{} | {} | ${} | {}'.format( str(row['collection']).ljust(10), str(row['token_id']).ljust(5), str(round(row['price'])).ljust(3), round(row['deal_score']) )
