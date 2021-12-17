@@ -1,15 +1,22 @@
 /******************/
 /*     Header     */
 /******************/
+.header-images {
+  padding-bottom: 10px;
+}
+.header-images img {
+  height: 60px;
+  width: 60px;
+}
+.header-images img.opacity50 {
+  opacity: 0.15;
+}
 #tokenid {
   padding-bottom: 5px;
 }
 .beta {
   opacity: 0.3;
   font-size: 14px;
-}
-.barcode {
-  filter: invert(100%);
 }
 .title {
     font-weight: 900;

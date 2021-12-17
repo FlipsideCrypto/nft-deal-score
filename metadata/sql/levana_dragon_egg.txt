@@ -1,0 +1,149 @@
+WITH legendary_traits AS (
+
+ select block_timestamp,
+        block_id,
+        tx_id,
+        msg_value:execute_msg:mint:extension:name::string                 as name,
+        msg_value:execute_msg:mint:token_id::float                        as tokenid,
+        msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+        msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+        msg_value:execute_msg:mint:extension:attributes[2]:value::string  as origin,
+        msg_value:execute_msg:mint:extension:attributes[3]:value::string  as cracking_date,
+        msg_value:execute_msg:mint:extension:attributes[4]:value::string  as essence,
+        msg_value:execute_msg:mint:extension:attributes[5]:value::string  as rune,
+        msg_value:execute_msg:mint:extension:attributes[6]:value::string  as infusion,
+        msg_value:execute_msg:mint:extension:attributes[7]:value::string  as affecting_moon,
+        msg_value:execute_msg:mint:extension:attributes[8]:value::string  as lucky_number,
+        msg_value:execute_msg:mint:extension:attributes[9]:value::string  as constellation,
+        msg_value:execute_msg:mint:extension:attributes[10]:value::string as temperature,
+        msg_value:execute_msg:mint:extension:attributes[11]:value::string as weight,
+        msg_value:execute_msg:mint:extension:attributes[12]:value::string as family,
+        msg_value:execute_msg:mint:extension:attributes[13]:value::string as genus,
+        msg_value:execute_msg:mint:extension:attributes[18]:value::string as shower,
+        msg_value:execute_msg:mint:extension:attributes[19]:value::string as meteor_id,
+        msg_value:execute_msg:mint:extension:attributes[14]:value::string as legendary_composition,
+        msg_value:execute_msg:mint:extension:attributes[15]:value::string as ancient_composition,
+        msg_value:execute_msg:mint:extension:attributes[16]:value::string as rare_composition,
+        msg_value:execute_msg:mint:extension:attributes[17]:value::string as common_composition
+  from  terra.msgs 
+  where msg_value:contract::string = 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' 
+  and   msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and   msg_value:execute_msg:mint is not null
+  and   tx_status = 'SUCCEEDED'
+  and   rarity = 'Legendary'),
+  
+  ancient_traits as (
+  
+ select block_timestamp,
+        block_id,
+        tx_id,
+        msg_value:execute_msg:mint:extension:name::string                 as name,
+        msg_value:execute_msg:mint:token_id::float                        as tokenid,
+        msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+        msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+        msg_value:execute_msg:mint:extension:attributes[2]:value::string  as origin,
+        msg_value:execute_msg:mint:extension:attributes[3]:value::string  as cracking_date,
+        msg_value:execute_msg:mint:extension:attributes[4]:value::string  as essence,
+        msg_value:execute_msg:mint:extension:attributes[5]:value::string  as rune,
+        msg_value:execute_msg:mint:extension:attributes[6]:value::string  as infusion,
+        msg_value:execute_msg:mint:extension:attributes[7]:value::string  as affecting_moon,
+        msg_value:execute_msg:mint:extension:attributes[8]:value::string  as lucky_number,
+        msg_value:execute_msg:mint:extension:attributes[9]:value::string  as constellation,
+        msg_value:execute_msg:mint:extension:attributes[10]:value::string as temperature,
+        msg_value:execute_msg:mint:extension:attributes[11]:value::string as weight,
+        msg_value:execute_msg:mint:extension:attributes[12]:value::string as family,
+        msg_value:execute_msg:mint:extension:attributes[13]:value::string as genus,
+        msg_value:execute_msg:mint:extension:attributes[17]:value::string as shower,
+        msg_value:execute_msg:mint:extension:attributes[18]:value::string as meteor_id,
+        null                                                              as legendary_composition,
+        msg_value:execute_msg:mint:extension:attributes[14]:value::string as ancient_composition,
+        msg_value:execute_msg:mint:extension:attributes[15]:value::string as rare_composition,
+        msg_value:execute_msg:mint:extension:attributes[16]:value::string as common_composition
+  from  terra.msgs 
+  where msg_value:contract::string = 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' 
+  and   msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and   msg_value:execute_msg:mint is not null
+  and   tx_status = 'SUCCEEDED'
+  and   rarity = 'Ancient'),
+  
+  rare_traits as (
+  
+ select block_timestamp,
+        block_id,
+        tx_id,
+        msg_value:execute_msg:mint:extension:name::string                 as name,
+        msg_value:execute_msg:mint:token_id::float                        as tokenid,
+        msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+        msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+        msg_value:execute_msg:mint:extension:attributes[2]:value::string  as origin,
+        msg_value:execute_msg:mint:extension:attributes[3]:value::string  as cracking_date,
+        msg_value:execute_msg:mint:extension:attributes[4]:value::string  as essence,
+        msg_value:execute_msg:mint:extension:attributes[5]:value::string  as rune,
+        msg_value:execute_msg:mint:extension:attributes[6]:value::string  as infusion,
+        msg_value:execute_msg:mint:extension:attributes[7]:value::string  as affecting_moon,
+        msg_value:execute_msg:mint:extension:attributes[8]:value::string  as lucky_number,
+        msg_value:execute_msg:mint:extension:attributes[9]:value::string  as constellation,
+        msg_value:execute_msg:mint:extension:attributes[10]:value::string as temperature,
+        msg_value:execute_msg:mint:extension:attributes[11]:value::string as weight,
+        msg_value:execute_msg:mint:extension:attributes[12]:value::string as family,
+        msg_value:execute_msg:mint:extension:attributes[13]:value::string as genus,
+        msg_value:execute_msg:mint:extension:attributes[16]:value::string as shower,
+        msg_value:execute_msg:mint:extension:attributes[17]:value::string as meteor_id,
+        null                                                              as legendary_composition,
+        null                                                              as ancient_composition,
+        msg_value:execute_msg:mint:extension:attributes[14]:value::string as rare_composition,
+        msg_value:execute_msg:mint:extension:attributes[15]:value::string as common_composition
+  from  terra.msgs 
+  where msg_value:contract::string = 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' 
+  and   msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and   msg_value:execute_msg:mint is not null
+  and   tx_status = 'SUCCEEDED'
+  and   rarity = 'Rare'),
+  
+  common_traits as (
+  
+ select block_timestamp,
+        block_id,
+        tx_id,
+        msg_value:execute_msg:mint:extension:name::string                 as name,
+        msg_value:execute_msg:mint:token_id::float                        as tokenid,
+        msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+        msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+        msg_value:execute_msg:mint:extension:attributes[2]:value::string  as origin,
+        msg_value:execute_msg:mint:extension:attributes[3]:value::string  as cracking_date,
+        msg_value:execute_msg:mint:extension:attributes[4]:value::string  as essence,
+        msg_value:execute_msg:mint:extension:attributes[5]:value::string  as rune,
+        msg_value:execute_msg:mint:extension:attributes[6]:value::string  as infusion,
+        msg_value:execute_msg:mint:extension:attributes[7]:value::string  as affecting_moon,
+        msg_value:execute_msg:mint:extension:attributes[8]:value::string  as lucky_number,
+        msg_value:execute_msg:mint:extension:attributes[9]:value::string  as constellation,
+        msg_value:execute_msg:mint:extension:attributes[10]:value::string as temperature,
+        msg_value:execute_msg:mint:extension:attributes[11]:value::string as weight,
+        msg_value:execute_msg:mint:extension:attributes[12]:value::string as family,
+        msg_value:execute_msg:mint:extension:attributes[13]:value::string as genus,
+        msg_value:execute_msg:mint:extension:attributes[15]:value::string as shower,
+        msg_value:execute_msg:mint:extension:attributes[16]:value::string as meteor_id,
+        null                                                              as legendary_composition,
+        null                                                              as ancient_composition,
+        null                                                              as rare_composition,
+        msg_value:execute_msg:mint:extension:attributes[14]:value::string as common_composition
+  from  terra.msgs 
+  where msg_value:contract::string = 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' 
+  and   msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and   msg_value:execute_msg:mint is not null
+  and   tx_status = 'SUCCEEDED'
+  and   rarity = 'Common'),
+  
+combine AS (
+
+      select * from legendary_traits
+      UNION ALL
+      select * from ancient_traits
+      UNION ALL
+      select * from rare_traits
+      UNION ALL
+      select * from common_traits
+      
+      )
+
+select * from combine order by tokenid

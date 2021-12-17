@@ -1,0 +1,222 @@
+WITH 
+  ancient_traits1 as (
+
+select   block_timestamp,
+         block_id,
+         tx_id,
+         msg_value:execute_msg:mint:extension:name::string                 as name,
+         msg_value:execute_msg:mint:token_id::float                        as tokenid,
+         msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+         msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+         msg_value:execute_msg:mint:extension:attributes[2]:value::string  as dust_volume,
+         msg_value:execute_msg:mint:extension:attributes[3]:value::string  as spirit_level,
+         msg_value:execute_msg:mint:extension:attributes[4]:value::string  as origin,
+         msg_value:execute_msg:mint:extension:attributes[5]:value::string  as bottling_date,
+         msg_value:execute_msg:mint:extension:attributes[6]:value::string  as essence,
+         msg_value:execute_msg:mint:extension:attributes[7]:value::string  as rune,
+         msg_value:execute_msg:mint:extension:attributes[8]:value::string  as infusion,
+         msg_value:execute_msg:mint:extension:attributes[9]:value::string  as ancient_gem,
+         msg_value:execute_msg:mint:extension:attributes[10]:value::string as rare_gem,
+         msg_value:execute_msg:mint:extension:attributes[11]:value::string as common_gem,
+         msg_value:execute_msg:mint:extension:attributes[12]:value::string as weight,
+         null                                                              as legendary_composition,
+         msg_value:execute_msg:mint:extension:attributes[13]:value::string as ancient_composition,
+         msg_value:execute_msg:mint:extension:attributes[14]:value::string as rare_composition,
+         msg_value:execute_msg:mint:extension:attributes[15]:value::string as common_composition,
+         msg_value:execute_msg:mint:extension:attributes[16]:value::string as shower,
+         msg_value:execute_msg:mint:extension:attributes[17]:value::string as meteor_id
+  from   terra.msgs 
+  where  msg_value:contract::string = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' 
+  and    msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and    msg_value:execute_msg:mint is not null
+  and    tx_status = 'SUCCEEDED'
+  and    rarity = 'Ancient'
+  and    msg_value:execute_msg:mint:extension:attributes[13]:trait_type::string <> 'Legendary Composition'),
+
+  ancient_traits2 as (select block_timestamp,
+         block_id,
+         tx_id,
+         msg_value:execute_msg:mint:extension:name::string                 as name,
+         msg_value:execute_msg:mint:token_id::float                        as tokenid,
+         msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+         msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+         msg_value:execute_msg:mint:extension:attributes[2]:value::string  as dust_volume,
+         msg_value:execute_msg:mint:extension:attributes[3]:value::string  as spirit_level,
+         msg_value:execute_msg:mint:extension:attributes[4]:value::string  as origin,
+         msg_value:execute_msg:mint:extension:attributes[5]:value::string  as bottling_date,
+         msg_value:execute_msg:mint:extension:attributes[6]:value::string  as essence,
+         msg_value:execute_msg:mint:extension:attributes[7]:value::string  as rune,
+         msg_value:execute_msg:mint:extension:attributes[8]:value::string  as infusion,
+         msg_value:execute_msg:mint:extension:attributes[9]:value::string  as ancient_gem,
+         msg_value:execute_msg:mint:extension:attributes[10]:value::string as rare_gem,
+         msg_value:execute_msg:mint:extension:attributes[11]:value::string as common_gem,
+         msg_value:execute_msg:mint:extension:attributes[12]:value::string as weight,
+         msg_value:execute_msg:mint:extension:attributes[13]:value::string as legendary_composition,
+         msg_value:execute_msg:mint:extension:attributes[14]:value::string as ancient_composition,
+         msg_value:execute_msg:mint:extension:attributes[15]:value::string as rare_composition,
+         msg_value:execute_msg:mint:extension:attributes[16]:value::string as common_composition,
+         msg_value:execute_msg:mint:extension:attributes[17]:value::string as shower,
+         msg_value:execute_msg:mint:extension:attributes[18]:value::string as meteor_id
+  from   terra.msgs 
+  where  msg_value:contract::string = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' 
+  and    msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and    msg_value:execute_msg:mint is not null
+  and    tx_status = 'SUCCEEDED'
+  and    rarity = 'Ancient'
+  and    msg_value:execute_msg:mint:extension:attributes[13]:trait_type::string = 'Legendary Composition'
+  ),
+
+  rare_traits1 as (
+  
+  select block_timestamp,
+         block_id,
+         tx_id,
+         msg_value:execute_msg:mint:extension:name::string                 as name,
+         msg_value:execute_msg:mint:token_id::float                        as tokenid,
+         msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+         msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+         msg_value:execute_msg:mint:extension:attributes[2]:value::string  as dust_volume,
+         msg_value:execute_msg:mint:extension:attributes[3]:value::string  as spirit_level,
+         msg_value:execute_msg:mint:extension:attributes[4]:value::string  as origin,
+         msg_value:execute_msg:mint:extension:attributes[5]:value::string  as bottling_date,
+         msg_value:execute_msg:mint:extension:attributes[6]:value::string  as essence,
+         msg_value:execute_msg:mint:extension:attributes[7]:value::string  as rune,
+         msg_value:execute_msg:mint:extension:attributes[8]:value::string  as infusion,
+         null                                                              as ancient_gem,
+         msg_value:execute_msg:mint:extension:attributes[9]:value::string  as rare_gem,
+         msg_value:execute_msg:mint:extension:attributes[10]:value::string as common_gem,
+         msg_value:execute_msg:mint:extension:attributes[11]:value::string as weight,
+         msg_value:execute_msg:mint:extension:attributes[12]:value::string as legendary_composition,
+         null                                                              as ancient_composition,
+         msg_value:execute_msg:mint:extension:attributes[13]:value::string as rare_composition,
+         msg_value:execute_msg:mint:extension:attributes[14]:value::string as common_composition,
+         msg_value:execute_msg:mint:extension:attributes[15]:value::string as shower,
+         msg_value:execute_msg:mint:extension:attributes[16]:value::string as meteor_id
+  from   terra.msgs 
+  where  msg_value:contract::string = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' 
+  and    msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and    msg_value:execute_msg:mint is not null
+  and    tx_status = 'SUCCEEDED'
+  and    rarity = 'Rare'
+  and    msg_value:execute_msg:mint:extension:attributes[12]:trait_type::string = 'Legendary Composition'),
+
+  rare_traits2 as (
+  
+  select block_timestamp,
+         block_id,
+         tx_id,
+         msg_value:execute_msg:mint:extension:name::string                 as name,
+         msg_value:execute_msg:mint:token_id::float                        as tokenid,
+         msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+         msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+         msg_value:execute_msg:mint:extension:attributes[2]:value::string  as dust_volume,
+         msg_value:execute_msg:mint:extension:attributes[3]:value::string  as spirit_level,
+         msg_value:execute_msg:mint:extension:attributes[4]:value::string  as origin,
+         msg_value:execute_msg:mint:extension:attributes[5]:value::string  as bottling_date,
+         msg_value:execute_msg:mint:extension:attributes[6]:value::string  as essence,
+         msg_value:execute_msg:mint:extension:attributes[7]:value::string  as rune,
+         msg_value:execute_msg:mint:extension:attributes[8]:value::string  as infusion,
+         null                                                              as ancient_gem,
+         msg_value:execute_msg:mint:extension:attributes[9]:value::string  as rare_gem,
+         msg_value:execute_msg:mint:extension:attributes[10]:value::string as common_gem,
+         msg_value:execute_msg:mint:extension:attributes[11]:value::string as weight,
+         null                                                              as legendary_composition,
+         null                                                              as ancient_composition,
+         msg_value:execute_msg:mint:extension:attributes[12]:value::string as rare_composition,
+         msg_value:execute_msg:mint:extension:attributes[13]:value::string as common_composition,
+         msg_value:execute_msg:mint:extension:attributes[14]:value::string as shower,
+         msg_value:execute_msg:mint:extension:attributes[15]:value::string as meteor_id
+  from   terra.msgs 
+  where  msg_value:contract::string = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' 
+  and    msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and    msg_value:execute_msg:mint is not null
+  and    tx_status = 'SUCCEEDED'
+  and    rarity = 'Rare'
+  and    msg_value:execute_msg:mint:extension:attributes[12]:trait_type::string <> 'Legendary Composition'),
+
+  common_traits1 as (
+  
+  select block_timestamp,
+         block_id,
+         tx_id,
+         msg_value:execute_msg:mint:extension:name::string                 as name,
+         msg_value:execute_msg:mint:token_id::float                        as tokenid,
+         msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+         msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+         msg_value:execute_msg:mint:extension:attributes[2]:value::string  as dust_volume,
+         msg_value:execute_msg:mint:extension:attributes[3]:value::string  as spirit_level,
+         msg_value:execute_msg:mint:extension:attributes[4]:value::string  as origin,
+         msg_value:execute_msg:mint:extension:attributes[5]:value::string  as bottling_date,
+         msg_value:execute_msg:mint:extension:attributes[6]:value::string  as essence,
+         msg_value:execute_msg:mint:extension:attributes[7]:value::string  as rune,
+         msg_value:execute_msg:mint:extension:attributes[8]:value::string  as infusion,
+         null                                                              as ancient_gem,
+         null                                                              as rare_gem,
+         msg_value:execute_msg:mint:extension:attributes[9]:value::string  as common_gem,
+         msg_value:execute_msg:mint:extension:attributes[10]:value::string as weight,
+         msg_value:execute_msg:mint:extension:attributes[11]:value::string as legendary_composition,
+         null                                                              as ancient_composition,
+         null                                                              as rare_composition,
+         msg_value:execute_msg:mint:extension:attributes[12]:value::string as common_composition,
+         msg_value:execute_msg:mint:extension:attributes[13]:value::string as shower,
+         msg_value:execute_msg:mint:extension:attributes[14]:value::string as meteor_id
+  from   terra.msgs 
+  where  msg_value:contract::string = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' 
+  and    msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and    msg_value:execute_msg:mint is not null
+  and    tx_status = 'SUCCEEDED'
+  and    rarity = 'Common'
+  and    msg_value:execute_msg:mint:extension:attributes[11]:trait_type::string = 'Legendary Composition'),
+
+  common_traits2 as (
+  
+  select block_timestamp,
+         block_id,
+         tx_id,
+         msg_value:execute_msg:mint:extension:name::string                 as name,
+         msg_value:execute_msg:mint:token_id::float                        as tokenid,
+         msg_value:execute_msg:mint:extension:attributes[0]:value::string  as rarity,
+         msg_value:execute_msg:mint:extension:attributes[1]:value::string  as rank,
+         msg_value:execute_msg:mint:extension:attributes[2]:value::string  as dust_volume,
+         msg_value:execute_msg:mint:extension:attributes[3]:value::string  as spirit_level,
+         msg_value:execute_msg:mint:extension:attributes[4]:value::string  as origin,
+         msg_value:execute_msg:mint:extension:attributes[5]:value::string  as bottling_date,
+         msg_value:execute_msg:mint:extension:attributes[6]:value::string  as essence,
+         msg_value:execute_msg:mint:extension:attributes[7]:value::string  as rune,
+         msg_value:execute_msg:mint:extension:attributes[8]:value::string  as infusion,
+         null                                                              as ancient_gem,
+         null                                                              as rare_gem,
+         msg_value:execute_msg:mint:extension:attributes[9]:value::string  as common_gem,
+         msg_value:execute_msg:mint:extension:attributes[10]:value::string as weight,
+         null                                                              as legendary_composition,
+         null                                                              as ancient_composition,
+         null                                                              as rare_composition,
+         msg_value:execute_msg:mint:extension:attributes[11]:value::string as common_composition,
+         msg_value:execute_msg:mint:extension:attributes[12]:value::string as shower,
+         msg_value:execute_msg:mint:extension:attributes[13]:value::string as meteor_id
+  from   terra.msgs 
+  where  msg_value:contract::string = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' 
+  and    msg_value:sender::string = 'terra1awy9ychm2z2hd696kz6yeq67l30l7nxs7n762t'
+  and    msg_value:execute_msg:mint is not null
+  and    tx_status = 'SUCCEEDED'
+  and    rarity = 'Common'
+  and    msg_value:execute_msg:mint:extension:attributes[11]:trait_type::string <> 'Legendary Composition'),
+  
+combine AS (
+
+        select * from ancient_traits1
+        UNION ALL
+        select * from ancient_traits2
+        UNION ALL
+        select * from rare_traits1
+        UNION ALL
+        select * from rare_traits2
+        UNION ALL
+        select * from common_traits1
+        UNION ALL
+        select * from common_traits2
+        
+        )
+  
+select * from combine order by tokenid
+

@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import time
 import requests
 import functools
@@ -18,6 +19,161 @@ os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
 browser = webdriver.Chrome()
 
+cookies = {
+	'_ga':'GA1.1.1163336421.1631570500'
+	,'XSRF-TOKEN':'eyJpdiI6IkVPWStLdjlmdHZDd0dXSTJoUC9LTGc9PSIsInZhbHVlIjoiUzN1V2tDaDBlOFdORlNNY242YXJSeWhxOERSdVVoR1ByZ2pLbWExMmt2RVdGRTZkcXdZc2hTQWE5S0gwY2JreTB1cG1yQ0pJU01IMDNCeTBlUnBJUVIwaVBhTzkwYk9SNkhZRUl5bFNpWDZ6ekY1c1Z5T056OTF4M3ZwNmlNaVAiLCJtYWMiOiI5Mjk5MzAyMDI2MjU3ZTkxZTRmZDZjMmU4NDBjMzljYTNlMWY1ZWY1ZDk0NzQ4NWYxODA5MGJiZmNiYjY0ZjBkIiwidGFnIjoiIn0='
+	,'howrareis_session':'eyJpdiI6ImVDYU9ld3JvMURxNldZK3BiOUdJa1E9PSIsInZhbHVlIjoiZjNFa0s0MVkyY2FaSkd1RWpUZ0l1bG5aMDR2Z2hsY1JWdWJpNzhLbk5pNSs4bTVqMzg4N3pmbEY5b1BxQkhqZmd1a1pIQ2hkSVZ1V2ZMWTJhTDlIS1dIbjZ1RkJGayszL09TQmR1OWVBRXYxY1VBWDZISkpObmdoYkFrQmFnRHgiLCJtYWMiOiI4NjE3MDk5MzI5N2MyY2VhZWI3NmM1MGUzZjcxZTA4NDQ2ZDI0YTMwMGNhMWI0YjQyOTE5MTUxZDYzMjhiZGM5IiwidGFnIjoiIn0='
+	,'_ga_RSXEMJDEZW':'GS1.1.1639426379.166.1.1639427138.0'
+}
+clean_names = {
+	'aurory': 'Aurory'
+	,'thugbirdz': 'Thugbirdz'
+	,'smb': 'Solana Monkey Business'
+	,'degenapes': 'Degen Apes'
+	,'peskypenguinclub': 'Pesky Penguins'
+	,'meerkatmillionaires': 'Meerkat Millionaires'
+	,'boryokudragonz': 'Boryoku Dragonz'
+}
+
+def clean_name(name):
+	if name in clean_names.keys():
+		return(clean_names[name])
+	return(name)
+
+def scrape_randomearth():
+	data = []
+	page = 0
+	has_more = True
+	while has_more:
+		page += 1
+		print('Page #{}'.format(page))
+		url = 'https://randomearth.io/api/items?collection_addr=terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k&sort=price.asc&page={}&on_sale=1'.format(page)
+		browser.get(url)
+		soup = BeautifulSoup(browser.page_source)
+		# txt = browser.page_source
+		j = json.loads(soup.text)
+		has_more = 'items' in j.keys() and len(j['items'])
+		if has_more:
+			for i in j['items']:
+				data += [[ 'Terra', 'Galactic Punks', i['token_id'], i['price'] / (10 ** 6) ]]
+	df = pd.DataFrame(data, columns=['chain','collection','token_id','price'])
+	old = pd.read_csv('./data/listings.csv')
+	old = old[-old.collection.isin(df.collection.unique())]
+	old = old.append(df)
+	old.to_csv('./data/listings.csv', index=False)
+
+def awards():
+	dailysales = pd.read_csv('~/Downloads/dailysales.csv')
+	pred_price = pd.read_csv('./data/pred_price.csv')[['collection','token_id','pred_price','pred_sd']]
+	pred_price['collection'] = pred_price.collection.apply(lambda x: clean_name(x))
+	dailysales['collection'] = dailysales.collection.apply(lambda x: clean_name(x))
+
+	coefsdf = pd.read_csv('./data/coefsdf.csv')
+	coefsdf['collection'] = coefsdf.collection.apply(lambda x: clean_name(x))
+	coefsdf['tot'] = coefsdf.lin_coef + coefsdf.log_coef
+	coefsdf['lin_coef'] = coefsdf.lin_coef / coefsdf.tot
+	coefsdf['log_coef'] = coefsdf.log_coef / coefsdf.tot
+	pred_price = pred_price.merge(coefsdf)
+	floors = {
+		'Aurory': 17,
+		'Thugbirdz': 27,
+		'Solana Monkey Business': 98,
+		'Degen Apes': 29,
+		'Pesky Penguins': 3.65,
+	}
+	pred_price = pred_price[pred_price.collection.isin(floors.keys())]
+	pred_price['floor'] = pred_price.collection.apply(lambda x: floors[x] )
+
+	# metadata = pd.read_csv('./data/metadata.csv')
+	# solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'skin') & (metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
+	# pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 8 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
+
+	pred_price['abs_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.lin_coef
+	pred_price['pct_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.log_coef
+	pred_price['pred_price_0'] = pred_price.pred_price
+	pred_price['pred_price'] = pred_price.apply( lambda x: x['pred_price'] + x['abs_chg'] + ( x['pct_chg'] * x['pred_price'] / x['floor_price'] ), 1 )
+	pred_price['pred_price'] = pred_price.apply( lambda x: max( x['pred_price'], x['floor']), 1 )
+	# pred_price['deal_score'] = pred_price.apply( lambda x: (( x['pred_price'] - x['price'] ) * 50 / ( 3 * x['pred_sd'])) + 50  , 1 )
+	# pred_price['deal_score'] = pred_price.deal_score.apply( lambda x: min(max(0, x), 100) )
+	dailysales = dailysales.merge(pred_price, how='left')
+	dailysales['deal_score'] = dailysales.apply( lambda x: 100 * (1 - norm.cdf( x['price'], x['pred_price'], 2 * x['pred_sd'] * x['pred_price'] / x['pred_price_0'] )) , 1 )
+	dailysales.sort_values('deal_score', ascending=0).head(100)[['collection','token_id','price','pred_price','deal_score']].to_csv('~/Downloads/tmp2.csv', index=False)
+
+def scrape_recent_smb_sales():
+	o_sales = pd.read_csv('./data/sales.csv')
+	o_sales.head()
+	# o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
+	# o_sales.groupby('tmp').token_id.count().tail(20)
+	data = []
+	url = 'https://market.solanamonkey.business/'
+	browser.get(url)
+	browser.find_elements_by_class_name('inline-flex')[-1].click()
+	sleep(2)
+	es = browser.find_elements_by_class_name('inline-flex')
+	for i in range(len(es)):
+		print(i, es[i].text)
+	browser.find_elements_by_class_name('inline-flex')[4].click()
+	sleep(2)
+	soup = BeautifulSoup(browser.page_source)
+	for tr in soup.find_all('table', class_='min-w-full')[0].find_all('tbody')[0].find_all('tr'):
+		td = tr.find_all('td')
+		token_id = int(re.split('#', td[0].text)[1])
+		price = float(td[1].text)
+		t = td[3].text
+		num = 1 if 'an ' in t or 'a ' in t else int(re.split(' ', t)[0])
+		hours_ago = 0 if 'minute' in t else num if 'hour' in t else 24 * num
+		sale_date = datetime.today() - timedelta(hours=hours_ago)
+		data += [[ 'smb', token_id, price, sale_date  ]]
+	new_sales = pd.DataFrame(data, columns=['collection','token_id','price','sale_date'])
+	print('{} new sales'.format(len(new_sales)))
+	smb = o_sales[o_sales.collection.isin(['smb','Solana Monkey Business'])]
+	o_sales = o_sales[-(o_sales.collection.isin(['smb','Solana Monkey Business']))]
+	print(len(smb))
+	smb = smb.append(new_sales)
+	smb['tmp'] = smb.sale_date.apply(lambda x: str(x)[:10] )
+	smb = smb.drop_duplicates(subset=['token_id','price'], keep='last')
+	print(len(smb))
+	smb[(smb.tmp >= '2021-12-13') & (-smb.token_id.isin(list(new_sales.token_id.unique())))]
+	smb['messed'] = smb.sale_date.apply(lambda x: str(x)[14:22] == '02:36.63' )
+	smb['sale_date'] = smb.sale_date.apply(lambda x: datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S') if len(str(x)) == 19 else datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S.%f') )
+	mn = smb[smb.messed].sale_date.min()
+	def f(x):
+		if x['messed'] == True:
+			d = x['sale_date'] - mn
+			return(mn - d)
+		return(x['sale_date'])
+	smb['sale_date'] = smb.apply(lambda x: f(x), 1 )
+	smb['tmp'] = smb.sale_date.apply(lambda x: str(x)[:10] )
+	len(smb[smb.messed])
+	print(smb.groupby('tmp').token_id.count().reset_index())
+	smb.groupby('tmp').token_id.count().reset_index().to_csv('~/Downloads/tmp.csv', index=False)
+	# print(smb[smb.messed==False].groupby('tmp').token_id.count().tail(20))
+	# len(smb[(smb.tmp >= '2021-12-12') & (-smb.token_id.isin(list(new_sales.token_id.unique())))])
+	del smb['tmp']
+	# del smb['sales_date']
+	# browser.find_elements_by_class_name('css-1wy0on6')[-1].click()
+	# browser.find_element_by_id('react-select-4-option-1').click()
+	o_sales = o_sales.append(smb)
+	print(o_sales.groupby('collection').token_id.count())
+	o_sales.to_csv('./data/sales.csv', index=False)
+
+def scrape_magic_eden():
+	collection = 'boryokudragonz'
+	listings = pd.DataFrame()
+	url = 'https://magiceden.io/marketplace/boryoku_dragonz'
+	for i in range(5):
+		s = i * 20
+		url = 'https://api-mainnet.magiceden.io/rpc/getListedNFTsByQuery?q={%22$match%22:{%22collectionSymbol%22:%22boryoku_dragonz%22},%22$sort%22:{%22takerAmount%22:1,%22createdAt%22:-1},%22$skip%22:'+str(s)+',%22$limit%22:20}'
+		r = requests.get(url)
+		j = r.json()
+		if len(j['results']):
+			cur = pd.DataFrame(j['results'])[[ 'price','title' ]]
+			cur['token_id'] = cur.title.apply(lambda x: int(re.split('#', x)[1]) )
+			del cur['title']
+			cur['collection'] = collection
+			listings = listings.append(cur)
+	return(listings)
+
 def convert_collection_names():
 	d = {
 		'aurory': 'Aurory'
@@ -26,25 +182,41 @@ def convert_collection_names():
 		,'degenapes': 'Degen Apes'
 		,'peskypenguinclub': 'Pesky Penguins'
 		,'meerkatmillionaires': 'Meerkat Millionaires'
+		,'boryokudragonz': 'Boryoku Dragonz'
 	}
 	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
 		df = pd.read_csv('./data/{}.csv'.format(c))
-		df['collection'] = df.collection.apply(lambda x: d[x] if x in d.keys() else x )
+		df['collection'] = df.collection.apply(lambda x: clean_name(x) if x in d.keys() else x )
 		df.to_csv('./data/{}.csv'.format(c), index=False)
-
 
 def scrape_recent_sales():
 	o_sales = pd.read_csv('./data/sales.csv')
+	o_sales.groupby('collection').sale_date.max()
 	sales = pd.DataFrame()
-	collections = [ 'smb','thugbirdz']
+	collections = [ 'aurory']
+	collection = 'thugbirdz'
+	collection = 'degenape'
 	for collection in collections:
 		url = 'https://qzlsklfacc.medianetwork.cloud/all_sold_per_collection_day?collection={}'.format(collection)
+		# url = 'https://qzlsklfacc.medianetwork.cloud/all_sold_per_collection_day?collection={}'.format('degenape')
+		# url = 'https://hkgwtdvfyh.medianetwork.cloud/all_sold_per_collection_day?collection={}'.format(collection)
 		r = requests.get(url)
 		j = r.json()
 		cur = pd.DataFrame(j)
 		cur['collection'] = collection
 		cur['sale_date'] = cur.date.apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S.000Z'))
+		cur['token_id'] = cur.name.apply(lambda x: int(re.split('#', x)[1]) )
 		sales = sales.append( cur[['collection','token_id','price','sale_date']] )
+	l0 = len(o_sales)
+	sales['tmp'] = sales.sale_date.apply(lambda x: str(x)[:10] )
+	o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
+	o_sales = o_sales.append(sales).drop_duplicates(subset=['collection','token_id','tmp','price'])
+	l1 = len(o_sales)
+	print('{} -> {}'.format(l0, l1))
+	o_sales.groupby('collection').tmp.max()
+	o_sales.groupby('collection').token_id.count()
+	del o_sales['tmp']
+	o_sales.to_csv('./data/sales.csv', index=False)
 
 def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = []):
 	data = []
@@ -57,6 +229,8 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 		, 'peskypenguinclub': 'pesky-penguins'
 	}
 	for collection in collections:
+		if collection == 'boryokudragonz':
+			continue
 		c = d[collection] if collection in d.keys() else collection
 		url = 'https://solanafloor.com/nft/{}/listed'.format(c)
 		browser.get(url)
@@ -106,6 +280,8 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 				break
 	old = pd.read_csv('./data/listings.csv')
 	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
+	# others = scrape_magic_eden()
+	# listings = listings.append(others).drop_duplicates()
 	d = {
 		'aurory': 'Aurory'
 		,'thugbirdz': 'Thugbirdz'
@@ -113,16 +289,17 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 		,'degenapes': 'Degen Apes'
 		,'peskypenguinclub': 'Pesky Penguins'
 		,'meerkatmillionaires': 'Meerkat Millionaires'
+		,'boryokudragonz': 'Boryoku Dragonz'
 	}
-	listings['collection'] = listings.collection.apply(lambda x: d[x])
+	listings['collection'] = listings.collection.apply(lambda x: clean_name(x))
 	old = old[ -(old.collection.isin(listings.collection.unique())) ]
 	pred_price = pd.read_csv('./data/pred_price.csv')
 	df = listings.merge(pred_price[['collection','token_id','pred_price']])
 	df['ratio'] = df.pred_price / df.price
 	print(df[df.collection == 'smb'].sort_values('ratio', ascending=0).head())
 	listings[ listings.collection == 'smb' ].head()
-	print(listings.groupby('collection').token_id.count())
 	listings = listings.append(old)
+	print(listings.groupby('collection').token_id.count())
 	listings.to_csv('./data/listings.csv', index=False)
 
 	listings = listings.sort_values('price')
@@ -134,9 +311,11 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 	t = t[ (t.pct >= 1.15) | (t.dff >= 10 ) ]
 
 	pred_price = pd.read_csv('./data/pred_price.csv')[['collection','token_id','pred_price','pred_sd']]
+	pred_price['collection'] = pred_price.collection.apply(lambda x: clean_name(x))
 	pred_price = pred_price.merge(listings)
 
 	coefsdf = pd.read_csv('./data/coefsdf.csv')
+	coefsdf['collection'] = coefsdf.collection.apply(lambda x: clean_name(x))
 	coefsdf['tot'] = coefsdf.lin_coef + coefsdf.log_coef
 	coefsdf['lin_coef'] = coefsdf.lin_coef / coefsdf.tot
 	coefsdf['log_coef'] = coefsdf.log_coef / coefsdf.tot
@@ -146,7 +325,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 
 	metadata = pd.read_csv('./data/metadata.csv')
 	solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'skin') & (metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
-	pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 8 if x['token_id'] in solana_blob and x['collection'] == 'aurory' else x['pred_price'], 1 )
+	pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 8 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
 
 	pred_price['abs_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.lin_coef
 	pred_price['pct_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.log_coef
@@ -347,8 +526,12 @@ def scrape_how_rare():
 	o_metadata[ (o_metadata.collection == 'aurory') ].feature_name.unique()
 	sorted(o_metadata[ (o_metadata.collection == 'aurory') & (o_metadata.feature_name == 'skin') ].feature_value.unique())
 	ts = o_metadata[ (o_metadata.collection == 'aurory') & (o_metadata.feature_name == 'skin') & (o_metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
+	ts = o_metadata[ (o_metadata.collection == 'smb') & (o_metadata.feature_name == 'type') & (o_metadata.feature_value == 'Skeleton (2.42%)')].token_id.unique()
+	# ts = o_metadata[ (o_metadata.collection == 'smb') & (o_metadata.feature_name == 'type')].feature_value.unique()
+	# ts = o_metadata[ (o_metadata.collection == 'smb') ].feature_name.unique()
 	len(ts)
 
+	token_data = []
 	errors = []
 	data = []
 	s_data = []
@@ -359,19 +542,21 @@ def scrape_how_rare():
 		'thugbirdz': 3333,
 		'meerkatmillionaires': 10000,
 		'peskypenguinclub': 8888,
+		'boryokudragonz': 1111,
 	}
-	k = 'peskypenguinclub'
-	v = 8888
+	k = 'degenapes'
+	v = collections[k]
 	seen = o_metadata[ (o_metadata.collection == k) ].token_id.unique()
 	opener = urllib.request.build_opener()
 	opener.addheaders = [('User-Agent','Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1941.0 Safari/537.36')]
 	urllib.request.install_opener(opener)
 	i = 1
 	j = i
-	# for i in range(j, v + 1):
 	# ts = [ x[1] for x in errors ]
-	# for i in range(j, v):
-	for i in ts:
+	# errors = []
+	# for i in range(11, 1112):
+	# for i in ts:
+	for i in range(j, v):
 		if i in seen:
 			continue
 		t_0 = time.time()
@@ -383,54 +568,56 @@ def scrape_how_rare():
 		url = 'https://howrare.is/{}/{}/'.format(k, i)
 		if k == 'thugbirdz':
 			url = 'https://howrare.is/{}/{}/'.format(k, str(i).zfill(4))
-		r = requests.get(url)
+		r = requests.get(url, cookies=cookies)
+		r = s.get(url)
 		soup = BeautifulSoup(r.text)
 		atts = { 'token_id': i, 'collection': k }
 		try:
-			ul = soup.find_all('ul', class_='attributes')[0]
+			ul = soup.find_all('div', class_='attributes')[0]
 		except:
 			try:
 				sleep(2)
 				r = requests.get(url)
 				soup = BeautifulSoup(r.text)
-				ul = soup.find_all('ul', class_='attributes')[0]
+				ul = soup.find_all('div', class_='attributes')[0]
 			except:
 				try:
 					sleep(10)
 					r = requests.get(url)
 					soup = BeautifulSoup(r.text)
-					ul = soup.find_all('ul', class_='attributes')[0]
+					ul = soup.find_all('div', class_='attributes')[0]
 				except:
 					errors += [[ k, i ]]
 					print('Error on ID #{}'.format(i))
 					continue
 		t_1 = time.time()
 		print('Took {} seconds to load page'.format(round(t_1 - t_0, 1)))
-		lis = ul.find_all('li')
+		lis = ul.find_all('div', class_='attribute')
 		if len(lis) == 0:
 			print('No atts on ID #{}'.format(i))
 		for li in lis:
 			# try:
-			if len(li.find_all('span')) + len(li.find_all('div')) == 2:
-				att = re.sub(' ', '_', re.sub( ':', '', li.find_all('span')[0].text)).strip().lower()
-				val = re.sub(' ', '', li.find_all('div')[0].text.strip())
-				val = ' '.join(li.find_all('div')[0].text.strip().split())
-				atts[att] = val
+			if len(li.contents) >= 2:
+				att = re.sub(' ', '_', li.contents[0].strip()).lower()
+				# val = ' '.join(li.find_all('div')[0].text.strip().split())
+				atts[att] = li.contents[1].text.strip()
 			# except:
 			# pass
-		data += [atts]
-		table = soup.find_all('table', class_='table')
-		# img = soup.find_all('img')
-		# if len(img):
-		# 	src = img[0].attrs['src']
-		# 	urllib.request.urlretrieve(src, './viz/www/img/{}/{}.png'.format(k, i))
+		table = soup.find_all('div', class_='sales_history')
+		img = soup.find_all('img')
+		if len(img):
+			src = img[0].attrs['src']
+			token_data += [[ k, i, src ]]
+			# urllib.request.urlretrieve(src, './viz/www/img/{}/{}.png'.format(k, i))
 		# print('Took {} seconds to load image'.format(round(time.time() - t_1, 1)))
+		data += [atts]
 		if len(table):
 			table = table[0]
-			for tr in table.find_all('tbody')[0].find_all('tr'):
-				td = tr.find_all('td')
-				tx_id = td[5].find_all('a')[0].attrs['href'] if len(td[5].find_all('a')) > 0 else None
-				s_data += [[ k, i, td[0].text, td[2].text, td[3].find_all('a')[0].attrs['href'], td[4].find_all('a')[0].attrs['href'], tx_id ]]
+			for tr in table.find_all('div', class_='all_coll_row')[1:]:
+				td = tr.find_all('div', class_='all_coll_col')
+				if len(td) > 4:
+					tx_id = td[4].find_all('a')[0].attrs['href'] if len(td[4].find_all('a')) > 0 else None
+					s_data += [[ k, i, td[0].text, re.sub('◎', '', td[1].text).strip(), td[2].find_all('a')[0].attrs['href'], td[3].find_all('a')[0].attrs['href'], tx_id ]]
 		# except:
 	df = pd.DataFrame(data)
 	# seen = list(df.token_id.unique())
@@ -440,7 +627,7 @@ def scrape_how_rare():
 	s_df['buyer'] = s_df.buyer.apply(lambda x: re.split('=', x)[-1] )
 	s_df['tx_id'] = s_df.tx_id.apply(lambda x: re.split('/', x)[-1] if x and x == x else None )
 	s_df.sort_values('price').tail(30)
-	# s_df[[ 'token_id','sale_date','price' ]].to_csv('~/Downloads/smb_zombie_sales.csv', index=False)
+	# s_df[[ 'token_id','sale_date','price' ]].to_csv('~/Downloads/smb_skelly_sales.csv', index=False)
 
 	def reshape_df(df):
 		r_data = []
@@ -463,13 +650,28 @@ def scrape_how_rare():
 	m_df.to_csv('./data/metadata.csv', index=False)
 
 	o_sales = pd.read_csv('./data/sales.csv').rename(columns={'block_timestamp':'sale_date'})[[ 'collection','token_id','sale_date','price' ]]
+	print(o_sales.groupby('collection').sale_date.max())
+	print(o_sales.groupby('collection').token_id.max())
+	print(o_sales.groupby('collection').token_id.count())
+	# o_sales = o_sales[o_sales.collection != 'aurory']
 	s_df = o_sales.append(s_df).drop_duplicates()
 	s_df = s_df.drop_duplicates()
 	print(s_df.groupby('collection').token_id.count())
-	len(s_df)
+	print(o_sales.groupby('collection').token_id.count())
 	s_df.to_csv('./data/sales.csv', index=False)
-	sales = pd.read_csv('./data/sales.csv')
+	# sales = pd.read_csv('./data/sales.csv')
 	# sales[sales.collection == 'smb'][['token_id','sale_date','price']].to_csv('~/Downloads/historical_monke_sales.csv', index=False)
+
+	tokens = pd.DataFrame(token_data, columns=['collection','token_id','image_url']).drop_duplicates()
+	tokens['image_url'] = tokens.image_url.apply(lambda x: x[:-8] )
+	tokens['image_url'].values[0]
+	len(tokens.token_id.unique())
+	tokens[ tokens.collection == 'degenapes' ].sort_values('token_id')
+	old = pd.read_csv('./data/tokens.csv')
+	old.image_url.unique()
+	tokens = old.append(tokens).drop_duplicates(subset=['collection','token_id'], keep='last')
+	print(tokens.groupby('collection').token_id.count())
+	tokens.to_csv('./data/tokens.csv', index=False)
 
 def save_img():
 	i = 1
@@ -487,9 +689,12 @@ def scratch():
 	o_sales.to_csv('./data/md_sales.csv', index=False)
 
 # scrape_listings(['smb'])
+# alerted = []
+# for i in range(1):
+# 	alerted = scrape_listings(alerted = alerted)
+# 	sleep_to = (datetime.today() + timedelta(minutes=15)).strftime("%H:%M %p")
+# 	print('Sleeping until {}'.format(sleep_to))
+# 	sleep(60 * 15)
 alerted = []
-for i in range(1):
-	alerted = scrape_listings(alerted = alerted)
-	sleep_to = (datetime.today() + timedelta(minutes=15)).strftime("%H:%M %p")
-	print('Sleeping until {}'.format(sleep_to))
-	sleep(60 * 15)
+alerted = scrape_listings(alerted = alerted)
+convert_collection_names()
