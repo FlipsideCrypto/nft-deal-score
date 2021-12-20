@@ -40,7 +40,8 @@ fluidPage(
 				span(id="beta-text-tooltip", class="beta", "beta")
 				, bsTooltip(id = "beta-text-tooltip", title = "This is a pilot app with 4 collections; plan is to expand to more collections and more chains!", placement = "right", trigger = "hover")
 			),
-			p("Check if an NFT listing is a deal, a steal, or a rip-off"),
+			p(class='margin-bottom-0', "Check if an NFT listing is a deal, a steal, or a rip-off"),
+			div("(not financial advice)"),
 		)
 	})
 	, fluidRow(

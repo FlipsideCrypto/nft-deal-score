@@ -1,6 +1,9 @@
 /******************/
 /*     Header     */
 /******************/
+.margin-bottom-0 {
+  margin-bottom: 0;
+}
 .header-images {
   padding-bottom: 10px;
 }

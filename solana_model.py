@@ -177,6 +177,7 @@ collections = sorted(metadata.keys())
 collection = 'Galactic Punks'
 tokens = pd.read_csv('./data/tokens.csv')
 for collection in s_df.collection.unique():
+    # collection = 'LunaBulls'
     # collection = 'smb'
     # collection = 'aurory'
     # collection = 'meerkatmillionaires'
@@ -206,8 +207,8 @@ for collection in s_df.collection.unique():
     df = p_sales.merge(p_metadata, on=['token_id','contract_address'])
     df = df[df.mn_20.notnull()]
     target_col = 'adj_price'
-    df[target_col] = df.apply(lambda x: max(0.8 * (x['mn_20'] - 0.2), x['price']), 1 )
-    df['mn_20'] = df.apply(lambda x: min(x[target_col], x['mn_20']), 1 )
+    df[target_col] = df.apply(lambda x: max(0.7 * (x['mn_20'] - 0.2), x['price']), 1 )
+    # df['mn_20'] = df.apply(lambda x: min(x[target_col], x['mn_20']), 1 )
     # tmp = df[['block_timestamp','mn_20']].copy()
     # tmp['tmp'] = tmp.block_timestamp.apply(lambda x: str(x)[:10] )
     # tmp = tmp.groupby('tmp').mn_20.median().reset_index()
@@ -439,8 +440,10 @@ for collection in s_df.collection.unique():
     test['pred'] = clf.predict( test[[ 'pred_lin','pred_log' ]].values )
     # test['pred'] = np.exp( (sd * model.predict(test[std_pred_cols].values)) + mu) * ratio
     test['pred_price'] = test.pred#.apply(lambda x: x*(1+pe_mu) )
+    if not CHECK_EXCLUDE:
+        test['pred_price'] = test.pred.apply(lambda x: (x*0.985) )
     test['pred_sd'] = test.pred * pe_sd
-    test['rk'] = test.pred.rank(ascending=0)
+    test['rk'] = test.pred.rank(ascending=0, method='first')
     test['collection'] = collection
     pred_price = pred_price.append( test[[ 'collection', 'contract_address','token_id','rank','rk','pred_price','pred_sd' ] + p_features].rename(columns={'rank':'hri_rank'}).sort_values('pred_price') )
     # print(test[[ 'contract_address','token_id','pred_price','pred_sd' ]].sort_values('pred_price'))
@@ -453,6 +456,23 @@ for collection in s_df.collection.unique():
     for a, b, c in zip(p_pred_cols, clf_lin.coef_, clf_log.coef_):
         coefs += [[ collection, a, b, c ]]
     coefs = pd.DataFrame(coefs, columns=['collection','col','lin_coef','log_coef'])
+    # coefs['feature'] = coefs.col.apply(lambda x: ' '.join(re.split('_', x)[:-1]).title() )
+    # coefs['feature'] = coefs.col.apply(lambda x: '_'.join(re.split('_', x)[:-1]) )
+    # coefs['value'] = coefs.col.apply(lambda x: re.split('_', x)[-1] )
+    # mn = coefs.groupby('feature')[[ 'lin_coef','log_coef' ]].min().reset_index()
+    # mn.columns = [ 'feature','mn_lin_coef','mn_log_coef' ]
+    # coefs = coefs.merge(mn)
+    # coefs['lin_coef'] = coefs.lin_coef - coefs.mn_lin_coef
+    # coefs['log_coef'] = coefs.log_coef - coefs.mn_log_coef
+    # coefs
+    # g = attributes[ attributes.collection == collection ][[ 'feature','value','rarity' ]].drop_duplicates()
+    # g['value'] = g.value.astype(str)
+    # len(coefs)
+    # g = coefs.merge(g, how='left')
+    # g[g.rarity.isnull()]
+    # len(g)
+    # coefs = coefs.merge( m_df[ m_df.collection == collection ][[ 'feature_name','' ]] )
+    # coefs.sort_values('lin_coef').tail(20)
 
     # TODO: pick the most common one and have that be the baseline
     most_common = attributes[(attributes.collection == collection)].sort_values('rarity', ascending=0).groupby('feature').head(1)
