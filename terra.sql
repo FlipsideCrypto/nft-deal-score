@@ -1,3 +1,6 @@
+
+AND additional_metadata:reservation_id = '4144'
+
 WITH ancient_traits1 AS (
 	SELECT block_timestamp,
 	block_id,

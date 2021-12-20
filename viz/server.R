@@ -45,7 +45,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Galactic Punks'
+			, selected = 'LunaBulls'
 			, choices = choices
 			, width = "100%"
 		)

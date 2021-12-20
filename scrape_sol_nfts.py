@@ -37,26 +37,33 @@ def clean_name(name):
 	return(name)
 
 def scrape_randomearth():
+	d_address = {
+		'Galactic Punks': 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
+		'LunaBulls': 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2'
+	}
 	data = []
-	page = 0
-	has_more = True
-	while has_more:
-		page += 1
-		print('Page #{}'.format(page))
-		url = 'https://randomearth.io/api/items?collection_addr=terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k&sort=price.asc&page={}&on_sale=1'.format(page)
-		browser.get(url)
-		soup = BeautifulSoup(browser.page_source)
-		# txt = browser.page_source
-		j = json.loads(soup.text)
-		has_more = 'items' in j.keys() and len(j['items'])
-		if has_more:
-			for i in j['items']:
-				data += [[ 'Terra', 'Galactic Punks', i['token_id'], i['price'] / (10 ** 6) ]]
-	df = pd.DataFrame(data, columns=['chain','collection','token_id','price'])
-	old = pd.read_csv('./data/listings.csv')
-	old = old[-old.collection.isin(df.collection.unique())]
-	old = old.append(df)
-	old.to_csv('./data/listings.csv', index=False)
+	for collection in [ 'Galactic Punks', 'LunaBulls' ]:
+		print(collection)
+		page = 0
+		has_more = True
+		while has_more:
+			page += 1
+			print('Page #{}'.format(page))
+			url = 'https://randomearth.io/api/items?collection_addr={}&sort=price.asc&page={}&on_sale=1'.format( d_address[collection], page)
+			browser.get(url)
+			soup = BeautifulSoup(browser.page_source)
+			# txt = browser.page_source
+			j = json.loads(soup.text)
+			has_more = 'items' in j.keys() and len(j['items'])
+			if has_more:
+				for i in j['items']:
+					data += [[ 'Terra', collection, i['token_id'], i['price'] / (10 ** 6) ]]
+		df = pd.DataFrame(data, columns=['chain','collection','token_id','price'])
+		old = pd.read_csv('./data/listings.csv')
+		old = old[-old.collection.isin(df.collection.unique())]
+		old = old.append(df)
+		print(old.groupby('collection').token_id.count())
+		old.to_csv('./data/listings.csv', index=False)
 
 def awards():
 	dailysales = pd.read_csv('~/Downloads/dailysales.csv')
@@ -106,8 +113,8 @@ def scrape_recent_smb_sales():
 	browser.find_elements_by_class_name('inline-flex')[-1].click()
 	sleep(2)
 	es = browser.find_elements_by_class_name('inline-flex')
-	for i in range(len(es)):
-		print(i, es[i].text)
+	# for i in range(len(es)):
+	# 	print(i, es[i].text)
 	browser.find_elements_by_class_name('inline-flex')[4].click()
 	sleep(2)
 	soup = BeautifulSoup(browser.page_source)
@@ -124,25 +131,26 @@ def scrape_recent_smb_sales():
 	print('{} new sales'.format(len(new_sales)))
 	smb = o_sales[o_sales.collection.isin(['smb','Solana Monkey Business'])]
 	o_sales = o_sales[-(o_sales.collection.isin(['smb','Solana Monkey Business']))]
-	print(len(smb))
+	l0 = len(smb)
 	smb = smb.append(new_sales)
 	smb['tmp'] = smb.sale_date.apply(lambda x: str(x)[:10] )
-	smb = smb.drop_duplicates(subset=['token_id','price'], keep='last')
-	print(len(smb))
-	smb[(smb.tmp >= '2021-12-13') & (-smb.token_id.isin(list(new_sales.token_id.unique())))]
-	smb['messed'] = smb.sale_date.apply(lambda x: str(x)[14:22] == '02:36.63' )
-	smb['sale_date'] = smb.sale_date.apply(lambda x: datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S') if len(str(x)) == 19 else datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S.%f') )
-	mn = smb[smb.messed].sale_date.min()
-	def f(x):
-		if x['messed'] == True:
-			d = x['sale_date'] - mn
-			return(mn - d)
-		return(x['sale_date'])
-	smb['sale_date'] = smb.apply(lambda x: f(x), 1 )
-	smb['tmp'] = smb.sale_date.apply(lambda x: str(x)[:10] )
-	len(smb[smb.messed])
-	print(smb.groupby('tmp').token_id.count().reset_index())
-	smb.groupby('tmp').token_id.count().reset_index().to_csv('~/Downloads/tmp.csv', index=False)
+	smb = smb.drop_duplicates(subset=['token_id','price','tmp'], keep='last')
+	l1 = len(smb)
+	print('SMB sales {} -> {} (added {}, max date {})'.format(l0, l1, l1 - l0, new_sales.sale_date.max()))
+	# smb[(smb.tmp >= '2021-12-13') & (-smb.token_id.isin(list(new_sales.token_id.unique())))]
+	# smb['messed'] = smb.sale_date.apply(lambda x: str(x)[14:22] == '02:36.63' )
+	# smb['sale_date'] = smb.sale_date.apply(lambda x: datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S') if len(str(x)) == 19 else datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S.%f') )
+	# mn = smb[smb.messed].sale_date.min()
+	# def f(x):
+	# 	if x['messed'] == True:
+	# 		d = x['sale_date'] - mn
+	# 		return(mn - d)
+	# 	return(x['sale_date'])
+	# smb['sale_date'] = smb.apply(lambda x: f(x), 1 )
+	# smb['tmp'] = smb.sale_date.apply(lambda x: str(x)[:10] )
+	# len(smb[smb.messed])
+	# print(smb.groupby('tmp').token_id.count().reset_index())
+	# smb.groupby('tmp').token_id.count().reset_index().to_csv('~/Downloads/tmp.csv', index=False)
 	# print(smb[smb.messed==False].groupby('tmp').token_id.count().tail(20))
 	# len(smb[(smb.tmp >= '2021-12-12') & (-smb.token_id.isin(list(new_sales.token_id.unique())))])
 	del smb['tmp']
@@ -187,11 +195,11 @@ def convert_collection_names():
 
 def scrape_recent_sales():
 	o_sales = pd.read_csv('./data/sales.csv')
+	o_sales['collection'] = o_sales.collection.apply(lambda x: 'degenapes' if x == 'degenape' else x )
 	o_sales.groupby('collection').sale_date.max()
 	sales = pd.DataFrame()
-	collections = [ 'aurory']
-	collection = 'thugbirdz'
-	collection = 'degenape'
+	collections = [ 'aurory','thugbirdz','degenape']
+	collection = 'peskypenguinclub'
 	for collection in collections:
 		url = 'https://qzlsklfacc.medianetwork.cloud/all_sold_per_collection_day?collection={}'.format(collection)
 		# url = 'https://qzlsklfacc.medianetwork.cloud/all_sold_per_collection_day?collection={}'.format('degenape')
@@ -199,16 +207,18 @@ def scrape_recent_sales():
 		r = requests.get(url)
 		j = r.json()
 		cur = pd.DataFrame(j)
-		cur['collection'] = collection
+		cur['collection'] = 'degenapes' if collection == 'degenape' else collection
 		cur['sale_date'] = cur.date.apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S.000Z'))
 		cur['token_id'] = cur.name.apply(lambda x: int(re.split('#', x)[1]) )
 		sales = sales.append( cur[['collection','token_id','price','sale_date']] )
 	l0 = len(o_sales)
+	print(sales.groupby('collection').token_id.count())
 	sales['tmp'] = sales.sale_date.apply(lambda x: str(x)[:10] )
 	o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
 	o_sales = o_sales.append(sales).drop_duplicates(subset=['collection','token_id','tmp','price'])
+	o_sales = o_sales.drop_duplicates(subset=['collection','token_id','tmp','price'])
 	l1 = len(o_sales)
-	print('{} -> {}'.format(l0, l1))
+	print('{} -> {} (added {})'.format(l0, l1, l1 - l0))
 	o_sales.groupby('collection').tmp.max()
 	o_sales.groupby('collection').token_id.count()
 	del o_sales['tmp']
@@ -288,6 +298,9 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 		,'boryokudragonz': 'Boryoku Dragonz'
 	}
 	listings['collection'] = listings.collection.apply(lambda x: clean_name(x))
+	listings[listings.token_id=='1656']
+	listings[listings.token_id==1656]
+
 	old = old[ -(old.collection.isin(listings.collection.unique())) ]
 	pred_price = pd.read_csv('./data/pred_price.csv')
 	listings.token_id.values[:3]
@@ -337,6 +350,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 	pred_price['deal_score'] = pred_price.apply( lambda x: 100 * (1 - norm.cdf( x['price'], x['pred_price'], 2 * x['pred_sd'] * x['pred_price'] / x['pred_price_0'] )) , 1 )
 
 	pred_price = pred_price.sort_values(['deal_score'], ascending=[0])
+	pred_price[pred_price.token_id=='1656']
 	g = pred_price.groupby('collection').head(4)[['collection','token_id','deal_score','price']]
 	n1 = g.groupby('collection').head(2).groupby('collection').head(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_1'})
 	n2 = g.groupby('collection').head(2).groupby('collection').tail(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_2'})
@@ -697,4 +711,5 @@ def scratch():
 # 	sleep(60 * 15)
 alerted = []
 alerted = scrape_listings(alerted = alerted)
+scrape_randomearth()
 convert_collection_names()
