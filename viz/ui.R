@@ -78,6 +78,7 @@ fluidPage(
 					div(class = "subtitle", textOutput("tokenrank", inline=TRUE), icon(class="padding-left-5", id="rank-tooltip", "info-circle") )
 					, bsTooltip(id = "rank-tooltip", title = "Dynamic value rank based on the estimated fair market price modeled from historical sales. Model and rank will update periodically as we get more sales data.", placement = "bottom", trigger = "hover")
 				)
+				, div(class = "link", uiOutput('randomearthurl'))
 			)
 			, fluidRow(
 				column(6

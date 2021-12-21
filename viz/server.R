@@ -658,6 +658,18 @@ server <- function(input, output, session) {
 		HTML(paste(url))
     })
 
+	output$randomearthurl <- renderUI({
+		id <- getTokenId()
+		selected <- getCollection()
+		chain <- getChain()
+		if( chain != 'Terra' | length(id) == 0 | length(selected) == 0 ) {
+			return(NULL)
+		}
+		href <- tokens[ (collection == eval(selected)) & (token_id == eval(id)) ]$market_url[1]
+		url <- span("View on ", a("randomearth.io", href=href))
+		HTML(paste(url))
+    })
+
 	observe({
 		req(input$tokenid)
 		ed <- event_data("plotly_click", source = "listingLink")
