@@ -24,6 +24,14 @@ ctx = snowflake.connector.connect(
 	account='vna27887.us-east-1'
 )
 
+d_market = {
+	'Galactic Punks': 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
+	'LunaBulls': 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2',
+	'Levana Dragon Eggs': 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg',
+	'Levana Dust': 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7',
+	'Levana Meteors': 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v',
+}
+
 ###################################
 #     Define Helper Functions     #
 ###################################
@@ -40,10 +48,26 @@ def manual_clean():
 			df['clean_token_id'] = df.token_id
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
-def add_eth_sales():
-	# BAYC and MAYC sales
-	query = '''
-	'''
+def run_queries():
+	for c in [ 'Levana Dragon Eggs','Levana Meteors','Levana Dust' ]:
+		with open('./metadata/sql/{}.txt'.format(c)) as f:
+			query = f.readlines()
+		metadata = ctx.cursor().execute(' '.join(query))
+		metadata = pd.DataFrame.from_records(iter(metadata), columns=[x[0] for x in metadata.description])
+		metadata = clean_colnames(metadata)
+		metadata['collection'] = c
+		metadata['chain'] = 'Terra'
+		metadata.to_csv('./data/metadata/{}.csv'.format(c), index=False)
+		# old = pd.read_csv('./data/metadata.csv')
+		# old = old[-old.collection.isin(metadata.collection.unique())]
+		# old = old[[ 'token_id', 'collection', 'feature_name', 'feature_value' ]]
+		# old = old.append(metadata)
+		# old = old.drop_duplicates()
+		# print(old.groupby(['chain','collection']).token_id.count())
+		# print(old[['chain','collection','token_id']].drop_duplicates().groupby(['chain','collection']).token_id.count())
+		# old.to_csv('./data/metadata.csv', index=False)
+		# old = old[-old.collection == c]
+
 def add_terra_tokens():
 	# galactic punks
 	query = '''
@@ -60,21 +84,25 @@ def add_terra_tokens():
 	tokens = clean_colnames(tokens)
 	for c in tokens.columns:
 		tokens[c] = tokens[c].apply(lambda x: re.sub('"', '', x) )
-	for collection in [ 'Galactic Punks', 'LunaBulls' ]:
-		if collection == 'LunaBulls':
-			df = pd.read_csv('./data/metadata/lunabulls/lunabulls.csv')
-			df = clean_colnames(df).rename(columns={'tokenid':'token_id'})
-			df['collection'] = collection
-			df['image_url'] = df.ipfs_image
-		else:
+	for collection in [ 'Galactic Punks', 'LunaBulls', 'Levana Dragon Eggs' ]:
+		if collection == 'Galactic Punks':
 			df = tokens
 			df['image_url'] = df.image.apply(lambda x: 'https://ipfs.io/ipfs/'+re.split('/', x)[-1] )
-		df['clean_token_id'] = df.name.apply(lambda x: re.split('#', x)[1] )
+		else:
+			df = pd.read_csv('./data/metadata/{}.csv'.format(collection))
+			df = clean_colnames(df).rename(columns={'tokenid':'token_id'})
+			df['collection'] = collection
+			if collection == 'LunaBulls':
+				df['image_url'] = df.ipfs_image
+			else:
+				df['image_url'] = df.image
+		df['clean_token_id'] = df.name.apply(lambda x: re.split('#', x)[1] ).astype(int)
 		df['collection'] = collection
 		df['chain'] = 'Terra'
 		old = pd.read_csv('./data/tokens.csv')
 		old = old[ -(old.collection == collection) ]
 		old = old.drop_duplicates(subset=['collection','token_id'], keep='first')
+		df['market_url'] = df.apply(lambda x: '' if x['chain'] == 'Solana' else 'https://randomearth.io/items/{}_{}'.format( d_market[x['collection']], x['token_id'] ), 1)
 		df = df[list(old.columns)]
 		old = old.append(df)
 		print(old.groupby('collection').clean_token_id.count())
@@ -101,8 +129,8 @@ def add_terra_metadata():
 	db_metadata = ctx.cursor().execute(query)
 	db_metadata = pd.DataFrame.from_records(iter(db_metadata), columns=[x[0] for x in db_metadata.description])
 	db_metadata = clean_colnames(db_metadata)
-	collection = 'LunaBulls'
-	for collection in [ 'Galactic Punks', 'LunaBulls' ]:
+	collection = 'Levana Dragon Eggs'
+	for collection in [ 'Galactic Punks', 'LunaBulls', 'Levana Dragon Eggs' ]:
 		if collection == 'Galactic Punks':
 			cur = db_metadata[ db_metadata.collection == collection ]
 			data = []
@@ -117,8 +145,11 @@ def add_terra_metadata():
 			metadata = pd.DataFrame(data)
 		else:
 			cols = [ 'token_id', 'background', 'horns', 'body', 'nose', 'outfit', 'eyes', 'headwear', 'nosepiece' ]
-			metadata = pd.read_csv('./data/metadata/lunabulls/lunabulls.csv')
+			metadata = pd.read_csv('./data/metadata/{}.csv'.format(collection))
+			if 'Levana' in collection:
+				metadata = metadata.rename(columns={'rank':'collection_rank'})
 			metadata = clean_colnames(metadata).rename(columns={'tokenid':'token_id'})
+			cols = [ c for c in metadata.columns if not c in [ 'block_timestamp','block_id','tx_id','collection','chain','name','image' ] ]
 			metadata = metadata[cols]
 			metadata['collection'] = collection
 
@@ -132,21 +163,28 @@ def add_terra_metadata():
 		metadata['pct'] = 1
 		metadata['attribute_count'] = 0
 		l = len(metadata)
+		incl_att_count = not collection in [ 'Levana Dragon Eggs' ]
 		for c in list(metadata.columns) + ['attribute_count']:
-			if c in ['token_id','collection','pct']:
+			if c in ['token_id','collection','pct','levana_rank','meteor_id']:
+				continue
+			if c == 'attribute_count' and not incl_att_count:
 				continue
 			g = metadata.groupby(c).token_id.count().reset_index()
 			g['cur_pct'] = g.token_id / l
 			metadata = metadata.merge(g[[c, 'cur_pct']])
 			metadata['pct'] = metadata.pct * metadata.cur_pct
-			if not c in ['attribute_count','glitch_trait']:
+			if incl_att_count and not c in ['attribute_count','glitch_trait']:
 				metadata['attribute_count'] = metadata.attribute_count + metadata[c].apply(lambda x: int(x != none_col) )
 			del metadata['cur_pct']
 			# cur = metadata[[ 'collection','token_id', c ]].rename(columns={c: 'feature_value'})
 			# cur['feature_name'] = c
 			# m = m.append(cur)
-		metadata.groupby('attribute_count').token_id.count().reset_index()
+		if incl_att_count:
+			metadata.groupby('attribute_count').token_id.count().reset_index()
+			# metadata.groupby(['rarity','attribute_count']).token_id.count().reset_index()
 		# metadata.groupby('backgrounds').token_id.count().reset_index().token_id.sum()
+		# metadata.sort_values('pct_rank')
+		metadata.sort_values('pct')
 		metadata['rank'] = metadata.pct.rank()
 		metadata['score'] = metadata.pct.apply(lambda x: 1.0 / x )
 		mn = metadata.score.min()
@@ -168,16 +206,23 @@ def add_terra_metadata():
 		g = m.groupby('feature_value').feature_name.count().reset_index().sort_values('feature_name').tail(50)
 		old = pd.read_csv('./data/metadata.csv')
 		if not 'chain' in old.columns:
-			old['chain'] = 'Solana'
+			old['chain'] = old.collection.apply(lambda x: 'Terra' if x in [ 'Galactic Punks', 'LunaBulls' ] else 'Solana' )
 		old = old[-old.collection.isin(m.collection.unique())]
 		old = old.append(m)
+		old = old.drop_duplicates()
 		print(old.groupby(['chain','collection']).token_id.count())
 		print(old[['chain','collection','token_id']].drop_duplicates().groupby(['chain','collection']).token_id.count())
-		old = old.drop_duplicates()
 		old.to_csv('./data/metadata.csv', index=False)
 
 def add_terra_sales():
 	# galactic punks
+	contracts = [
+		'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7'
+		, 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v'
+		, 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg'
+		, 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2'
+		, 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k'
+	]
 	query = '''
 	WITH orders AS (
 		SELECT tx_id
@@ -189,7 +234,7 @@ def add_terra_sales():
 		WHERE msg_value:contract::string = 'terra1eek0ymmhyzja60830xhzm7k7jkrk99a60q2z2t' 
 		AND tx_status = 'SUCCEEDED'
 		AND msg_value:execute_msg:execute_order IS NOT NULL
-		AND contract IN ( 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k','terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2','terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' )
+		AND contract IN ( '{}' )
 	), Lorders AS (
 		SELECT tx_id
 		, block_timestamp AS sale_date
@@ -200,14 +245,16 @@ def add_terra_sales():
 		WHERE msg_value:contract::string = 'terra1eek0ymmhyzja60830xhzm7k7jkrk99a60q2z2t' 
 		AND tx_status = 'SUCCEEDED'
 		AND msg_value:execute_msg:ledger_proxy:msg:execute_order IS NOT NULL
-		AND contract IN ( 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k','terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2','terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' )
+		AND contract IN ( '{}' )
 	), unioned AS (
 		SELECT * FROM orders
 		UNION ALL 
 		SELECT * FROM Lorders
 	)
 	SELECT CASE 
-		WHEN contract = 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' THEN 'Levana Dragons'
+		WHEN contract = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' THEN 'Levana Dust'
+		WHEN contract = 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' THEN 'Levana Meteors'
+		WHEN contract = 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' THEN 'Levana Dragon Eggs'
 		WHEN contract = 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2' THEN 'LunaBulls'
 		WHEN contract = 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k' THEN 'Galactic Punks'
 		ELSE 'Other' 
@@ -217,7 +264,7 @@ def add_terra_sales():
 	, tx_id
 	, price
 	FROM unioned
-	'''
+	'''.format( '\', \''.join(contracts), '\', \''.join(contracts) )
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
@@ -232,6 +279,7 @@ def add_terra_sales():
 	old = old[ -(old.collection.isin(sales.collection.unique())) ]
 	old = old.append(sales)
 	old = old[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
+	old = old[-(old.collection == 'Levana Dragons')]
 	print(old.groupby(['chain','collection']).token_id.count())
 	old.to_csv('./data/sales.csv', index=False)
 

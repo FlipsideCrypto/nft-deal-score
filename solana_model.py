@@ -18,7 +18,7 @@ warnings.filterwarnings('ignore')
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
 CHECK_EXCLUDE = False
-# CHECK_EXCLUDE = True
+CHECK_EXCLUDE = True
 
 # Using sales from howrare.is - the last sale that was under 300 was when the floor was at 72. Filtering for when the floor is >100, the lowest sale was 400
 
@@ -64,8 +64,11 @@ exclude = [
     # ( 'aurory', 3323, 138 )
 ]
 s_df = pd.read_csv('./data/sales.csv').rename(columns={'sale_date':'block_timestamp'})
+s_df[ s_df.collection == 'Levana Dragons' ].sort_values('block_timestamp', ascending=0).head()
+print(len(s_df[s_df.collection == 'Levana Dragon Eggs']))
+print(s_df.groupby('collection').token_id.count())
 s_df.collection.unique()
-s_df = s_df[-s_df.collection.isin(['Levana Dragons'])]
+s_df = s_df[-s_df.collection.isin(['Levana Meteors','Levana Dust'])]
 s_df = s_df[[ 'chain','collection','block_timestamp','token_id','price','tx_id' ]]
 s_df = s_df[ -s_df.collection.isin(['boryokudragonz', 'Boryoku Dragonz']) ]
 for e in exclude:
@@ -80,6 +83,10 @@ if not CHECK_EXCLUDE:
     del s_df['exclude']
 
 m_df = pd.read_csv('./data/metadata.csv')
+m_df['token_id'] = m_df.token_id.astype(str)
+tmp = m_df[m_df.collection.isin(['Levana Dragon Eggs','Levana Meteors','Levana Dust'])]
+tmp['tmp'] = tmp.token_id.astype(int)
+tmp.groupby('collection').tmp.max()
 m_df.head()
 # s_df['block_timestamp'] = s_df.block_timestamp.apply(lambda x: datetime.strptime(x[:10], '%Y-%m-%d %H:%M:%S') )
 s_df['block_timestamp'] = s_df.block_timestamp.apply(lambda x: datetime.strptime(str(x)[:19], '%Y-%m-%d %H:%M:%S') if len(x) > 10 else datetime.strptime(x[:10], '%Y-%m-%d') )
@@ -94,12 +101,18 @@ s_df[[ 'block_timestamp','days_ago' ]].drop_duplicates(subset=['days_ago'])
 
 s_df['av_20'] = s_df.groupby('collection')['mn_20'].rolling(20).mean().reset_index(0,drop=True)
 s_df = s_df.sort_values(['collection','block_timestamp'])
-s_df['md_20'] = s_df.groupby('collection')['mn_20'].rolling(20).median().reset_index(0,drop=True)
-s_df = s_df[ (s_df.price) >= (s_df.av_20 * 0.2) ]
+# s_df['md_20'] = s_df.groupby('collection')['mn_20'].rolling(20).median().reset_index(0,drop=True)
+s_df['md_20'] = s_df.groupby('collection')['mn_20'].rolling(20).quantile(.01).reset_index(0,drop=True)
+# s_df[ (-((s_df.price) >= (s_df.md_20 * 0.2))) & (s_df.price.notnull()) & (s_df.collection == 'Levana Dragon Eggs') ]
+
+s_df = s_df[ (s_df.price) >= (s_df.md_20 * 0.75) ]
+s_df = s_df.sort_values(['collection','block_timestamp'])
 s_df['mn_20'] = s_df.groupby('collection').price.shift(1)
+s_df = s_df.sort_values(['collection','block_timestamp'])
 # s_df['mn_20'] = s_df.groupby('collection')['mn_20'].rolling(20).min().reset_index(0,drop=True)
 s_df['mn_20'] = s_df.groupby('collection')['mn_20'].rolling(20).quantile(.1).reset_index(0,drop=True)
-s_df[['price','mn_20','block_timestamp']].head(40).tail(40)
+s_df.sort_values(['collection','block_timestamp'])[['price','mn_20','block_timestamp']].head(21).tail(40)
+s_df.sort_values(['collection','block_timestamp'])[['price','mn_20','block_timestamp']].head(20).sort_values('price')
 s_df['tmp'] = s_df.mn_20 / s_df.md_20
 
 tmp = s_df[s_df.collection=='smb'][['mn_20','block_timestamp']]
@@ -129,12 +142,16 @@ sales = {}
 collection_features = {}
 m_df[(m_df.collection == 'Galactic Punks') & (m_df.feature_name == 'pct')].sort_values('token_id')
 c = 'Galactic Punks'
+EXCLUDE_COLS = {
+    'Levana Dragon Eggs': ['collection_rank','meteor_id','shower','lucky_number','cracking_date','attribute_count','weight','temperature']
+}
 for c in s_df.collection.unique():
     print('Building {} model'.format(c))
     sales[c] = s_df[ s_df.collection == c ]
-    pred_cols[c] = sorted(m_df[ m_df.collection == c ].feature_name.unique())
-    collection_features[c] = [ c for c in pred_cols[c] if not c in ['score','rank','pct'] ]
-    metadata[c] = m_df[ m_df.collection == c ]
+    exclude = EXCLUDE_COLS[c] if c in EXCLUDE_COLS.keys() else []
+    pred_cols[c] = sorted([x for x in m_df[ m_df.collection == c ].feature_name.unique() if not x in exclude])
+    collection_features[c] = [ c for c in pred_cols[c] if not c in ['score','rank','pct']+exclude ]
+    metadata[c] = m_df[ (m_df.collection == c) & (-(m_df.feature_name.isin(exclude))) ]
 
     # tmp = pd.pivot_table( metadata[c], ['collection','token_id'], columns=['feature_name'], values=['feature_value'] )
     metadata[c] = metadata[c].pivot( ['collection','token_id'], ['feature_name'], ['feature_value'] ).reset_index()
@@ -155,7 +172,9 @@ for c in s_df.collection.unique():
     cur = pd.concat([ cur.reset_index(drop=True), dummies.reset_index(drop=True) ], axis=1)
     metadata[c] = cur
     # pred_cols[c] = ['rank','score','timestamp','mn_20','log_mn_20'] + list(dummies.columns)
-    pred_cols[c] = ['rank','score'] + list(dummies.columns)
+    cols = [ 'collection_rank' ]
+    cols = [ ]
+    pred_cols[c] = [ 'rank','transform_rank','score'] + [x for x in cols if x in m_df.feature_name.unique()] + list(dummies.columns)
 
 # collection_features = {
 #     'Hashmasks': [ 'character','eyecolor','item','mask','skincolor' ]
@@ -164,8 +183,6 @@ for c in s_df.collection.unique():
 #     , 'Aurory': [ 'attribute_count','type','clothes','ears','mouth','eyes','hat','background' ]
 #     # , 'Thugbirdz': [ 'attribute_count','type','clothes','ears','mouth','eyes','hat','background' ]
 # }
-
-sorted(metadata['aurory'].columns)
 
 excludedf = pd.DataFrame()
 coefsdf = pd.DataFrame()
@@ -176,14 +193,17 @@ feature_values = pd.DataFrame()
 collections = sorted(metadata.keys())
 collection = 'Galactic Punks'
 tokens = pd.read_csv('./data/tokens.csv')
-for collection in s_df.collection.unique():
+collection = 'Levana Dragon Eggs'
+# for collection in s_df.collection.unique():
+for collection in ['Levana Dragon Eggs']:
     # collection = 'LunaBulls'
     # collection = 'smb'
     # collection = 'aurory'
     # collection = 'meerkatmillionaires'
     print('Working on collection {}'.format(collection))
     p_metadata = metadata[collection]
-    p_metadata['attribute_count'] = p_metadata.attribute_count.astype(float).astype(int)
+    if 'attribute_count' in p_metadata.columns:
+        p_metadata['attribute_count'] = p_metadata.attribute_count.astype(float).astype(int)
     
     p_sales = sales[collection]
     # specify the predictive features
@@ -199,10 +219,10 @@ for collection in s_df.collection.unique():
     p_metadata['contract_address'] = ''
 
     # remove 1 columns for each group (since they are colinear)
-    exclude = []
-    for f in p_features:
-        e = [ c for c in p_pred_cols if c[:len(f)] == f ][-1]
-        exclude.append(e)
+    # exclude = []
+    # for f in p_features:
+    #     e = [ c for c in p_pred_cols if c[:len(f)] == f ][-1]
+    #     exclude.append(e)
 
     df = p_sales.merge(p_metadata, on=['token_id','contract_address'])
     df = df[df.mn_20.notnull()]
@@ -216,6 +236,7 @@ for collection in s_df.collection.unique():
     # df['timestamp'] = df.block_timestamp.astype(int)
     df = df[df[target_col].notnull()]
     df = df.reset_index(drop=True)
+    df['transform_rank'] = df['rank'].apply(lambda x: 1.0 / (x**2) )
     df['rel_price_0'] = df[target_col] - df.mn_20
     df['rel_price_1'] = df[target_col] / df.mn_20
     df = df[df.mn_20 > 0]
@@ -224,6 +245,7 @@ for collection in s_df.collection.unique():
     # df['price_median'] = df.groupby('token_id').price.median()
 
     # standardize columns to mean 0 sd 1
+    len(p_pred_cols)
     df = standardize_df(df, p_pred_cols)
     std_pred_cols_0 = [ 'std_{}'.format(c) for c in p_pred_cols ]
     # p_pred_cols = [ c for c in p_pred_cols if not c in exclude ]
@@ -256,60 +278,6 @@ for collection in s_df.collection.unique():
     y_0 = df.rel_price_0.values
     y_1 = df.rel_price_1.values
     # y_log = df.log_price.values
-
-    # max_depth, min_samples_leaf, max_leaf_nodes
-    # d = {}
-    # tracker = []
-    # for max_depth in [ 2, 4, 6 ]:
-    #     for min_samples_leaf in [5, 25, 100]:
-    #         for max_leaf_nodes in [25, 100, 500]:
-    #             x_train, x_test, y_train, y_test = train_test_split(X, y, test_size = .2, random_state = 123)
-
-    #             clf = RandomForestRegressor(max_depth=max_depth, min_samples_leaf=min_samples_leaf, max_leaf_nodes=max_leaf_nodes)
-    #             kf = KFold(n_splits=4)
-    #             errs = []
-    #             pred = np.zeros(len(X))
-    #             for train_index, test_index in kf.split(X):
-    #                 X_train, X_test = X[train_index], X[test_index]
-    #                 y_train, y_test = y[train_index], y[test_index]
-    #                 clf.fit(X_train, y_train)
-    #                 y_pred = clf.predict(X_test)
-    #                 pred[test_index] = y_pred
-    #                 err = np.mean([ abs((y_p - y_a) - 0) for y_p, y_a in zip(y_pred, y_test) ])
-    #                 # err = np.mean([ ((y_p - y_a) - 0) for y_p, y_a in zip(y_pred, y_test) ])
-    #                 errs.append(err)
-    #             tracker += [[ max_depth, min_samples_leaf, max_leaf_nodes, np.mean(errs) ]]
-    # tracker = pd.DataFrame(tracker, columns=['max_depth', 'min_samples_leaf', 'max_leaf_nodes', 'avg_err']).sort_values('avg_err', ascending=0)
-    # tracker
-    # df['pred'] = pred
-    # df[['pred','rel_price_1','token_id','mn_20']].head()
-
-
-
-    # # run neural net
-    # model = tf.keras.models.Sequential([
-    #     tf.keras.layers.Dense(10, activation='relu')
-    #     # , tf.keras.layers.Dense(10, activation='linear')
-    #     , tf.keras.layers.Dense(5, activation='relu')
-    #     # , tf.keras.layers.Dense(3, activation='linear')
-    #     , tf.keras.layers.Dense(1, activation='linear')
-    # ])
-    # # model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer='adam')
-    # model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer='sgd')
-    # # model.compile(loss='mse', optimizer='sgd')
-    # # model.compile(loss='mse', optimizer=tf.keras.optimizers.SGD(learning_rate=0.001))
-    # # model.compile(loss='mae', optimizer=tf.keras.optimizers.SGD(learning_rate=0.0025))
-    # # model.compile(loss='mae', optimizer=tf.keras.optimizers.SGD())
-    # model.fit(X, y, epochs=200, validation_split=0.25)
-
-    # print(np.mean(y))
-    # print(np.mean(model.predict(X)))
-
-
-
-    # d = {}
-    # d[collection] = df
-    # ret = models.fit_mlp( d, collection, std_pred_cols, None, .2, classifier = False, useUSD = False )
 
     clf_lin = RidgeCV(alphas=[1.5**x for x in range(20)])
     clf_lin.fit(X, y_0, df.weight.values)
@@ -536,11 +504,21 @@ feature_values['feature'] = feature_values.feature.apply(lambda x: re.sub('_', '
 
 pred_price = pred_price[[ 'collection', 'contract_address', 'token_id', 'hri_rank', 'rk', 'pred_price', 'pred_sd' ]]
 
+
 coefsdf.to_csv('./data/coefsdf.csv', index=False)
 salesdf.to_csv('./data/model_sales.csv', index=False)
 pred_price.to_csv('./data/pred_price.csv', index=False)
 attributes.to_csv('./data/attributes.csv', index=False)
 feature_values.to_csv('./data/feature_values.csv', index=False)
+
+pred_price = pd.read_csv('./data/pred_price.csv')
+tokens = pd.read_csv('./data/tokens.csv')
+rem = tokens[tokens.clean_token_id>=10000].token_id.unique()
+l0 = len(pred_price)
+pred_price = pred_price[ -((pred_price.collection == 'LunaBulls') & (pred_price.token_id.isin(rem))) ]
+l1 = len(pred_price)
+pred_price.to_csv('./data/pred_price.csv', index=False)
+
 # excludedf.to_csv('./data/excludedf.csv', index=False)
 # listings = pd.read_csv('./data/listings.csv')
 # listings['token_id'] = listings.token_id.astype(int)

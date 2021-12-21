@@ -458,6 +458,7 @@ def scrape_solanafloor():
 	len(tokens.token_id.unique())
 	tokens[ tokens.collection == 'degenapes' ].sort_values('token_id')
 	old = pd.read_csv('./data/tokens.csv')
+	old[ old.collection == 'LunaBulls' ].head()
 	tokens = old.append(tokens).drop_duplicates()
 	print(tokens.groupby('collection').token_id.count())
 	tokens.to_csv('./data/tokens.csv', index=False)
@@ -711,5 +712,5 @@ def scratch():
 # 	sleep(60 * 15)
 alerted = []
 alerted = scrape_listings(alerted = alerted)
-scrape_randomearth()
+# scrape_randomearth()
 convert_collection_names()

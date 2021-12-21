@@ -4,7 +4,8 @@ select  block_timestamp,
         block_id,
         tx_id,
         msg_value:execute_msg:mint:extension:name::string                as name,
-        msg_value:execute_msg:mint:token_id::float                       as tokenid,
+        CONCAT('https://d75aawrtvbfp1.cloudfront.net/',msg_value:execute_msg:mint:extension:image::string) as image,
+        msg_value:execute_msg:mint:token_id::string                       as token_id,
         msg_value:execute_msg:mint:extension:attributes[0]:value::string as rarity,
         msg_value:execute_msg:mint:extension:attributes[1]:value::string as rank,
         msg_value:execute_msg:mint:extension:attributes[2]:value::string as shower,
@@ -21,4 +22,4 @@ select  block_timestamp,
   and   msg_value:execute_msg:mint is not null
   and   tx_status = 'SUCCEEDED')
   
-select * from meteor_traits order by tokenid 
+select * from meteor_traits order by token_id 
