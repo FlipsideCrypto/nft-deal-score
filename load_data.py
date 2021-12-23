@@ -55,8 +55,10 @@ def run_queries():
 		metadata = ctx.cursor().execute(' '.join(query))
 		metadata = pd.DataFrame.from_records(iter(metadata), columns=[x[0] for x in metadata.description])
 		metadata = clean_colnames(metadata)
+		metadata['image'] = metadata.image.apply(lambda x: 'https://cloudflare-ipfs.com/ipfs/'+re.split('/', x)[-1] )
 		metadata['collection'] = c
 		metadata['chain'] = 'Terra'
+		list(metadata.image.values[:2]) + list(metadata.image.values[-2:])
 		metadata.to_csv('./data/metadata/{}.csv'.format(c), index=False)
 		# old = pd.read_csv('./data/metadata.csv')
 		# old = old[-old.collection.isin(metadata.collection.unique())]
@@ -75,7 +77,7 @@ def add_terra_tokens():
 		, msg_value:execute_msg:mint_nft:extension:name AS name
 		, msg_value:execute_msg:mint_nft:extension:image AS image
 		FROM terra.msgs 
-		WHERE msg_value:contract::string = 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2'
+		WHERE msg_value:contract::string = 'terra16wuzgsx3tz4hkqu73q5s7unxenefkkvefvewsh'
 		AND tx_status = 'SUCCEEDED'
 		AND msg_value:execute_msg:mint_nft is not null
 	'''
@@ -164,6 +166,9 @@ def add_terra_metadata():
 		metadata['attribute_count'] = 0
 		l = len(metadata)
 		incl_att_count = not collection in [ 'Levana Dragon Eggs' ]
+		metadata.groupby('cracking_date').token_id.count()
+		metadata.groupby('weight').token_id.count()
+		metadata[metadata.cracking_date=='2471-12-22'][['token_id']]
 		for c in list(metadata.columns) + ['attribute_count']:
 			if c in ['token_id','collection','pct','levana_rank','meteor_id']:
 				continue
@@ -186,11 +191,18 @@ def add_terra_metadata():
 		# metadata.sort_values('pct_rank')
 		metadata.sort_values('pct')
 		metadata['rank'] = metadata.pct.rank()
-		metadata['score'] = metadata.pct.apply(lambda x: 1.0 / x )
-		mn = metadata.score.min()
-		metadata['score'] = metadata.score.apply(lambda x: x / mn )
-		metadata.score.max()
-		metadata.sort_values('rank')[['rank','pct','score']]
+		metadata['rarity_score'] = metadata.pct.apply(lambda x: 1.0 / (x**0.2) )
+		mn = metadata.rarity_score.min()
+		mx = metadata.rarity_score.max()
+		metadata['rarity_score'] = metadata.rarity_score.apply(lambda x: round(((x - mn) * 999 / (mx - mn)) + 1) )
+		metadata.sort_values('rarity_score', ascending=0).head(20)[['token_id','collection_rank','rarity_score']]
+		metadata.sort_values('rarity_score', ascending=0).tail(20)[['token_id','collection_rank','rarity_score']]
+		metadata[metadata.token_id==6157].sort_values('rarity_score', ascending=0).tail(20)[['token_id','collection_rank','rarity_score','rank']]
+		metadata[metadata['rank']>=3000].groupby('weight').token_id.count()
+
+		metadata.rarity_score.max()
+		metadata.rarity_score.min()
+		metadata.sort_values('rank')[['rank','pct','rarity_score']]
 
 		m = pd.DataFrame()
 		for c in metadata.columns:
@@ -201,16 +213,20 @@ def add_terra_metadata():
 			m = m.append(cur)
 		m['chain'] = 'Terra'
 		m.groupby('feature_name').feature_value.count()
-		m[m.feature_name=='face'].groupby('feature_value').token_id.count()
-		print(len(m.token_id.unique()))
+		if collection == 'Levana Dragon Eggs':
+			add = m[m.feature_name=='collection_rank']
+			add['feature_name'] = 'transformed_collection_rank'
+			add['feature_value'] = add.feature_value.apply(lambda x: (1.0/ (x + 0.5))**1 )
+			m = m.append(add)
 		g = m.groupby('feature_value').feature_name.count().reset_index().sort_values('feature_name').tail(50)
 		old = pd.read_csv('./data/metadata.csv')
 		if not 'chain' in old.columns:
 			old['chain'] = old.collection.apply(lambda x: 'Terra' if x in [ 'Galactic Punks', 'LunaBulls' ] else 'Solana' )
 		old = old[-old.collection.isin(m.collection.unique())]
 		old = old.append(m)
-		old = old.drop_duplicates()
-		print(old.groupby(['chain','collection']).token_id.count())
+		old = old.drop_duplicates(subset=['collection','token_id','feature_name'])
+		old = old[-(old.feature_name.isin(['last_sale']))]
+		# print(old.groupby(['chain','collection']).token_id.count())
 		print(old[['chain','collection','token_id']].drop_duplicates().groupby(['chain','collection']).token_id.count())
 		old.to_csv('./data/metadata.csv', index=False)
 

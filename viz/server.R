@@ -45,7 +45,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'LunaBulls'
+			, selected = 'Levana Dragon Eggs'
 			, choices = choices
 			, width = "100%"
 		)
@@ -197,24 +197,27 @@ server <- function(input, output, session) {
 			return(head(attributes, 0))
 		}
 		cur <- attributes[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
-		cur <- merge( cur, feature_values[collection == eval(selected), list(feature, value, pred_vs_baseline, pct_vs_baseline) ], all.x=TRUE )
+		# cur <- merge( cur, feature_values[collection == eval(selected), list(feature_name, feature_value, pred_vs_baseline, pct_vs_baseline) ], all.x=TRUE )
 		cur <- cur[order(rarity)]
-		floor <- getFloors()[2]
-		log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
-		lin_coef <- coefsdf[ collection == eval(selected) ]$lin_coef[1]
-		s <- sum(cur$pct_vs_baseline)
-		p <- getPredPrice()
-		p <- as.numeric(p[ token_id == eval(as.numeric(id)) ]$pred_price)
-		# p <- pred_price[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]$pred_price
-		ratio <- (p / floor) - 1
-		ratio <- pmax(0, ratio)
-		if (ratio > 0 & length(ratio) > 0) {
-			mult <- ratio / s
-			cur[, pct_vs_baseline := pct_vs_baseline * eval(mult) ]
-		}
-		cur[, vs_baseline := round((pred_vs_baseline * eval(lin_coef)) + (pct_vs_baseline * eval(floor) * eval(log_coef) ), 1) ]
-		cur[, pred_vs_baseline := round(pred_vs_baseline, 1) ]
-		cur[, vs_baseline := round(pred_vs_baseline + (pct_vs_baseline * eval(floor)), 1) ]
+		# floor <- getFloors()[2]
+		# log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
+		# lin_coef <- coefsdf[ collection == eval(selected) ]$lin_coef[1]
+		# s <- sum(cur$pct_vs_baseline)
+		# p <- getPredPrice()
+		# p <- as.numeric(p[ token_id == eval(as.numeric(id)) ]$pred_price)
+		# # p <- pred_price[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]$pred_price
+		# ratio <- (p / floor) - 1
+		# ratio <- pmax(0, ratio)
+		# if (ratio > 0 & length(ratio) > 0) {
+		# 	mult <- ratio / s
+		# 	cur[, pct_vs_baseline := pct_vs_baseline * eval(mult) ]
+		# }
+		cur[, vs_baseline := 0 ]
+		cur[, pred_vs_baseline := 0 ]
+		cur[, vs_baseline := 0 ]
+		# cur[, vs_baseline := round((pred_vs_baseline * eval(lin_coef)) + (pct_vs_baseline * eval(floor) * eval(log_coef) ), 1) ]
+		# cur[, pred_vs_baseline := round(pred_vs_baseline, 1) ]
+		# cur[, vs_baseline := round(pred_vs_baseline + (pct_vs_baseline * eval(floor)), 1) ]
 		return(cur)
 	})
 
@@ -223,9 +226,11 @@ server <- function(input, output, session) {
 		if( nrow(data) == 0 ) {
 			return(NULL)
 		}
-		data[, rarity := paste0(format(round(rarity*100, 2), digits=4, decimal.mark="."),'%') ]
+		data[, rarity := ifelse(is.na(rarity), '', paste0(format(round(rarity*100, 2), digits=4, decimal.mark="."),'%') )]
+
 		# reactable(data[, list( feature, value, rarity, vs_baseline, pred_vs_baseline, pct_vs_baseline )],
-		data <- data[, list( feature, value, rarity, pct_vs_baseline )]
+		# data <- data[, list( feature, value, rarity, pct_vs_baseline )]
+		data <- data[, list( feature_name, feature_value, rarity )]
 		reactable(data,
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
@@ -234,17 +239,17 @@ server <- function(input, output, session) {
 			borderless = TRUE,
 			outlined = FALSE,
 			columns = list(
-				feature = colDef(name = "Attribute", align = "left"),
-				value = colDef(name = "Value", align = "left"),
-				rarity = colDef(name = "Rarity", align = "left"),
-				pct_vs_baseline = colDef(
-					name="Value", header=with_tooltip("Value", "The estimated price impact of this feature vs the floor")
-					, html = TRUE
-					, align = "left"
-					, cell = function(x) {
-						htmltools::tags$span(paste0('+', format(round(x*1000)/10, digits=4, decimal.mark=".", big.mark=","), '%'))
-					}
-				)
+				feature_name = colDef(name = "Attribute", align = "left"),
+				feature_value = colDef(name = "Value", align = "left"),
+				rarity = colDef(name = "Rarity", align = "left")
+				# pct_vs_baseline = colDef(
+				# 	name="Value", header=with_tooltip("Value", "The estimated price impact of this feature vs the floor")
+				# 	, html = TRUE
+				# 	, align = "left"
+				# 	, cell = function(x) {
+				# 		htmltools::tags$span(paste0('+', format(round(x*1000)/10, digits=4, decimal.mark=".", big.mark=","), '%'))
+				# 	}
+				# )
 			)
 	    )
 	})
@@ -255,7 +260,7 @@ server <- function(input, output, session) {
 			return(NULL)
 		}
 		data <- feature_values[ collection == eval(selected)]
-		reactable(data[, list( feature, value, rarity, pct_vs_baseline )],
+		reactable(data[, list( feature_name, feature_value, rarity, pct_vs_baseline )],
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
 			),
@@ -263,8 +268,8 @@ server <- function(input, output, session) {
 			outlined = FALSE,
 			searchable = TRUE,
 			columns = list(
-				feature = colDef(name = "Attribute", align = "left"),
-				value = colDef(name = "Value", align = "left"),
+				feature_name = colDef(name = "Attribute", align = "left"),
+				feature_value = colDef(name = "Value", align = "left"),
 				rarity = colDef(name = "Rarity", align = "left", cell = function(x) {
 					htmltools::tags$span(paste0(format(x*100, digits=3, decimal.mark=".", big.mark=","),'%'))
 				}),
@@ -504,7 +509,9 @@ server <- function(input, output, session) {
 		df[, deal_score := round(pmin( 100, pmax(0, deal_score) ))  ]
 		df[, deal_score := pnorm(price, pred_price, eval(SD_SCALE) * pred_sd * pred_price / pred_price_0), by = seq_len(nrow(df)) ]
 		df[, deal_score := round(100 * (1 - deal_score)) ]
-		df[, pred_price := round(pred_price) ]
+		# df[, pred_price := round(pred_price) ]
+		df[, pred_price := paste0(format(round(pred_price, 1), digits=3, decimal.mark=".", big.mark=",")) ]
+
 		df <- df[, list(token_id, price, pred_price, deal_score)]
 		df <- df[order(-deal_score)]
 		return(df)
@@ -517,7 +524,7 @@ server <- function(input, output, session) {
 		if( nrow(df) == 0 ) {
 			return(NULL)
 		}
-		df <- df[ deal_score >= 10 ]
+		df <- df[ deal_score >= 0 ]
 		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
 
 		fig <- plot_ly(
