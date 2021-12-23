@@ -156,11 +156,11 @@ feature_values = pd.DataFrame()
 ALL_NUMERIC_COLS = ['rank','score','pct']
 MODEL_EXCLUDE_COLS = {
     # 'Levana Dragon Eggs': ['collection_rank','meteor_id','shower','lucky_number','cracking_date','attribute_count','weight','temperature']
-    'Levana Dragon Eggs': ['meteor_id','shower','lucky_number','cracking_date','attribute_count']
+    'Levana Dragon Eggs': ['meteor_id','shower','lucky_number','cracking_date','attribute_count','rarity_score_rank']
 }
 RARITY_EXCLUDE_COLS = {
     # 'Levana Dragon Eggs': ['collection_rank','meteor_id','shower','lucky_number','cracking_date','attribute_count','weight','temperature']
-    'Levana Dragon Eggs': ['meteor_id','attribute_count','collection_rank','transformed_collection_rank','rarity_score']
+    'Levana Dragon Eggs': ['meteor_id','attribute_count','collection_rank','transformed_collection_rank','rarity_score','rarity_score_rank']
 }
 NUMERIC_COLS = {
     'Levana Dragon Eggs': ['collection_rank','weight','temperature','transformed_collection_rank','rarity_score']

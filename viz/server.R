@@ -45,7 +45,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Levana Dragon Eggs'
+			, selected = 'Galactic Punks'
 			, choices = choices
 			, width = "100%"
 		)
