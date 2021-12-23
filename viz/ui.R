@@ -102,16 +102,32 @@ fluidPage(
 	, fluidRow(
 		class="grey8row"
 		, h2("Listings", icon(class="padding-left-10", id="listings-tooltip", "info-circle"))
-		, bsTooltip(id = "listings-tooltip", title = "Plot only shows listings with deal score > 10; Click a dot to select the token", placement = "bottom", trigger = "hover")
+		, bsTooltip(id = "listings-tooltip", title = "Plot only shows listings with deal score > 5; Click a dot to select the token", placement = "bottom", trigger = "hover")
 		, div(
 			class = "listing-plot"
 			, plotlyOutput("listingplot", height = 500)
-			, div(class='description', 'Plot only shows listings with deal score > 10')
+			, div(class='description', 'Plot only shows listings with deal score > 5')
 			, div(class='description', 'Click a dot to select the token')
 		)
 		, div(class = "table", reactableOutput("listingtable"))
 		, div(class = "description", 'This app is still in beta - listings updates will be periodic (but at least 3x a week)')
 		, div(class = "link", uiOutput('listingurl'))
+	)
+	, fluidRow(
+		class="grey8row faq"
+		, h2("FAQ")
+		, h4("What is NFT Deal Score?")
+		, div("We use historical sales data to determine the values and the rankings of each NFT.")
+		, h4("Why is this rank different?")
+		, div("Although rarity is a feature in our model, it is not just a rarity-based ranking. Certain features are put at a higher premium on the secondary marketplace, and this ranking reflects that.")
+		, h4("Why are the rarity %s different?")
+		, div("Our %s reflect only the NFTs in existence. Other tools may include more theoretical numbers.")
+		, h4("How does the model work?")
+		, div("Each attribute is an input into the model. We are working to add better model explanations to the tool.")
+		, h4("How often is the data updated?")
+		, div("Listings are updated 3x / week. Model is updated weekly.")
+		, h4("Where can I send my questions?")
+		, div(a(class="", href="https://twitter.com/nftdealscore", "@nftdealscore"), " on Twitter")
 	)
 	, fluidRow(
 		class="grey8row"
@@ -127,11 +143,11 @@ fluidPage(
 		, div(class = "table", reactableOutput("salestable"))
 		, div(class = "description", 'This app is still in beta - sales data may be incomplete or delayed')
 	)
-	, fluidRow(
-		class="grey8row"
-		, h2("Feature Summary", icon(class="padding-left-10", id="feature-summary-tooltip", "info-circle"))
-		, bsTooltip(id = "feature-summary-tooltip", title = "Shows the rarity and estimated price impact of each feature", placement = "bottom", trigger = "hover")
-		, div(class = "table", reactableOutput("featurestable"))
-		, div(class = "description", 'Shows the rarity and estimated price impact of each feature')
-	)
+	# , fluidRow(
+	# 	class="grey8row"
+	# 	, h2("Feature Summary", icon(class="padding-left-10", id="feature-summary-tooltip", "info-circle"))
+	# 	, bsTooltip(id = "feature-summary-tooltip", title = "Shows the rarity and estimated price impact of each feature", placement = "bottom", trigger = "hover")
+	# 	, div(class = "table", reactableOutput("featurestable"))
+	# 	, div(class = "description", 'Shows the rarity and estimated price impact of each feature')
+	# )
 )

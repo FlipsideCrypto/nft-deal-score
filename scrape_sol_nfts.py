@@ -39,16 +39,18 @@ def clean_name(name):
 def scrape_randomearth():
 	d_address = {
 		'Galactic Punks': 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
-		'LunaBulls': 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2'
+		'LunaBulls': 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2',
+		'Levana Dragon Eggs': 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg',
 	}
 	data = []
-	for collection in [ 'Galactic Punks', 'LunaBulls' ]:
+	# for collection in [ 'Levana Dragon Eggs' ]:
+	for collection in d_address.keys():
 		print(collection)
 		page = 0
 		has_more = True
 		while has_more:
 			page += 1
-			print('Page #{}'.format(page))
+			print('Page #{} ({})'.format(page, len(data)))
 			url = 'https://randomearth.io/api/items?collection_addr={}&sort=price.asc&page={}&on_sale=1'.format( d_address[collection], page)
 			browser.get(url)
 			soup = BeautifulSoup(browser.page_source)
@@ -59,6 +61,7 @@ def scrape_randomearth():
 				for i in j['items']:
 					data += [[ 'Terra', collection, i['token_id'], i['price'] / (10 ** 6) ]]
 		df = pd.DataFrame(data, columns=['chain','collection','token_id','price'])
+		df.to_csv('~/Downloads/tmp.csv', index=False)
 		old = pd.read_csv('./data/listings.csv')
 		old = old[-old.collection.isin(df.collection.unique())]
 		old = old.append(df)
@@ -189,9 +192,12 @@ def convert_collection_names():
 		,'boryokudragonz': 'Boryoku Dragonz'
 	}
 	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
-		df = pd.read_csv('./data/{}.csv'.format(c))
-		df['collection'] = df.collection.apply(lambda x: clean_name(x) if x in d.keys() else x )
-		df.to_csv('./data/{}.csv'.format(c), index=False)
+		try:
+			df = pd.read_csv('./data/{}.csv'.format(c))
+			df['collection'] = df.collection.apply(lambda x: clean_name(x) if x in d.keys() else x )
+			df.to_csv('./data/{}.csv'.format(c), index=False)
+		except:
+			pass
 
 def scrape_recent_sales():
 	o_sales = pd.read_csv('./data/sales.csv')
@@ -234,6 +240,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 		, 'degenapes': 'degen-ape-academy'
 		, 'peskypenguinclub': 'pesky-penguins'
 	}
+	collection = 'smb'
 	for collection in collections:
 		if collection == 'boryokudragonz':
 			continue
@@ -249,7 +256,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 			print('{} page #{} ({})'.format(collection, page, len(data)))
 			sleep(3)
 			page += 1
-			for j in [25, 30, 35, 30, 25] * 2:
+			for j in [20, 30, 30, 30, 30, 30, 30, 30] * 1:
 				for _ in range(1):
 					soup = BeautifulSoup(browser.page_source)
 					# for row in browser.find_elements_by_class_name('ag-row'):
@@ -325,6 +332,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 
 	pred_price = pd.read_csv('./data/pred_price.csv')[['collection','token_id','pred_price','pred_sd']]
 	pred_price['collection'] = pred_price.collection.apply(lambda x: clean_name(x))
+	pred_price['token_id'] = pred_price.token_id.astype(str)
 	pred_price = pred_price.merge(listings)
 
 	coefsdf = pd.read_csv('./data/coefsdf.csv')
@@ -338,7 +346,10 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 
 	metadata = pd.read_csv('./data/metadata.csv')
 	solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'skin') & (metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
-	pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 8 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
+	pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 4 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
+
+	solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'hair') & (metadata.feature_value == 'Long Blob Hair (9.72%)')].token_id.unique()
+	pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 2 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
 
 	pred_price['abs_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.lin_coef
 	pred_price['pct_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.log_coef
@@ -711,6 +722,7 @@ def scratch():
 # 	print('Sleeping until {}'.format(sleep_to))
 # 	sleep(60 * 15)
 alerted = []
+scrape_randomearth()
 alerted = scrape_listings(alerted = alerted)
-# scrape_randomearth()
+# alerted = scrape_listings(['smb'],alerted = alerted)
 convert_collection_names()
