@@ -36,6 +36,24 @@ def clean_name(name):
 		return(clean_names[name])
 	return(name)
 
+def convert_collection_names():
+	d = {
+		'aurory': 'Aurory'
+		,'thugbirdz': 'Thugbirdz'
+		,'smb': 'Solana Monkey Business'
+		,'degenapes': 'Degen Apes'
+		,'peskypenguinclub': 'Pesky Penguins'
+		,'meerkatmillionaires': 'Meerkat Millionaires'
+		,'boryokudragonz': 'Boryoku Dragonz'
+	}
+	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
+		try:
+			df = pd.read_csv('./data/{}.csv'.format(c))
+			df['collection'] = df.collection.apply(lambda x: clean_name(x) if x in d.keys() else x )
+			df.to_csv('./data/{}.csv'.format(c), index=False)
+		except:
+			pass
+
 def scrape_randomearth():
 	d_address = {
 		'Galactic Punks': 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
@@ -180,24 +198,6 @@ def scrape_magic_eden():
 			cur['collection'] = collection
 			listings = listings.append(cur)
 	return(listings)
-
-def convert_collection_names():
-	d = {
-		'aurory': 'Aurory'
-		,'thugbirdz': 'Thugbirdz'
-		,'smb': 'Solana Monkey Business'
-		,'degenapes': 'Degen Apes'
-		,'peskypenguinclub': 'Pesky Penguins'
-		,'meerkatmillionaires': 'Meerkat Millionaires'
-		,'boryokudragonz': 'Boryoku Dragonz'
-	}
-	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
-		try:
-			df = pd.read_csv('./data/{}.csv'.format(c))
-			df['collection'] = df.collection.apply(lambda x: clean_name(x) if x in d.keys() else x )
-			df.to_csv('./data/{}.csv'.format(c), index=False)
-		except:
-			pass
 
 def scrape_recent_sales():
 	o_sales = pd.read_csv('./data/sales.csv')
