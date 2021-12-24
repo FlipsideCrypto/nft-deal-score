@@ -18,7 +18,7 @@ warnings.filterwarnings('ignore')
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
 CHECK_EXCLUDE = False
-# CHECK_EXCLUDE = True
+CHECK_EXCLUDE = True
 
 # Using sales from howrare.is - the last sale that was under 300 was when the floor was at 72. Filtering for when the floor is >100, the lowest sale was 400
 
@@ -156,17 +156,17 @@ feature_values = pd.DataFrame()
 ALL_NUMERIC_COLS = ['rank','score','pct']
 MODEL_EXCLUDE_COLS = {
     # 'Levana Dragon Eggs': ['collection_rank','meteor_id','shower','lucky_number','cracking_date','attribute_count','weight','temperature']
-    'Levana Dragon Eggs': ['meteor_id','shower','lucky_number','cracking_date','attribute_count','rarity_score_rank']
+    'Levana Dragon Eggs': ['meteor_id','shower','lucky_number','cracking_date','attribute_count','rarity_score_rank','rarity_score','weight']
 }
 RARITY_EXCLUDE_COLS = {
     # 'Levana Dragon Eggs': ['collection_rank','meteor_id','shower','lucky_number','cracking_date','attribute_count','weight','temperature']
-    'Levana Dragon Eggs': ['meteor_id','attribute_count','collection_rank','transformed_collection_rank','rarity_score','rarity_score_rank']
+    'Levana Dragon Eggs': ['meteor_id','attribute_count','collection_rank','transformed_collection_rank','rarity_score','rarity_score_rank','collection_rank_group']
 }
 NUMERIC_COLS = {
-    'Levana Dragon Eggs': ['collection_rank','weight','temperature','transformed_collection_rank','rarity_score']
+    'Levana Dragon Eggs': ['collection_rank','temperature','transformed_collection_rank']
 }
 ATT_EXCLUDE_COLS = {
-    'Levana Dragon Eggs': ['attribute_count','transformed_collection_rank']
+    'Levana Dragon Eggs': ['attribute_count','transformed_collection_rank','collection_rank_group']
 }
 # for collection in [ 'Levana Dragon Eggs' ]:
 for collection in s_df.collection.unique():
@@ -206,6 +206,8 @@ for collection in s_df.collection.unique():
     df = merge(df, cat_metadata, ['collection','token_id'])
     for c in num_features:
         df[c] = df[c].apply(lambda x: just_float(x))
+    df.sort_values('price', ascending=0)[['price']].head(20)
+    # df.groupby(['rarity','weight']).price.mean()
 
     # create target cols
     target_col = 'adj_price'
@@ -230,19 +232,28 @@ for collection in s_df.collection.unique():
     tmp.sort_values('b').head(20)
     rem = list(tmp[tmp.b==0].a.values)
     std_pred_cols = [ c for c in std_pred_cols if not c in rem ]
-    # if collection == 'Levana Dragon Eggs':
-    #     std_pred_cols = [ 'std_genus_Titan','std_score','std_weight','std_transformed_collection_rank','std_collection_rank','std_legendary_composition_None','std_ancient_composition_None' ]
+    if collection == 'Levana Dragon Eggs':
+        std_pred_cols = [ 'std_essence_Dark','std_collection_rank_group_0.0','std_rarity_Legendary','std_rarity_Rare','std_rarity_Ancient','std_collection_rank','std_transformed_collection_rank' ]
     mn = df.timestamp.min()
     mx = df.timestamp.max()
     df['wt'] = df.timestamp.apply(lambda x: 2.5 ** ((x - mn) / (mx - mn)) )
+    if collection == 'Levana Dragon Eggs':
+        df['wt'] = 1
+    #     df['wt'] = df.price.apply(lambda x: 1.0 / (x ** 0.9) )
+    #     df.sort_values('price', ascending=0)[['price','wt']].head(20)
     X = df[std_pred_cols].values
     y_0 = df.rel_price_0.values
     y_1 = df.rel_price_1.values
+    # df['tmp'] = df.collection_rank.apply(lambda x: int((8888 - x)/1000) )
+    # g = df.groupby('tmp').rel_price_0.mean().reset_index()
+    # g['g'] = g.tmp.apply(lambda x: (((1.42**(x**1.42)) - 1) / 20) + 0.13 )
+    # g['g'] = g.tmp.apply(lambda x: 2**x )
+    # g
 
 
     # run the linear model
-    clf_lin = Lasso() if collection in [ 'Levana Dragon Eggs' ] else RidgeCV(alphas=[1.5**x for x in range(20)])
-    # clf_lin = RidgeCV(alphas=[1.5**x for x in range(20)])
+    # clf_lin = Lasso(alpha=1.0) if collection in [ 'Levana Dragon Eggs' ] else RidgeCV(alphas=[1.5**x for x in range(20)])
+    clf_lin = RidgeCV(alphas=[1.5**x for x in range(20)])
     clf_lin.fit(X, y_0, df.wt.values)
     if collection == 'Levana Dragon Eggs':
         coefs = []
@@ -250,13 +261,16 @@ for collection in s_df.collection.unique():
             coefs += [[a,b]]
         coefs = pd.DataFrame(coefs, columns=['col','coef']).sort_values('coef', ascending=0)
         coefs.to_csv('~/Downloads/levana_lin_coefs.csv', index=False)
+        print(coefs[coefs.coef !=0])
     df['pred_lin'] = clf_lin.predict(X)
     df['pred_lin'] = df.pred_lin.apply(lambda x: max(0, x)) + df.mn_20
     df['err_lin'] = abs(((df.pred_lin - df[target_col]) / df[target_col]) )
+    # df[df.genus_Titan==1][['rarity']]
+    # df[(df.rarity=='Legendary') | (df.genus=='Titan')][['genus','rarity']]
 
     # run the log model
-    clf_log = Lasso() if collection in [ 'Levana Dragon Eggs' ] else RidgeCV(alphas=[1.5**x for x in range(20)])
-    # clf_log = RidgeCV(alphas=[1.5**x for x in range(20)])
+    # clf_log = Lasso(1.0) if collection in [ 'Levana Dragon Eggs' ] else RidgeCV(alphas=[1.5**x for x in range(20)])
+    clf_log = RidgeCV(alphas=[1.5**x for x in range(20)])
     clf_log.fit(X, y_1, df.wt.values)
     if collection == 'Levana Dragon Eggs':
         coefs = []

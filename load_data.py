@@ -219,8 +219,19 @@ def add_terra_metadata():
 		if collection == 'Levana Dragon Eggs':
 			add = m[m.feature_name=='collection_rank']
 			add['feature_name'] = 'transformed_collection_rank'
-			add['feature_value'] = add.feature_value.apply(lambda x: (1.0/ (x + 0.5))**1 )
+			mx = add.feature_value.max()
+			mn = add.feature_value.min()
+			add['feature_value'] = add.feature_value.apply(lambda x: 1.42**(1.42**(8*(x-mn)/(mx-mn))) + 0.13)
+			# add['tmp'] = add.feature_value.rank() * 10 / len(add)
+			# add['tmp'] = add.tmp.astype(int)
+			# add.groupby('tmp').feature_value.mean()
 			m = m.append(add)
+
+			add = m[m.feature_name=='collection_rank']
+			add['feature_name'] = 'collection_rank_group'
+			add['feature_value'] = add.feature_value.apply(lambda x: int(x/1000))
+			m = m.append(add)
+
 		g = m.groupby('feature_value').feature_name.count().reset_index().sort_values('feature_name').tail(50)
 		old = pd.read_csv('./data/metadata.csv')
 		if not 'chain' in old.columns:
