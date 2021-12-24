@@ -385,8 +385,14 @@ server <- function(input, output, session) {
 				cur <- data.table(x = x, y = y )
 				plot_data <- rbind( plot_data, cur )
 			}
-		} else {
+		} else if (mx - mn > 10){
 			for (x in seq(mn, mx, .1)) {
+				y <- pnorm(x, mu, sd)
+				cur <- data.table(x = x, y = y )
+				plot_data <- rbind( plot_data, cur )
+			}
+		} else {
+			for (x in seq(mn, mx, .01)) {
 				y <- pnorm(x, mu, sd)
 				cur <- data.table(x = x, y = y )
 				plot_data <- rbind( plot_data, cur )
@@ -524,7 +530,7 @@ server <- function(input, output, session) {
 		if( nrow(df) == 0 ) {
 			return(NULL)
 		}
-		df <- df[ deal_score >= 0 ]
+		df <- df[ deal_score >= 10 ]
 		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
 
 		fig <- plot_ly(
