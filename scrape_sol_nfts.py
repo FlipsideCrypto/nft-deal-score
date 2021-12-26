@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
-browser = webdriver.Chrome()
+# browser = webdriver.Chrome()
 
 # old = pd.read_csv('./data/tokens.csv')
 # metadata[(metadata.collection == 'Galactic Punks') & (metadata.feature_name=='attribute_count')].drop_duplicates(subset=['feature_value']).merge(old)
@@ -52,9 +52,22 @@ def convert_collection_names():
 			df['collection'] = df.collection.apply(lambda x: clean_name(x) if x in d.keys() else x )
 			df.to_csv('./data/{}.csv'.format(c), index=False)
 		except:
+			print('error',c)
 			pass
 
-def scrape_randomearth():
+# def scrape_magic_eden_sales():
+# 	url = 'https://api-mainnet.magiceden.io/rpc/getGlobalActivitiesByQuery?q={%22$match%22:{%22collection_symbol%22:%22pesky_penguins%22},%22$sort%22:{%22blockTime%22:-1},%22$skip%22:0}'
+# 	results = requests.get(url).json()['results']
+# 	df = pd.DataFrame([ x['parsedTransaction'] for x in results if 'parsedTransaction' in x.keys()])
+# 	df[[ 'blockTime','collection_symbol','total_amount' ]]
+# 	for r in results:
+# 		pass
+# 		t = 
+# 		data += [[ r['createdAt'],  ]]
+
+
+def scrape_randomearth(browser):
+	print('Querying randomearth.io sales...')
 	d_address = {
 		'Galactic Punks': 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
 		'LunaBulls': 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2',
@@ -123,7 +136,8 @@ def awards():
 	dailysales['deal_score'] = dailysales.apply( lambda x: 100 * (1 - norm.cdf( x['price'], x['pred_price'], 2 * x['pred_sd'] * x['pred_price'] / x['pred_price_0'] )) , 1 )
 	dailysales.sort_values('deal_score', ascending=0).head(100)[['collection','token_id','price','pred_price','deal_score']].to_csv('~/Downloads/tmp2.csv', index=False)
 
-def scrape_recent_smb_sales():
+def scrape_recent_smb_sales(browser):
+	print('Scraping recent SMB sales...')
 	o_sales = pd.read_csv('./data/sales.csv')
 	o_sales.head()
 	# o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
@@ -131,13 +145,14 @@ def scrape_recent_smb_sales():
 	data = []
 	url = 'https://market.solanamonkey.business/'
 	browser.get(url)
+	sleep(4)
 	browser.find_elements_by_class_name('inline-flex')[-1].click()
-	sleep(2)
+	sleep(4)
 	es = browser.find_elements_by_class_name('inline-flex')
 	# for i in range(len(es)):
 	# 	print(i, es[i].text)
 	browser.find_elements_by_class_name('inline-flex')[4].click()
-	sleep(2)
+	sleep(4)
 	soup = BeautifulSoup(browser.page_source)
 	for tr in soup.find_all('table', class_='min-w-full')[0].find_all('tbody')[0].find_all('tr'):
 		td = tr.find_all('td')
@@ -200,6 +215,7 @@ def scrape_magic_eden():
 	return(listings)
 
 def scrape_recent_sales():
+	print('Scraping recent solanart sales...')
 	o_sales = pd.read_csv('./data/sales.csv')
 	o_sales['collection'] = o_sales.collection.apply(lambda x: 'degenapes' if x == 'degenape' else x )
 	o_sales.groupby('collection').sale_date.max()
@@ -230,7 +246,8 @@ def scrape_recent_sales():
 	del o_sales['tmp']
 	o_sales.to_csv('./data/sales.csv', index=False)
 
-def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = []):
+def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = []):
+	print('Scraping solanafloor listings...')
 	data = []
 	# collections = [ 'aurory','thugbirdz','meerkatmillionaires','aurory','degenapes' ]
 	# collections = [ 'aurory','thugbirdz','smb','degenapes' ]
@@ -408,7 +425,7 @@ def scrape_listings(collections = [ 'aurory','thugbirdz','smb','degenapes','pesk
 
 	return alerted
 
-def scrape_solanafloor():
+def scrape_solanafloor(browser):
 	data = []
 	collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ]
 	collections = [ 'peskypenguinclub' ]
@@ -474,7 +491,7 @@ def scrape_solanafloor():
 	print(tokens.groupby('collection').token_id.count())
 	tokens.to_csv('./data/tokens.csv', index=False)
 
-def scrape_solana_explorer():
+def scrape_solana_explorer(browser):
 	url = 'https://explorer.solana.com/address/9uBX3ASjxWvNBAD1xjbVaKA74mWGZys3RGSF7DdeDD3F/tokens'
 	browser.get(url)
 	# r = requests.get(url)
@@ -515,7 +532,7 @@ def scrape_solana_explorer():
 	txdf = txdf[(txdf.monke_id.notnull()) & (txdf.tx_id.notnull())]
 	txdf.to_csv('../data/tx.csv', index=False)
 
-def scrape_tx():
+def scrape_tx(browser):
     txdf = pd.read_csv('../data/tx.csv')
     data = []
     t_data = []
@@ -721,8 +738,7 @@ def scratch():
 # 	sleep_to = (datetime.today() + timedelta(minutes=15)).strftime("%H:%M %p")
 # 	print('Sleeping until {}'.format(sleep_to))
 # 	sleep(60 * 15)
-alerted = []
-scrape_randomearth()
-alerted = scrape_listings(alerted = alerted)
-# alerted = scrape_listings(['smb'],alerted = alerted)
-convert_collection_names()
+# alerted = []
+# scrape_randomearth()
+# alerted = scrape_listings(alerted = alerted)
+# convert_collection_names()

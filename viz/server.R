@@ -2,7 +2,7 @@ server <- function(input, output, session) {
 	load('data.Rdata')
 
 	SD_MULT = 3
-	SD_SCALE = 2
+	SD_SCALE = 1.95
 
 	with_tooltip <- function(value, tooltip) {
 		div(style = "text-decoration: underline; text-decoration-style: dotted; cursor: help",
@@ -37,6 +37,22 @@ server <- function(input, output, session) {
 			, width = "100%"
 			, placeholder = coefsdf[ collection == eval(selected) ]$floor_price[1]
 			, value = min(listings[ collection == eval(selected) ]$price)
+		)
+	})
+
+	output$maxpriceinput <- renderUI({
+		textInput(
+			inputId = 'maxprice'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+
+	output$maxnftrankinput <- renderUI({
+		textInput(
+			inputId = 'maxnftrank'
+			, label = NULL
+			, width = "100%"
 		)
 	})
 
@@ -505,7 +521,7 @@ server <- function(input, output, session) {
 			return(data.table())
 		}
 
-		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd) ])
+		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd, rk) ])
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
 		df[, pred_price_0 := pred_price ]
@@ -518,7 +534,10 @@ server <- function(input, output, session) {
 		# df[, pred_price := round(pred_price) ]
 		df[, pred_price := paste0(format(round(pred_price, 1), digits=3, decimal.mark=".", big.mark=",")) ]
 
-		df <- df[, list(token_id, price, pred_price, deal_score)]
+		df <- df[, list(token_id, price, pred_price, deal_score, rk)]
+		m <- dcast(attributes[collection == eval(selected)], collection + token_id ~ feature_name, value.var='clean_name')
+		df <- merge(df, m, all.x=TRUE)
+		df[, collection := NULL]
 		df <- df[order(-deal_score)]
 		return(df)
 	})
@@ -697,6 +716,19 @@ server <- function(input, output, session) {
 		if( nrow(df) == 0 ) {
 			return(NULL)
 		}
+		# df[, rk:=paste0('#', format(rk, trim=TRUE, big.mark=","))]
+		mx <- as.numeric(input$maxprice)
+		if(!is.na(mx)) {
+			df <- df[ price <= eval(mx) ]
+		}
+		mx <- as.numeric(input$maxnftrank)
+		print('mx')
+		print(mx)
+		print(head(df$rk))
+		if(!is.na(mx)) {
+			df <- df[ rk <= eval(mx) ]
+		}
+		# df[, rk := paste0('#', format(rk, big.mark=","))]
 
 		reactable(df,
 			defaultColDef = colDef(
@@ -708,8 +740,10 @@ server <- function(input, output, session) {
 				token_id = colDef(name = "Token ID", align = "left"),
 				price = colDef(name = "Listed Price", align = "left"),
 				pred_price = colDef(name = "Fair Market Price", align = "left"),
-				deal_score = colDef(name = "Deal Score", align = "left")
-			)
+				deal_score = colDef(name = "Deal Score", align = "left"),
+				rk = colDef(name = "NFT Rank", align = "left")
+			),
+			searchable = TRUE
 	    )
 	})
 
