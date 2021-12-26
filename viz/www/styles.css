@@ -234,10 +234,6 @@ input[type=number] {
   background-color: #10151A;
   color: #FFFFFF;
 }
-.ReactTable {
-  color: #C4CDD5;
-  border: none;
-}
 .ReactTable .rt-table {
   background-color: #171e25;
 }
@@ -247,6 +243,15 @@ input[type=number] {
   padding-bottom: 15px;
   font-weight: 400;
   font-family: Inter;
+}
+#listingtable .rt-td {
+  font-size: 14px;
+  /* padding: 2px; */
+}
+#listingtable .rt-th {
+  font-size: 15px;
+  padding: 10px 6px;
+  /* padding: 2px; */
 }
 .rt-pagination {
   margin: 0;

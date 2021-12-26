@@ -109,6 +109,24 @@ fluidPage(
 			, div(class='description', 'Plot only shows listings with deal score > 5')
 			, div(class='description', 'Click a dot to select the token')
 		)
+		, fluidRow(
+			column(4
+				, div(
+					class = "inputtitle"
+					, "Max Price"
+					# , icon(id="floor-price-tooltip", "info-circle")
+					# , bsTooltip(id = "floor-price-tooltip", title = "Update this number to the current floor price of the collection, which will update the rest of the numbers on this page", placement = "bottom", trigger = "hover")
+				)
+				, fluidRow(uiOutput("maxpriceinput"))
+			)
+			, column(4
+				, div(
+					class = "inputtitle"
+					, "Max NFT Rank"
+				)
+				, fluidRow(uiOutput("maxnftrankinput"))
+			)
+		)
 		, div(class = "table", reactableOutput("listingtable"))
 		, div(class = "description", 'This app is still in beta - listings updates will be periodic (but at least 3x a week)')
 		, div(class = "link", uiOutput('listingurl'))

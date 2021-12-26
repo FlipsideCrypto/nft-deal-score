@@ -191,21 +191,21 @@ def add_terra_metadata():
 		# metadata.sort_values('pct_rank')
 		metadata.sort_values('pct')
 		metadata['rank'] = metadata.pct.rank()
-		metadata['rarity_score'] = metadata.pct.apply(lambda x: 1.0 / (x**0.07) )
-		mn = metadata.rarity_score.min()
-		mx = metadata.rarity_score.max()
-		metadata = metadata.sort_values('token_id')
-		metadata['rarity_score'] = metadata.rarity_score.apply(lambda x: ((x - mn) * 99 / (mx - mn)) + 1)
-		metadata['rarity_score_rank'] = metadata.rarity_score.rank(ascending=0, method='first').astype(int)
-		metadata.sort_values('rarity_score', ascending=0).head(20)[['token_id','collection_rank','rarity_score','rarity_score_rank']]
-		metadata.sort_values('rarity_score', ascending=0).tail(20)[['token_id','collection_rank','rarity_score']]
-		len(metadata[metadata.rarity_score<=2.4]) / len(metadata)
-		metadata[metadata.token_id==6157].sort_values('rarity_score', ascending=0).tail(20)[['token_id','collection_rank','rarity_score','rank']]
-		metadata[metadata['rank']>=3000].groupby('weight').token_id.count()
+		# metadata['rarity_score'] = metadata.pct.apply(lambda x: 1.0 / (x**0.07) )
+		# mn = metadata.rarity_score.min()
+		# mx = metadata.rarity_score.max()
+		# metadata = metadata.sort_values('token_id')
+		# metadata['rarity_score'] = metadata.rarity_score.apply(lambda x: ((x - mn) * 99 / (mx - mn)) + 1)
+		# metadata['rarity_score_rank'] = metadata.rarity_score.rank(ascending=0, method='first').astype(int)
+		# metadata.sort_values('rarity_score', ascending=0).head(20)[['token_id','collection_rank','rarity_score','rarity_score_rank']]
+		# metadata.sort_values('rarity_score', ascending=0).tail(20)[['token_id','collection_rank','rarity_score']]
+		# len(metadata[metadata.rarity_score<=2.4]) / len(metadata)
+		# metadata[metadata.token_id==6157].sort_values('rarity_score', ascending=0).tail(20)[['token_id','collection_rank','rarity_score','rank']]
+		# metadata[metadata['rank']>=3000].groupby('weight').token_id.count()
 
-		metadata.rarity_score.max()
-		metadata.rarity_score.min()
-		metadata.sort_values('rank')[['rank','pct','rarity_score']]
+		# metadata.rarity_score.max()
+		# metadata.rarity_score.min()
+		# metadata.sort_values('rank')[['rank','pct','rarity_score']]
 
 		m = pd.DataFrame()
 		for c in metadata.columns:
