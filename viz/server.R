@@ -2,7 +2,7 @@ server <- function(input, output, session) {
 	load('data.Rdata')
 
 	SD_MULT = 3
-	SD_SCALE = 1.9
+	SD_SCALE = 1.95
 
 	with_tooltip <- function(value, tooltip) {
 		div(style = "text-decoration: underline; text-decoration-style: dotted; cursor: help",
