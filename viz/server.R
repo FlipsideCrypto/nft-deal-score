@@ -336,6 +336,15 @@ server <- function(input, output, session) {
 		data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred )]
 		data[, price := paste0(format(price, scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
 		data[, pred := paste0(format(round(pred, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+
+		m <- pred_price[collection == eval(selected), list(token_id, rk)]
+		data <- merge(data, m, all.x=TRUE)
+
+		m <- dcast(attributes[collection == eval(selected), list(token_id, feature_name, clean_name)], token_id ~ feature_name, value.var='clean_name')
+		data <- merge(data, m, all.x=TRUE)
+
+		data <- data[order(-block_timestamp)]
+
 		reactable(data,
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
@@ -347,7 +356,8 @@ server <- function(input, output, session) {
 				token_id = colDef(name = "Token ID", align = "left"),
 				block_timestamp = colDef(name = "Sale Date", align = "left"),
 				price = colDef(name = "Price", align = "left"),
-				pred = colDef(name = "Fair Market Price", align = "left")
+				pred = colDef(name = "Fair Market Price", align = "left"),
+				rk = colDef(name = "Rank", align = "left")
 			)
 	    )
 	})
@@ -728,7 +738,7 @@ server <- function(input, output, session) {
 		if(!is.na(mx)) {
 			df <- df[ rk <= eval(mx) ]
 		}
-		# df[, rk := paste0('#', format(rk, big.mark=","))]
+		df[, price := round(price, 2)]
 
 		reactable(df,
 			defaultColDef = colDef(
