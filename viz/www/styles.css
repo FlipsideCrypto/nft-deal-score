@@ -158,6 +158,9 @@
 /*****************/
 /*     Forms     */
 /*****************/
+.rt-search {
+  color: #222;
+}
 .selectize-input, .selectize-dropdown  {
   background: #10151A !important;
   border: 1px solid #03E1FF !important;
@@ -244,11 +247,11 @@ input[type=number] {
   font-weight: 400;
   font-family: Inter;
 }
-#listingtable .rt-td {
+#listingtable .rt-td, #salestable .rt-td {
   font-size: 14px;
   /* padding: 2px; */
 }
-#listingtable .rt-th {
+#listingtable .rt-th, #salestable .rt-th {
   font-size: 15px;
   padding: 10px 6px;
   /* padding: 2px; */

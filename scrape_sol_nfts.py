@@ -236,8 +236,15 @@ def scrape_recent_sales():
 	l0 = len(o_sales)
 	print(sales.groupby('collection').token_id.count())
 	sales['tmp'] = sales.sale_date.apply(lambda x: str(x)[:10] )
+	sales['chain'] = 'Solana'
+	o_sales['chain'] = o_sales['chain'].fillna('Solana')
+	o_sales[['chain','collection']].drop_duplicates()
 	o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
-	o_sales = o_sales.append(sales).drop_duplicates(subset=['collection','token_id','tmp','price'])
+	o_sales = o_sales.append(sales)
+	o_sales['token_id'] = o_sales.token_id.apply(lambda x: str(x) )
+	o_sales['collection'] = o_sales.collection.apply(lambda x: clean_name(x) )
+	o_sales = o_sales.drop_duplicates(subset=['collection','token_id','tmp','price'])
+	o_sales[o_sales.token_id=='1606']
 	o_sales = o_sales.drop_duplicates(subset=['collection','token_id','tmp','price'])
 	l1 = len(o_sales)
 	print('{} -> {} (added {})'.format(l0, l1, l1 - l0))
