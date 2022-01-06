@@ -49,7 +49,8 @@ def manual_clean():
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
 def run_queries():
-	for c in [ 'Levana Dragon Eggs','Levana Meteors','Levana Dust' ]:
+	for c in [ 'Levana Dragon Eggs','Levana Meteors','Levana Dust' ][1:]:
+		print(c)
 		with open('./metadata/sql/{}.txt'.format(c)) as f:
 			query = f.readlines()
 		metadata = ctx.cursor().execute(' '.join(query))
@@ -84,6 +85,7 @@ def add_terra_tokens():
 	tokens = ctx.cursor().execute(query)
 	tokens = pd.DataFrame.from_records(iter(tokens), columns=[x[0] for x in tokens.description])
 	tokens = clean_colnames(tokens)
+	len(tokens)
 	for c in tokens.columns:
 		tokens[c] = tokens[c].apply(lambda x: re.sub('"', '', x) )
 	for collection in [ 'Galactic Punks', 'LunaBulls', 'Levana Dragon Eggs' ]:
@@ -148,6 +150,7 @@ def add_terra_metadata():
 		else:
 			cols = [ 'token_id', 'background', 'horns', 'body', 'nose', 'outfit', 'eyes', 'headwear', 'nosepiece' ]
 			metadata = pd.read_csv('./data/metadata/{}.csv'.format(collection))
+			metadata.columns = [ x.lower() for x in metadata.columns ]
 			if 'Levana' in collection:
 				metadata = metadata.rename(columns={'rank':'collection_rank'})
 			metadata = clean_colnames(metadata).rename(columns={'tokenid':'token_id'})
@@ -166,9 +169,6 @@ def add_terra_metadata():
 		metadata['attribute_count'] = 0
 		l = len(metadata)
 		incl_att_count = not collection in [ 'Levana Dragon Eggs' ]
-		metadata.groupby('cracking_date').token_id.count()
-		metadata.groupby('weight').token_id.count()
-		metadata[metadata.cracking_date=='2471-12-22'][['token_id']]
 		for c in list(metadata.columns) + ['attribute_count']:
 			if c in ['token_id','collection','pct','levana_rank','meteor_id']:
 				continue
@@ -304,12 +304,15 @@ def add_terra_sales():
 	sales = sales[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
 	sales['token_id'] = sales.token_id.apply(lambda x: re.sub('"', '', x) )
 	old = pd.read_csv('./data/sales.csv')
+	l0 = len(old)
 	if not 'chain' in old.columns:
 		old['chain'] = 'Solana'
 	old = old[ -(old.collection.isin(sales.collection.unique())) ]
 	old = old.append(sales)
 	old = old[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
 	old = old[-(old.collection == 'Levana Dragons')]
+	l0 = len(old)
+	print('Added {} sales'.format(l1 - l0))
 	print(old.groupby(['chain','collection']).token_id.count())
 	old.to_csv('./data/sales.csv', index=False)
 

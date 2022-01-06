@@ -132,6 +132,13 @@ fluidPage(
 		, div(class = "link", uiOutput('listingurl'))
 	)
 	, fluidRow(
+		class="grey8row"
+		, h2("Historical Sales", icon(class="padding-left-10", id="historical-sales-tooltip", "info-circle"))
+		, bsTooltip(id = "historical-sales-tooltip", title = "This app is still in beta - sales data may be incomplete or delayed", placement = "bottom", trigger = "hover")
+		, div(class = "table", reactableOutput("salestable"))
+		, div(class = "description", 'This app is still in beta - sales data may be incomplete or delayed')
+	)
+	, fluidRow(
 		class="grey8row faq"
 		, h2("FAQ")
 		, h4("What is NFT Deal Score?")
@@ -153,13 +160,6 @@ fluidPage(
 		, bsTooltip(id = "nft-rankings-tooltip", title = "Fair market price is based on training a machine learning model on historical sales data", placement = "bottom", trigger = "hover")
 		, div(class = "table", reactableOutput("nftstable"))
 		, div(class = "description", 'Fair market price is based on training a machine learning model on historical sales data')
-	)
-	, fluidRow(
-		class="grey8row"
-		, h2("Historical Sales", icon(class="padding-left-10", id="historical-sales-tooltip", "info-circle"))
-		, bsTooltip(id = "historical-sales-tooltip", title = "This app is still in beta - sales data may be incomplete or delayed", placement = "bottom", trigger = "hover")
-		, div(class = "table", reactableOutput("salestable"))
-		, div(class = "description", 'This app is still in beta - sales data may be incomplete or delayed')
 	)
 	# , fluidRow(
 	# 	class="grey8row"

@@ -161,6 +161,16 @@
 .rt-search {
   color: #222;
 }
+input.rt-filter:focus {
+    border: 1px solid #03E1FF;
+}
+input.rt-filter {
+    background: #212B36;
+    /* border: 1px solid #03E1FF; */
+    border-radius: 4px;
+    font-family: Roboto Mono !important;
+    color: #FFFFFF;
+}
 .selectize-input, .selectize-dropdown  {
   background: #10151A !important;
   border: 1px solid #03E1FF !important;
@@ -250,6 +260,10 @@ input[type=number] {
 #listingtable .rt-td, #salestable .rt-td {
   font-size: 14px;
   /* padding: 2px; */
+}
+.rt-td img {
+    max-width: 6rem;
+    max-height: 6rem;
 }
 #listingtable .rt-th, #salestable .rt-th {
   font-size: 15px;

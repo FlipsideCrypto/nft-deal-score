@@ -138,7 +138,7 @@ def awards():
 
 def scrape_recent_smb_sales(browser):
 	print('Scraping recent SMB sales...')
-	o_sales = pd.read_csv('./data/sales.csv')
+	o_sales = pd.read_csv('./data/sales.csv').rename(columns={'block_timestamp':'sale_date'})
 	o_sales.head()
 	# o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
 	# o_sales.groupby('tmp').token_id.count().tail(20)
@@ -162,8 +162,9 @@ def scrape_recent_smb_sales(browser):
 		num = 1 if 'an ' in t or 'a ' in t else int(re.split(' ', t)[0])
 		hours_ago = 0 if 'minute' in t else num if 'hour' in t else 24 * num
 		sale_date = datetime.today() - timedelta(hours=hours_ago)
-		data += [[ 'smb', token_id, price, sale_date  ]]
+		data += [[ 'Solana Monkey Business', token_id, price, sale_date  ]]
 	new_sales = pd.DataFrame(data, columns=['collection','token_id','price','sale_date'])
+	new_sales['chain'] = 'Solana'
 	print('{} new sales'.format(len(new_sales)))
 	smb = o_sales[o_sales.collection.isin(['smb','Solana Monkey Business'])]
 	o_sales = o_sales[-(o_sales.collection.isin(['smb','Solana Monkey Business']))]
@@ -194,7 +195,8 @@ def scrape_recent_smb_sales(browser):
 	# browser.find_elements_by_class_name('css-1wy0on6')[-1].click()
 	# browser.find_element_by_id('react-select-4-option-1').click()
 	o_sales = o_sales.append(smb)
-	print(o_sales.groupby('collection').token_id.count())
+	o_sales['chain'] = o_sales.collection.apply(lambda x: 'Terra' if x in [ 'Galactic Punks', 'Levana Dragon Eggs', 'LunaBulls' ] else 'Solana' )
+	print(o_sales.groupby(['chain','collection']).token_id.count())
 	o_sales.to_csv('./data/sales.csv', index=False)
 
 def scrape_magic_eden():
@@ -249,7 +251,7 @@ def scrape_recent_sales():
 	l1 = len(o_sales)
 	print('{} -> {} (added {})'.format(l0, l1, l1 - l0))
 	o_sales.groupby('collection').tmp.max()
-	o_sales.groupby('collection').token_id.count()
+	print(o_sales.groupby('collection').token_id.count())
 	del o_sales['tmp']
 	o_sales.to_csv('./data/sales.csv', index=False)
 
@@ -368,12 +370,12 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 	floor = listings.groupby('collection').price.min().reset_index().rename(columns={'price':'floor'})
 	pred_price = pred_price.merge(floor)
 
-	metadata = pd.read_csv('./data/metadata.csv')
-	solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'skin') & (metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
-	pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 4 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
+	# metadata = pd.read_csv('./data/metadata.csv')
+	# solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'skin') & (metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
+	# pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 4 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
 
-	solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'hair') & (metadata.feature_value == 'Long Blob Hair (9.72%)')].token_id.unique()
-	pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 2 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
+	# solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'hair') & (metadata.feature_value == 'Long Blob Hair (9.72%)')].token_id.unique()
+	# pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 2 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
 
 	pred_price['abs_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.lin_coef
 	pred_price['pct_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.log_coef
@@ -540,36 +542,36 @@ def scrape_solana_explorer(browser):
 	txdf.to_csv('../data/tx.csv', index=False)
 
 def scrape_tx(browser):
-    txdf = pd.read_csv('../data/tx.csv')
-    data = []
-    t_data = []
-    tx_ids = sorted(txdf.tx_id.unique())
-    for i in range(0, len(tx_ids)):
-        if i % 100 == 0:
-            print('#{}/{}'.format(i, len(tx_ids)))
-        tx_id = tx_ids[i]
-        tx_id = '4eqXrk9ZvknDrtKJGH4JFgS94eG5nDqNcXHgPqFng27viiJeFzfD7S86RYkwZmpqYdY37GDLG6AAZZ6UdAEN9gf6'
-        url = 'https://explorer.solana.com/tx/{}'.format(tx_id)
-        browser.get(url)
-        # r = requests.get(url)
-        # soup = BeautifulSoup(r.text)
-        sleep(2)
-        soup = BeautifulSoup(browser.page_source)
-        soup.text
-        len(soup.find_all('table', class_='card-table'))
-        datum = { 'tx_id': tx_id }
-        for tr in soup.find_all('table', class_='card-table')[0].find_all('tbody')[0].find_all('tr'):
-            td = tr.find_all('td')
-            k = ' '.join(td[0].text.strip().split())
-            v = ' '.join(td[1].text.strip().split())
-            datum[k] = v
-        data += [ datum ]
-        for tr in soup.find_all('table', class_='card-table')[1].find_all('tbody')[0].find_all('tr'):
-            td = tr.find_all('td')
-            details = functools.reduce(lambda x, y: x+'.'+y, list(map(lambda x: x.text, list(td[4].find_all('span')))), '')
-            t_data += [[ td[1].text, td[2].text, details ]]
-        df = pd.DataFrame(data)
-        t_df = pd.DataFrame(t_data, columns=['address','sol','details'])
+	txdf = pd.read_csv('../data/tx.csv')
+	data = []
+	t_data = []
+	tx_ids = sorted(txdf.tx_id.unique())
+	for i in range(0, len(tx_ids)):
+		if i % 100 == 0:
+			print('#{}/{}'.format(i, len(tx_ids)))
+		tx_id = tx_ids[i]
+		tx_id = '4eqXrk9ZvknDrtKJGH4JFgS94eG5nDqNcXHgPqFng27viiJeFzfD7S86RYkwZmpqYdY37GDLG6AAZZ6UdAEN9gf6'
+		url = 'https://explorer.solana.com/tx/{}'.format(tx_id)
+		browser.get(url)
+		# r = requests.get(url)
+		# soup = BeautifulSoup(r.text)
+		sleep(2)
+		soup = BeautifulSoup(browser.page_source)
+		soup.text
+		len(soup.find_all('table', class_='card-table'))
+		datum = { 'tx_id': tx_id }
+		for tr in soup.find_all('table', class_='card-table')[0].find_all('tbody')[0].find_all('tr'):
+			td = tr.find_all('td')
+			k = ' '.join(td[0].text.strip().split())
+			v = ' '.join(td[1].text.strip().split())
+			datum[k] = v
+		data += [ datum ]
+		for tr in soup.find_all('table', class_='card-table')[1].find_all('tbody')[0].find_all('tr'):
+			td = tr.find_all('td')
+			details = functools.reduce(lambda x, y: x+'.'+y, list(map(lambda x: x.text, list(td[4].find_all('span')))), '')
+			t_data += [[ td[1].text, td[2].text, details ]]
+		df = pd.DataFrame(data)
+		t_df = pd.DataFrame(t_data, columns=['address','sol','details'])
 
 def scrape_how_rare():
 	o_metadata = pd.read_csv('./data/metadata.csv')

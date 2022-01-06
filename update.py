@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from selenium import webdriver
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
@@ -41,3 +42,28 @@ ssn.convert_collection_names()
 sm.train_model(True, False)
 sm.train_model(False, False)
 # sm.train_model(False, True)
+
+def update_token_ids():
+    tokens = pd.read_csv('./data/tokens.csv')
+    tokens.groupby('collection').token_id.count()
+    tokens['token_id'] = tokens.token_id.astype(str)
+    # df[ (df.collection == 'Pesky Penguins') & (df.token_id == '3362') ]
+    tokens[ (tokens.collection == 'Pesky Penguins') & (tokens.token_id == '3362') ]
+    tokens[ (tokens.collection == 'Pesky Penguins') & (tokens.token_id == 3362) ]
+    # df.token_id.unique()
+    c = 'listings'
+    for c in [ 'attributes','sales','listings' ]:
+        print(c)
+        df = pd.read_csv('./data/{}.csv'.format(c))
+        df['token_id'] = df.token_id.astype(str)
+        if 'clean_token_id' in df.columns:
+            del df['clean_token_id']
+        
+        df = df.merge(tokens[['collection','token_id','clean_token_id']], how='left')
+        df[df.collection == 'Galactic Punks']
+        df['clean_token_id'] = df.clean_token_id.fillna(df.token_id).astype(int)
+        df[df.clean_token_id.isnull()].groupby('collection').token_id.count()
+        df[df.clean_token_id.notnull()].groupby('collection').token_id.count()
+        df['token_id'] = df.clean_token_id
+        del df['clean_token_id']
+        df.to_csv('./data/{}.csv'.format(c), index=False)

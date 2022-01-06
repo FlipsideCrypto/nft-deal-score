@@ -195,6 +195,7 @@ def train_model(check_exclude, supplement_with_listings):
         print('Working on collection {}'.format(collection))
         sales = s_df[ s_df.collection == collection ]
         metadata = m_df[ m_df.collection == collection ]
+        metadata['feature_name'] = metadata.feature_name.apply(lambda x: x.strip() )
         metadata[metadata.token_id == '1']
         metadata[metadata.feature_name == 'rank']
         metadata.feature_name.unique()

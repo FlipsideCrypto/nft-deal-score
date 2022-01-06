@@ -61,7 +61,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Levana Dragon Eggs'
+			, selected = 'Solana Monkey Business'
 			, choices = choices
 			, width = "100%"
 		)
@@ -282,7 +282,7 @@ server <- function(input, output, session) {
 			),
 			borderless = TRUE,
 			outlined = FALSE,
-			searchable = TRUE,
+			searchable = FALSE,
 			columns = list(
 				feature_name = colDef(name = "Attribute", align = "left"),
 				feature_value = colDef(name = "Value", align = "left"),
@@ -349,9 +349,10 @@ server <- function(input, output, session) {
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
 			),
+			filterable = TRUE,
 			borderless = TRUE,
 			outlined = FALSE,
-			searchable = TRUE,
+			searchable = FALSE,
 			columns = list(
 				token_id = colDef(name = "Token ID", align = "left"),
 				block_timestamp = colDef(name = "Sale Date", align = "left"),
@@ -532,6 +533,7 @@ server <- function(input, output, session) {
 		}
 
 		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd, rk) ])
+		df <- merge(df, tokens[collection == eval(selected), list(collection, token_id, image_url)] )
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
 		df[, pred_price_0 := pred_price ]
@@ -544,7 +546,7 @@ server <- function(input, output, session) {
 		# df[, pred_price := round(pred_price) ]
 		df[, pred_price := paste0(format(round(pred_price, 1), digits=3, decimal.mark=".", big.mark=",")) ]
 
-		df <- df[, list(token_id, price, pred_price, deal_score, rk)]
+		df <- df[, list(image_url, token_id, price, pred_price, deal_score, rk)]
 		m <- dcast(attributes[collection == eval(selected)], collection + token_id ~ feature_name, value.var='clean_name')
 		df <- merge(df, m, all.x=TRUE)
 		df[, collection := NULL]
@@ -561,6 +563,7 @@ server <- function(input, output, session) {
 		}
 		df <- df[ deal_score >= 10 ]
 		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
+        f <- min(df$price)
 
 		fig <- plot_ly(
 			source = "listingLink",
@@ -613,18 +616,22 @@ server <- function(input, output, session) {
 				, color = 'white'
 				, nticks = 7
 				, showgrid = FALSE
+                , range=list(f*0.9, f*2.5)
 			)
 			, yaxis= list(
 				title = "Fair Market Price"
 				, color = 'white'
 				, nticks = 7
 				, showgrid = FALSE
+                , range=list(f * 0.9, f*2.5)
 			)
 			, plot_bgcolor = plotly.style$plot_bgcolor
 			, paper_bgcolor = plotly.style$paper_bgcolor
-		) %>%
-		plotly::config(displayModeBar = FALSE) %>%
-		plotly::config(modeBarButtonsToRemove = c("zoomIn2d", "zoomOut2d"))
+		) 
+        # %>%
+		# plotly::config(displayModeBar = FALSE)
+        #  %>%
+		# plotly::config(modeBarButtonsToRemove = c("zoomIn2d", "zoomOut2d"))
 		event_register(fig, 'plotly_click')
 	})
 
@@ -745,15 +752,19 @@ server <- function(input, output, session) {
 				headerStyle = list(background = "#10151A")
 			),
 			borderless = TRUE,
+			filterable = TRUE,
 			outlined = FALSE,
 			columns = list(
+				image_url = colDef(name = "Token", align = "left", cell = function(value) {
+                    htmltools::tags$img(src=value)
+                }),
 				token_id = colDef(name = "Token ID", align = "left"),
 				price = colDef(name = "Listed Price", align = "left"),
 				pred_price = colDef(name = "Fair Market Price", align = "left"),
 				deal_score = colDef(name = "Deal Score", align = "left"),
 				rk = colDef(name = "NFT Rank", align = "left")
 			),
-			searchable = TRUE
+			searchable = FALSE
 	    )
 	})
 
