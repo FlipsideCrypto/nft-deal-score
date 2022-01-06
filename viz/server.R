@@ -128,7 +128,7 @@ server <- function(input, output, session) {
 			cur_0 <- pred_price[collection == eval(selected) ]
 			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
 			if (nrow(cur_1)) {
-				t <- paste0("Rank #", format(cur_1$rk[1], big.mark=",")," / ",format(nrow(cur_0), big.mark=","))
+				t <- paste0("Market Rank #", format(cur_1$rk[1], big.mark=",")," / ",format(nrow(cur_0), big.mark=","))
 			}
 		}
 		paste0(t)

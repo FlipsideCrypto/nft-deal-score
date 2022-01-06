@@ -29,18 +29,18 @@ browser = webdriver.Chrome()
 # sales.to_csv('~/Downloads/tmp.csv', index=False)
 
 # update sales
-ssn.scrape_recent_smb_sales(browser)
-ssn.scrape_recent_sales()
-ld.add_terra_sales()
+# ssn.scrape_recent_smb_sales(browser)
+# ssn.scrape_recent_sales()
+# ld.add_terra_sales()
 
 # update listings
 ssn.scrape_randomearth(browser)
 ssn.scrape_listings(browser)
 
 # update model
-ssn.convert_collection_names()
-sm.train_model(True, False)
-sm.train_model(False, False)
+# ssn.convert_collection_names()
+# sm.train_model(True, False)
+# sm.train_model(False, False)
 # sm.train_model(False, True)
 
 def update_token_ids():
@@ -67,3 +67,4 @@ def update_token_ids():
         df['token_id'] = df.clean_token_id
         del df['clean_token_id']
         df.to_csv('./data/{}.csv'.format(c), index=False)
+update_token_ids()
