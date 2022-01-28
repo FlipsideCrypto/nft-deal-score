@@ -1,3 +1,4 @@
+import collections
 import re
 import os
 import json
@@ -47,6 +48,47 @@ def manual_clean():
 		if c == 'tokens':
 			df['clean_token_id'] = df.token_id
 		df.to_csv('./data/{}.csv'.format(c), index=False)
+
+def solana_metadata():
+    metadata = pd.read_csv('./data/metadata.csv')
+    metadata[metadata.collection == 'Solana Monkey Business'].feature_name.unique()
+    
+    metadata = metadata[ metadata.collection.isin(['Aurory', 'Degen Apes', 'Galactic Punks', 'Pesky Penguins', 'Solana Monkey Business', 'Thugbirdz']) ]
+    collection = 'Solana Monkey Business'
+    for collection in metadata.collection.unique():
+        cur = metadata[metadata.collection == collection].fillna('None')
+        cur['token_id'] = cur.token_id.astype(int)
+        pct = cur[['token_id']].drop_duplicates()
+        pct['pct'] = 1
+        num_tokens = len(cur.token_id.unique())
+        print('Working on {} with {} tokens'.format(collection, num_tokens))
+        min(cur.token_id)
+        max(cur.token_id)
+        ps = pd.DataFrame()
+        for c in cur.feature_name.unique():
+            # if c in [ 'Attribute Count' ]:
+            #     continue
+            g = cur[cur.feature_name == c].groupby('feature_value').token_id.count().reset_index()
+            g['cur_pct'] = (g.token_id / num_tokens)
+            g = cur[cur.feature_name == c].merge(g[[ 'feature_value', 'cur_pct' ]] )
+            ps = ps.append(g[['token_id','cur_pct']])
+            pct = pct.merge(g[['token_id', 'cur_pct']])
+            pct['pct'] = pct.pct * pct.cur_pct * pct.cur_pct
+            del pct['cur_pct']
+        ps['rk'] = ps.groupby('token_id').cur_pct.rank(ascending=0)
+        ps[ps.token_id == 1355]
+        mn = ps.rk.min()
+        mx = ps.rk.max()
+        ps['mult'] = ps.apply(lambda x: x['cur_pct'] ** (1 + (x['rk'] / (mx - mn)) ) )
+        # d = {}
+        # for row in ps.iterrows():
+        # pct = pct.sort_values('pct')
+        # pct['rk'] = pct.pct.rank()
+        # pct.head()
+        # pct[ pct.token_id == 1355 ]
+        # pct[ pct.token_id == 2387 ]
+        # pct[ pct.token_id == 4024 ]
+        # cur[ cur.token_id == 1355 ]
 
 def run_queries():
 	for c in [ 'Levana Dragon Eggs','Levana Meteors','Levana Dust' ][1:]:
@@ -311,7 +353,7 @@ def add_terra_sales():
 	old = old.append(sales)
 	old = old[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
 	old = old[-(old.collection == 'Levana Dragons')]
-	l0 = len(old)
+	l1 = len(old)
 	print('Added {} sales'.format(l1 - l0))
 	print(old.groupby(['chain','collection']).token_id.count())
 	old.to_csv('./data/sales.csv', index=False)

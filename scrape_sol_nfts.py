@@ -12,6 +12,7 @@ from scipy.stats import norm
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from datetime import datetime, timedelta
+from selenium.webdriver.common.keys import Keys
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
@@ -55,16 +56,140 @@ def convert_collection_names():
 			print('error',c)
 			pass
 
-# def scrape_magic_eden_sales():
-# 	url = 'https://api-mainnet.magiceden.io/rpc/getGlobalActivitiesByQuery?q={%22$match%22:{%22collection_symbol%22:%22pesky_penguins%22},%22$sort%22:{%22blockTime%22:-1},%22$skip%22:0}'
-# 	results = requests.get(url).json()['results']
-# 	df = pd.DataFrame([ x['parsedTransaction'] for x in results if 'parsedTransaction' in x.keys()])
-# 	df[[ 'blockTime','collection_symbol','total_amount' ]]
-# 	for r in results:
-# 		pass
-# 		t = 
-# 		data += [[ r['createdAt'],  ]]
+def scrape_magic_eden_sales():
+	url = 'https://api-mainnet.magiceden.io/rpc/getGlobalActivitiesByQuery?q={%22$match%22:{%22collection_symbol%22:%22pesky_penguins%22},%22$sort%22:{%22blockTime%22:-1},%22$skip%22:0}'
+	results = requests.get(url).json()['results']
+	df = pd.DataFrame([ x['parsedTransaction'] for x in results if 'parsedTransaction' in x.keys()])
+	df[[ 'blockTime','collection_symbol','total_amount' ]]
 
+def scrape_not_found(browser):
+	url = 'https://notfoundterra.com/lunabulls'
+	browser.get(url)
+	data = []
+	for i in range(1, 9999+1):
+		t = browser.find_element_by_id('text-field')
+		if i % 100 == 0:
+			print(i, len(data))
+		t.clear()
+		t.send_keys(Keys.CONTROL, 'a')
+		sleep(0.1)
+		for _ in range(len(str(i))):
+			t.send_keys(Keys.BACKSPACE)
+			sleep(0.1)
+		# t.send_keys(u'\ue009' + u'\ue003')
+		t.send_keys('{}'.format(i))
+		b = browser.find_elements_by_class_name('MuiButton-label')
+		try:
+			b[0].click()
+		except:
+			sleep(1)
+			b = browser.find_elements_by_class_name('MuiButton-label')
+			b[0].click()
+
+		rk = browser.find_elements_by_class_name('Statistics-Rank2')
+		score = browser.find_elements_by_class_name('MuiListItemText-secondary')
+		data += [[ 'LunaBulls', i, rk[0].text, score[-1].text ]]
+		sleep(0.1)
+	df = pd.DataFrame(data, columns=['collection','token_id','nft_rank','nft_score']).drop_duplicates()
+	# df['collection'] = 'Galactic Punks'
+	df.to_csv('~/Downloads/lb_ranks.csv', index=False)
+	df['nft_rank'] = df.nft_rank.apply(lambda x: re.split('/|\)|\(', x)[1] )
+	df.to_csv('./data/lp_ranks.csv', index=False)
+
+def calculate_deal_scores(listings, alerted):
+	listings = listings.sort_values('price')
+	t1 = listings.groupby('collection').head(1).rename(columns={'price':'t1'})
+	t2 = listings.groupby('collection').head(2).groupby('collection').tail(1).rename(columns={'price':'t2'})
+	t = t1.merge(t2, on=['collection'])
+	t['pct'] = t.t2 / t.t1
+	t['dff'] = t.t2 - t.t1
+	t = t[ (t.pct >= 1.15) | (t.dff >= 10 ) ]
+
+	pred_price = pd.read_csv('./data/pred_price.csv')[['collection','token_id','pred_price','pred_sd']]
+	pred_price['collection'] = pred_price.collection.apply(lambda x: clean_name(x))
+	pred_price['token_id'] = pred_price.token_id.astype(str)
+	listings['token_id'] = listings.token_id.astype(str)
+	pred_price.collection.unique()
+	listings.collection.unique()
+	pred_price.head()
+	listings.head()
+	pred_price = pred_price.merge(listings[['collection','token_id','price']], on=['collection','token_id'])
+
+	coefsdf = pd.read_csv('./data/coefsdf.csv')
+	coefsdf['collection'] = coefsdf.collection.apply(lambda x: clean_name(x))
+	coefsdf['tot'] = coefsdf.lin_coef + coefsdf.log_coef
+	coefsdf['lin_coef'] = coefsdf.lin_coef / coefsdf.tot
+	coefsdf['log_coef'] = coefsdf.log_coef / coefsdf.tot
+	pred_price = pred_price.merge(coefsdf)
+	floor = listings.groupby('collection').price.min().reset_index().rename(columns={'price':'floor'})
+	pred_price = pred_price.merge(floor)
+
+	# metadata = pd.read_csv('./data/metadata.csv')
+	# solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'skin') & (metadata.feature_value == 'Solana Blob (9.72%)')].token_id.unique()
+	# pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 4 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
+
+	# solana_blob = metadata[ (metadata.collection == 'aurory') & (metadata.feature_name == 'hair') & (metadata.feature_value == 'Long Blob Hair (9.72%)')].token_id.unique()
+	# pred_price['pred_price'] = pred_price.apply(lambda x: (x['pred_price'] * 0.8) - 2 if x['token_id'] in solana_blob and x['collection'] == 'Aurory' else x['pred_price'], 1 )
+
+	pred_price['abs_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.lin_coef
+	pred_price['pct_chg'] = (pred_price.floor - pred_price.floor_price) * pred_price.log_coef
+	pred_price['pred_price_0'] = pred_price.pred_price
+	pred_price['pred_price'] = pred_price.apply( lambda x: x['pred_price'] + x['abs_chg'] + ( x['pct_chg'] * x['pred_price'] / x['floor_price'] ), 1 )
+	pred_price['pred_price'] = pred_price.apply( lambda x: max( x['pred_price'], x['floor']), 1 )
+	# pred_price['deal_score'] = pred_price.apply( lambda x: (( x['pred_price'] - x['price'] ) * 50 / ( 3 * x['pred_sd'])) + 50  , 1 )
+	# pred_price['deal_score'] = pred_price.deal_score.apply( lambda x: min(max(0, x), 100) )
+	pred_price['deal_score'] = pred_price.apply( lambda x: 100 * (1 - norm.cdf( x['price'], x['pred_price'], 2 * x['pred_sd'] * x['pred_price'] / x['pred_price_0'] )) , 1 )
+
+	pred_price = pred_price.sort_values(['deal_score'], ascending=[0])
+	pred_price[pred_price.token_id=='1656']
+	g = pred_price.groupby('collection').head(10)[['collection','token_id','deal_score','price']]
+	n1 = g.groupby('collection').head(2).groupby('collection').head(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_1'})
+	n2 = g.groupby('collection').head(2).groupby('collection').tail(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_2'})
+	n3 = g.groupby('collection').head(3).groupby('collection').tail(1)[['collection','deal_score']].rename(columns={'deal_score':'ds_3'})
+	g = g.merge(n1)
+	g = g.merge(n2)
+	g = g.merge(n3)
+	g['m2'] = g.ds_1 - g.ds_2
+	g['m3'] = g.ds_1 - g.ds_3
+	m1 = g.deal_score.max()
+	m2 = g.m2.max()
+	m3 = g.m3.max()
+	print(g)
+	g.to_csv('./data/tmp.csv', index=False)
+	g['id'] = g.collection+'.'+g.token_id.astype(str)
+	t['id'] = t.collection+'.'+t.token_id_x.astype(str)
+	a = list(g[ (g.m2 >= 8) | (g.m3 >= 15) ].groupby('collection').head(1).id.unique())
+	b = list(g[ (g.deal_score >= 90) ].id.unique())
+	c = list(t.id.unique())
+
+	# collections = t[ (t.pct >= 1.15) | (t.dff >= 1) ].collection.unique()
+	collections = t.id.unique()
+	to_alert = list(set(a + b + c))
+	to_alert = [ x for x in to_alert if not x in alerted ]
+	alerted += to_alert
+
+	s = '@here\n' if len(to_alert) else ''
+	if len(collections):
+		s += ', '.join(collections)
+		s += 'are listings far below floor\n'
+	s += '```'
+	for c in pred_price.collection.unique():
+		s += '{} floor: {}\n'.format(c, round(pred_price[pred_price.collection==c].floor.min(), 1))
+	# s += '```'
+	g = g.sort_values(['collection','deal_score'], ascending=[1,0])
+	for row in g.iterrows():
+		row = row[1]
+		txt = '{} | {} | ${} | {}'.format( str(row['collection']).ljust(10), str(row['token_id']).ljust(5), str(round(row['price'])).ljust(3), round(row['deal_score']) )
+		s += '{}\n'.format(txt)
+	s += '```'
+	print(s)
+
+	mUrl = 'https://discord.com/api/webhooks/931615663565443082/L_cQCI_fs1D4vOC5lCoP0qJuzvZKVX-3wx-jNSBw32v0HwWxz6OcKK0iGOz9T1-1xElf'
+
+	data = {"content": s}
+	response = requests.post(mUrl, json=data)
+
+	return alerted
 
 def scrape_randomearth(browser):
 	print('Querying randomearth.io sales...')
@@ -255,7 +380,7 @@ def scrape_recent_sales():
 	del o_sales['tmp']
 	o_sales.to_csv('./data/sales.csv', index=False)
 
-def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = []):
+def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
 	data = []
 	# collections = [ 'aurory','thugbirdz','meerkatmillionaires','aurory','degenapes' ]
@@ -271,7 +396,8 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 		if collection == 'boryokudragonz':
 			continue
 		c = d[collection] if collection in d.keys() else collection
-		url = 'https://solanafloor.com/nft/{}/listed'.format(c)
+		u = 'listed' if is_listings else 'all-tokens'
+		url = 'https://solanafloor.com/nft/{}/{}'.format(c, u)
 		browser.get(url)
 		sleep(5)
 		has_more = True
@@ -291,20 +417,32 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 					# 		token_id = int(cells[0].text)
 					# 		price = float(cells[4].text)
 					# 		data += [[ collection, token_id, price ]]
-					for row in soup.find_all('div', class_='ag-row'):
-						# print(row.text)
-						cell = row.find_all('div', class_='ag-cell')
-						if len(cell) > 4:
-							token_id = row.find_all('div', {'col-id':'tokenId'})
-							price = row.find_all('div', {'col-id':'price'})
+					d0 = soup.find_all('div', class_='ag-pinned-left-cols-container')
+					d1 = soup.find_all('div', class_='ag-center-cols-clipper')
+					if not len(d0) or not len(d1):
+						continue
+					d0 = d0[0]
+					d1 = d1[0]
+					rows0 = d0.find_all('div', class_='ag-row')
+					rows1 = d1.find_all('div', class_='ag-row')
+					for k in range(len(rows0)):
+						# for row in soup.find_all('div', class_='ag-row'):
+						# 	# print(row.text)
+						cell0 = rows0[k].find_all('div', class_='ag-cell')
+						cell1 = rows1[k].find_all('div', class_='ag-cell')
+						if len(cell1) > 2:
+							token_id = cell0[0].text
+							price = cell1[2 if is_listings else 0].text
 							if len(token_id) and len(price):
-								token_id = int(token_id[0].text)
-								price = float(price[0].text)
+								# token_id = int(token_id[0].text)
+								# price = float(price[0].text)
+								token_id = int(token_id)
+								price = float(price)
 								if not token_id in seen:
 									data += [[ collection, token_id, price ]]
 									seen.append(token_id)
-						# else:
-						# 	print(row.text)
+							# else:
+							# 	print(row.text)
 					scroll = browser.find_elements_by_class_name('ag-row-even')
 					j = min(j, len(scroll) - 1)
 					browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
@@ -427,10 +565,10 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 	s += '```'
 	print(s)
 
-	mUrl = 'https://discord.com/api/webhooks/916027651397914634/_zrDNThkwu2ZYB4F503JNRtwhPh9EJ642rIdENawlJu1Di0dpfKT_ba045xXGCefAFvI'
+	# mUrl = 'https://discord.com/api/webhooks/916027651397914634/_zrDNThkwu2ZYB4F503JNRtwhPh9EJ642rIdENawlJu1Di0dpfKT_ba045xXGCefAFvI'
 
-	data = {"content": s}
-	response = requests.post(mUrl, json=data)
+	# data = {"content": s}
+	# response = requests.post(mUrl, json=data)
 
 	return alerted
 
@@ -736,6 +874,11 @@ def save_img():
 def scratch():
 	o_metadata = pd.read_csv('./data/metadata.csv')
 	o_sales = pd.read_csv('./data/sales.csv')
+	o_sales[ o_sales.collection == 'Solana Monkey Business' ].head()
+	o_sales[ o_sales.collection == 'Solana Monkey Business' ].sort_values('sale_date', ascending=0).head()
+	o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
+	o_sales['n_sales'] = 1
+	o_sales.groupby(['collection','tmp'])[['price','n_sales']].sum().reset_index().to_csv('./data/tableau_sales_data.csv', index=False)
 	o_metadata.head()
 	o_sales.head()
 	o_sales.to_csv('./data/md_sales.csv', index=False)

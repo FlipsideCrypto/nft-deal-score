@@ -1,6 +1,9 @@
 import os
 import pandas as pd
 from selenium import webdriver
+from time import sleep
+from copy import deepcopy
+import random
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
@@ -10,6 +13,21 @@ import load_data as ld
 import solana_model as sm
 
 browser = webdriver.Chrome()
+
+
+
+if False:
+    alerted = []
+    for i in range(10):
+        ssn.scrape_randomearth(browser)
+        update_token_ids()
+        listings = pd.read_csv('./data/listings.csv')
+        listings = listings[listings.chain == 'Terra']
+        listings.collection.unique()
+        alerted = ssn.calculate_deal_scores(listings, alerted)
+        sleep(10 * 60)
+
+
 
 # sales = pd.read_csv('./data/sales.csv')
 # pred_price = pd.read_csv('./data/pred_price.csv').sort_values('token_id')
@@ -29,12 +47,13 @@ browser = webdriver.Chrome()
 # sales.to_csv('~/Downloads/tmp.csv', index=False)
 
 # update sales
-# ssn.scrape_recent_smb_sales(browser)
-# ssn.scrape_recent_sales()
-# ld.add_terra_sales()
+ssn.scrape_recent_smb_sales(browser)
+ssn.scrape_recent_sales()
+ld.add_terra_sales()
 
 # update listings
 ssn.scrape_randomearth(browser)
+# ssn.scrape_listings(browser, ['smb','aurory'])
 ssn.scrape_listings(browser)
 
 # update model
@@ -68,3 +87,4 @@ def update_token_ids():
         del df['clean_token_id']
         df.to_csv('./data/{}.csv'.format(c), index=False)
 update_token_ids()
+

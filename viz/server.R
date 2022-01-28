@@ -333,7 +333,7 @@ server <- function(input, output, session) {
 		if( length(selected) == 0 ) {
 			return(NULL)
 		}
-		data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred )]
+		data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred, mn_20 )]
 		data[, price := paste0(format(price, scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
 		data[, pred := paste0(format(round(pred, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
 
@@ -358,7 +358,8 @@ server <- function(input, output, session) {
 				block_timestamp = colDef(name = "Sale Date", align = "left"),
 				price = colDef(name = "Price", align = "left"),
 				pred = colDef(name = "Fair Market Price", align = "left"),
-				rk = colDef(name = "Rank", align = "left")
+				rk = colDef(name = "Rank", align = "left"),
+				mn_20 = colDef(name = "Floor Price", align = "left")
 			)
 	    )
 	})
@@ -762,7 +763,7 @@ server <- function(input, output, session) {
 				price = colDef(name = "Listed Price", align = "left"),
 				pred_price = colDef(name = "Fair Market Price", align = "left"),
 				deal_score = colDef(name = "Deal Score", align = "left"),
-				rk = colDef(name = "NFT Rank", align = "left")
+				rk = colDef(name = "Market Rank", align = "left")
 			),
 			searchable = FALSE
 	    )
