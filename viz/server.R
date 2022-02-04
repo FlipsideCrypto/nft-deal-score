@@ -536,13 +536,8 @@ server <- function(input, output, session) {
 
 		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd, rk) ])
 		df <- merge(df, tokens[collection == eval(selected), list(collection, token_id, image_url)] )
-        print('1')
-        print(head(df))
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
-        print('tuple')
-        print(tuple)
-        print(floors)
 
 		df[, pred_price_0 := pred_price ]
 		df[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
@@ -559,8 +554,6 @@ server <- function(input, output, session) {
 		df <- merge(df, m, all.x=TRUE)
 		df[, collection := NULL]
 		df <- df[order(-deal_score)]
-        print('2')
-        print(head(df))
 		return(df)
 	})
 
@@ -573,8 +566,6 @@ server <- function(input, output, session) {
 		}
 		df <- df[ deal_score >= 10 ]
 		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
-        print('head(df)')
-        print(head(df))
         f <- min(df[price > 0]$price)
 
 		fig <- plot_ly(
@@ -751,9 +742,6 @@ server <- function(input, output, session) {
 			df <- df[ price <= eval(mx) ]
 		}
 		mx <- as.numeric(input$maxnftrank)
-		print('mx')
-		print(mx)
-		print(head(df$rk))
 		if(!is.na(mx)) {
 			df <- df[ rk <= eval(mx) ]
 		}
