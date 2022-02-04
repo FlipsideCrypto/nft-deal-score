@@ -333,9 +333,10 @@ server <- function(input, output, session) {
 		if( length(selected) == 0 ) {
 			return(NULL)
 		}
-		data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred, mn_20 )]
+		# data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred, mn_20 )]
+		data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price )]
 		data[, price := paste0(format(price, scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
-		data[, pred := paste0(format(round(pred, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+		# data[, pred := paste0(format(round(pred, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
 
 		m <- pred_price[collection == eval(selected), list(token_id, rk)]
 		data <- merge(data, m, all.x=TRUE)
@@ -357,9 +358,9 @@ server <- function(input, output, session) {
 				token_id = colDef(name = "Token ID", align = "left"),
 				block_timestamp = colDef(name = "Sale Date", align = "left"),
 				price = colDef(name = "Price", align = "left"),
-				pred = colDef(name = "Fair Market Price", align = "left"),
-				rk = colDef(name = "Rank", align = "left"),
-				mn_20 = colDef(name = "Floor Price", align = "left")
+				# pred = colDef(name = "Fair Market Price", align = "left"),
+				rk = colDef(name = "DS Rank", align = "left")
+				# mn_20 = colDef(name = "Floor Price", align = "left")
 			)
 	    )
 	})
@@ -537,6 +538,7 @@ server <- function(input, output, session) {
 		df <- merge(df, tokens[collection == eval(selected), list(collection, token_id, image_url)] )
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
+
 		df[, pred_price_0 := pred_price ]
 		df[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
 		df[, pred_price := pmax( eval(floors[2]), pred_price) ]
@@ -564,7 +566,7 @@ server <- function(input, output, session) {
 		}
 		df <- df[ deal_score >= 10 ]
 		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
-        f <- min(df$price)
+        f <- min(df[price > 0]$price)
 
 		fig <- plot_ly(
 			source = "listingLink",
@@ -740,9 +742,6 @@ server <- function(input, output, session) {
 			df <- df[ price <= eval(mx) ]
 		}
 		mx <- as.numeric(input$maxnftrank)
-		print('mx')
-		print(mx)
-		print(head(df$rk))
 		if(!is.na(mx)) {
 			df <- df[ rk <= eval(mx) ]
 		}

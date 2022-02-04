@@ -403,7 +403,7 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 		has_more = True
 		page = 1
 		seen = []
-		while has_more and page < 20:
+		while has_more and page < 120:
 			# scroll = browser.find_element_by_class_name('ag-center-cols-viewport')
 			print('{} page #{} ({})'.format(collection, page, len(data)))
 			sleep(3)
@@ -436,8 +436,12 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 							if len(token_id) and len(price):
 								# token_id = int(token_id[0].text)
 								# price = float(price[0].text)
+								if not token_id.strip():
+									continue
 								token_id = int(token_id)
-								price = float(price)
+								price = float(price) if price.strip() else 0
+								if not price and is_listings:
+									continue
 								if not token_id in seen:
 									data += [[ collection, token_id, price ]]
 									seen.append(token_id)
@@ -455,6 +459,13 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 			else:
 				has_more = False
 				break
+	if not is_listings:
+		old = pd.read_csv('./data/solana_rarities.csv')
+		rarities = pd.DataFrame(data, columns=['collection','token_id','nft_rank']).drop_duplicates()
+		rarities = rarities.append(old).drop_duplicates()
+		print(rarities.groupby('collection').token_id.count())
+		rarities.to_csv('./data/solana_rarities.csv', index=False)
+
 	old = pd.read_csv('./data/listings.csv')
 	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
 	# others = scrape_magic_eden()
