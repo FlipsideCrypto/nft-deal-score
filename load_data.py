@@ -50,45 +50,45 @@ def manual_clean():
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
 def solana_metadata():
-    metadata = pd.read_csv('./data/metadata.csv')
-    metadata[metadata.collection == 'Solana Monkey Business'].feature_name.unique()
-    
-    metadata = metadata[ metadata.collection.isin(['Aurory', 'Degen Apes', 'Galactic Punks', 'Pesky Penguins', 'Solana Monkey Business', 'Thugbirdz']) ]
-    collection = 'Solana Monkey Business'
-    for collection in metadata.collection.unique():
-        cur = metadata[metadata.collection == collection].fillna('None')
-        cur['token_id'] = cur.token_id.astype(int)
-        pct = cur[['token_id']].drop_duplicates()
-        pct['pct'] = 1
-        num_tokens = len(cur.token_id.unique())
-        print('Working on {} with {} tokens'.format(collection, num_tokens))
-        min(cur.token_id)
-        max(cur.token_id)
-        ps = pd.DataFrame()
-        for c in cur.feature_name.unique():
-            # if c in [ 'Attribute Count' ]:
-            #     continue
-            g = cur[cur.feature_name == c].groupby('feature_value').token_id.count().reset_index()
-            g['cur_pct'] = (g.token_id / num_tokens)
-            g = cur[cur.feature_name == c].merge(g[[ 'feature_value', 'cur_pct' ]] )
-            ps = ps.append(g[['token_id','cur_pct']])
-            pct = pct.merge(g[['token_id', 'cur_pct']])
-            pct['pct'] = pct.pct * pct.cur_pct * pct.cur_pct
-            del pct['cur_pct']
-        ps['rk'] = ps.groupby('token_id').cur_pct.rank(ascending=0)
-        ps[ps.token_id == 1355]
-        mn = ps.rk.min()
-        mx = ps.rk.max()
-        ps['mult'] = ps.apply(lambda x: x['cur_pct'] ** (1 + (x['rk'] / (mx - mn)) ) )
-        # d = {}
-        # for row in ps.iterrows():
-        # pct = pct.sort_values('pct')
-        # pct['rk'] = pct.pct.rank()
-        # pct.head()
-        # pct[ pct.token_id == 1355 ]
-        # pct[ pct.token_id == 2387 ]
-        # pct[ pct.token_id == 4024 ]
-        # cur[ cur.token_id == 1355 ]
+	metadata = pd.read_csv('./data/metadata.csv')
+	metadata[metadata.collection == 'Solana Monkey Business'].feature_name.unique()
+	
+	metadata = metadata[ metadata.collection.isin(['Aurory', 'Degen Apes', 'Galactic Punks', 'Pesky Penguins', 'Solana Monkey Business', 'Thugbirdz']) ]
+	collection = 'Solana Monkey Business'
+	for collection in metadata.collection.unique():
+		cur = metadata[metadata.collection == collection].fillna('None')
+		cur['token_id'] = cur.token_id.astype(int)
+		pct = cur[['token_id']].drop_duplicates()
+		pct['pct'] = 1
+		num_tokens = len(cur.token_id.unique())
+		print('Working on {} with {} tokens'.format(collection, num_tokens))
+		min(cur.token_id)
+		max(cur.token_id)
+		ps = pd.DataFrame()
+		for c in cur.feature_name.unique():
+			# if c in [ 'Attribute Count' ]:
+			#     continue
+			g = cur[cur.feature_name == c].groupby('feature_value').token_id.count().reset_index()
+			g['cur_pct'] = (g.token_id / num_tokens)
+			g = cur[cur.feature_name == c].merge(g[[ 'feature_value', 'cur_pct' ]] )
+			ps = ps.append(g[['token_id','cur_pct']])
+			pct = pct.merge(g[['token_id', 'cur_pct']])
+			pct['pct'] = pct.pct * pct.cur_pct * pct.cur_pct
+			del pct['cur_pct']
+		ps['rk'] = ps.groupby('token_id').cur_pct.rank(ascending=0)
+		ps[ps.token_id == 1355]
+		mn = ps.rk.min()
+		mx = ps.rk.max()
+		ps['mult'] = ps.apply(lambda x: x['cur_pct'] ** (1 + (x['rk'] / (mx - mn)) ) )
+		# d = {}
+		# for row in ps.iterrows():
+		# pct = pct.sort_values('pct')
+		# pct['rk'] = pct.pct.rank()
+		# pct.head()
+		# pct[ pct.token_id == 1355 ]
+		# pct[ pct.token_id == 2387 ]
+		# pct[ pct.token_id == 4024 ]
+		# cur[ cur.token_id == 1355 ]
 
 def run_queries():
 	for c in [ 'Levana Dragon Eggs','Levana Meteors','Levana Dust' ][1:]:
@@ -130,6 +130,7 @@ def add_terra_tokens():
 	len(tokens)
 	for c in tokens.columns:
 		tokens[c] = tokens[c].apply(lambda x: re.sub('"', '', x) )
+	collection = 'Levana Dragon Eggs'
 	for collection in [ 'Galactic Punks', 'LunaBulls', 'Levana Dragon Eggs' ]:
 		if collection == 'Galactic Punks':
 			df = tokens
@@ -295,64 +296,256 @@ def add_terra_sales():
 		, 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2'
 		, 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k'
 	]
+	# query = '''
+	# WITH orders AS (
+	# 	SELECT tx_id
+	# 	, block_timestamp AS sale_date
+	# 	, msg_value:execute_msg:execute_order:order:order:maker_asset:info:nft:token_id AS token_id
+	# 	, msg_value:execute_msg:execute_order:order:order:maker_asset:info:nft:contract_addr::string AS contract
+	# 	, msg_value:execute_msg:execute_order:order:order:taker_asset:amount::decimal/pow(10,6) AS price
+	# 	FROM terra.msgs 
+	# 	WHERE msg_value:contract::string = 'terra1eek0ymmhyzja60830xhzm7k7jkrk99a60q2z2t' 
+	# 	AND tx_status = 'SUCCEEDED'
+	# 	AND msg_value:execute_msg:execute_order IS NOT NULL
+	# 	AND contract IN ( '{}' )
+	# ), Lorders AS (
+	# 	SELECT tx_id
+	# 	, block_timestamp AS sale_date
+	# 	, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:maker_asset:info:nft:token_id AS token_id
+	# 	, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:maker_asset:info:nft:contract_addr::string AS contract
+	# 	, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:taker_asset:amount::decimal/pow(10,6) AS price
+	# 	FROM terra.msgs 
+	# 	WHERE msg_value:contract::string = 'terra1eek0ymmhyzja60830xhzm7k7jkrk99a60q2z2t' 
+	# 	AND tx_status = 'SUCCEEDED'
+	# 	AND msg_value:execute_msg:ledger_proxy:msg:execute_order IS NOT NULL
+	# 	AND contract IN ( '{}' )
+	# ), unioned AS (
+	# 	SELECT * FROM orders
+	# 	UNION ALL 
+	# 	SELECT * FROM Lorders
+	# )
+	# SELECT CASE 
+	# 	WHEN contract = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' THEN 'Levana Dust'
+	# 	WHEN contract = 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' THEN 'Levana Meteors'
+	# 	WHEN contract = 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' THEN 'Levana Dragon Eggs'
+	# 	WHEN contract = 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2' THEN 'LunaBulls'
+	# 	WHEN contract = 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k' THEN 'Galactic Punks'
+	# 	ELSE 'Other' 
+	# END AS collection
+	# , sale_date
+	# , token_id
+	# , tx_id
+	# , price
+	# FROM unioned
+	# '''.format( '\', \''.join(contracts), '\', \''.join(contracts) )
+	# sales = ctx.cursor().execute(query)
+	# sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
+	# sales = clean_colnames(sales)
+	# sales.head()
+	# tokens.to_csv('~/Downloads/tmp3.csv', index=False)
+	# tokens[tokens.token_id == '25984997114855639851202718743284654443']
+	
+
 	query = '''
-	WITH orders AS (
-		SELECT tx_id
-		, block_timestamp AS sale_date
-		, msg_value:execute_msg:execute_order:order:order:maker_asset:info:nft:token_id AS token_id
-		, msg_value:execute_msg:execute_order:order:order:maker_asset:info:nft:contract_addr::string AS contract
-		, msg_value:execute_msg:execute_order:order:order:taker_asset:amount::decimal/pow(10,6) AS price
-		FROM terra.msgs 
-		WHERE msg_value:contract::string = 'terra1eek0ymmhyzja60830xhzm7k7jkrk99a60q2z2t' 
-		AND tx_status = 'SUCCEEDED'
-		AND msg_value:execute_msg:execute_order IS NOT NULL
-		AND contract IN ( '{}' )
-	), Lorders AS (
-		SELECT tx_id
-		, block_timestamp AS sale_date
-		, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:maker_asset:info:nft:token_id AS token_id
-		, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:maker_asset:info:nft:contract_addr::string AS contract
-		, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:taker_asset:amount::decimal/pow(10,6) AS price
-		FROM terra.msgs 
-		WHERE msg_value:contract::string = 'terra1eek0ymmhyzja60830xhzm7k7jkrk99a60q2z2t' 
-		AND tx_status = 'SUCCEEDED'
-		AND msg_value:execute_msg:ledger_proxy:msg:execute_order IS NOT NULL
-		AND contract IN ( '{}' )
-	), unioned AS (
-		SELECT * FROM orders
-		UNION ALL 
-		SELECT * FROM Lorders
-	)
-	SELECT CASE 
-		WHEN contract = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' THEN 'Levana Dust'
-		WHEN contract = 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' THEN 'Levana Meteors'
-		WHEN contract = 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' THEN 'Levana Dragon Eggs'
-		WHEN contract = 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2' THEN 'LunaBulls'
-		WHEN contract = 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k' THEN 'Galactic Punks'
-		ELSE 'Other' 
-	END AS collection
-	, sale_date
-	, token_id
-	, tx_id
-	, price
-	FROM unioned
-	'''.format( '\', \''.join(contracts), '\', \''.join(contracts) )
+		WITH 
+		RE_events AS (
+			SELECT
+				block_timestamp,
+				tx_id,
+				event_attributes
+			FROM
+				terra.msg_events
+			WHERE event_attributes:action = 'execute_orders'
+			AND event_type = 'from_contract'
+			AND tx_status = 'SUCCEEDED'
+				
+		),
+
+		RE_takers AS (
+			SELECT DISTINCT
+				tx_id,
+				msg_value:sender as taker
+			FROM
+				terra.msgs
+			WHERE
+				tx_id IN (SELECT DISTINCT tx_id FROM RE_events)
+		),
+		allSales AS 
+		(
+			SELECT 
+			block_timestamp,
+			tx_id,
+			platform,
+			nft_from,
+			nft_to,
+			nft_address,
+			CASE nft_address
+			WHEN 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2' THEN 'LunaBulls'
+			WHEN 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k' THEN 'Galactic Punks'
+			WHEN 'terra1vhuyuwwr4rkdpez5f5lmuqavut28h5dt29rpn6' THEN 'Levana Dragons'
+			WHEN 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' THEN 'Levana Meteor Dust'
+			WHEN 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' THEN 'Levana Eggs'
+			WHEN 'terra14gfnxnwl0yz6njzet4n33erq5n70wt79nm24el' THEN 'Levana Loot'
+			WHEN 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' THEN 'Levana Meteors'
+			ELSE nft_address END
+			as nft,
+			amount,
+			denom,
+			tokenid
+			FROM (
+				SELECT
+				block_timestamp,
+				tx_id,
+				'Random Earth' as platform,
+				action,
+				IFF(action = 'SELL', maker, taker) as nft_from,
+				IFF(action = 'ACCEPT BID', maker, taker) as nft_to,
+				nft_address,
+				amount,
+				denom,
+				tokenid
+				FROM (
+					SELECT
+						block_timestamp,
+						e.tx_id,
+						action,
+						maker,
+						taker,
+						nft_address,
+						amount,
+						denom,
+						tokenid
+					FROM (
+						SELECT 
+							block_timestamp,
+							tx_id,
+							IFF(event_attributes:order:order:maker_asset:info:nft is not null, 'SELL', 'ACCEPT BID') as action,
+							LISTAGG(CHR(F.VALUE)) WITHIN GROUP (ORDER BY F.INDEX) as maker,
+							IFF(event_attributes:order:order:maker_asset:info:nft is not null, event_attributes:order:order:maker_asset:info:nft:contract_addr, event_attributes:order:order:taker_asset:info:nft:contract_addr)::string as nft_address,
+							IFF(event_attributes:order:order:maker_asset:info:nft is not null, event_attributes:order:order:taker_asset:amount, event_attributes:order:order:maker_asset:amount) / 1e6 as amount,
+							IFF(event_attributes:order:order:maker_asset:info:nft is not null, event_attributes:order:order:taker_asset:info:native_token:denom, event_attributes:order:order:maker_asset:info:native_token:denom)::string as denom,
+									IFF(event_attributes:order:order:maker_asset:info:nft is not null, event_attributes:order:order:maker_asset:info:nft:token_id, event_attributes:order:order:taker_asset:info:nft:token_id) as tokenid
+						FROM 
+							RE_events e,
+							LATERAL FLATTEN(input => event_attributes:order:order:maker) F
+						GROUP BY
+							block_timestamp,
+							tx_id,
+							nft_address,
+							amount,
+							denom,
+							tokenid,
+							action
+					) e
+					JOIN RE_takers t
+					ON e.tx_id = t.tx_id
+				)
+
+				UNION 
+
+				SELECT 
+				block_timestamp,
+				tx_id,
+				'Knowhere' as platform,
+				MAX(IFF(event_attributes:bid_amount is not null, 'SELL', 'AUCTION')) as action,
+				MAX(IFF(event_type = 'coin_received', COALESCE(event_attributes:"2_receiver", event_attributes:"1_receiver"), '')) as nft_from,
+				MAX(IFF(event_attributes:"0_action" = 'settle' AND event_attributes:"1_action" = 'transfer_nft', event_attributes:recipient, '')) as nft_to,
+				MAX(IFF(event_attributes:"1_action" is not null, event_attributes:"1_contract_address", ''))::string as nft_address,
+				MAX(IFF(event_type = 'coin_received', COALESCE(NVL(event_attributes:"0_amount"[0]:amount,0) + NVL(event_attributes:"1_amount"[0]:amount,0) + NVL(event_attributes:"2_amount"[0]:amount, 0), event_attributes:amount[0]:amount), 0)) / 1e6 as amount,
+				MAX(IFF(event_type = 'coin_received', COALESCE(event_attributes:"0_amount"[0]:denom, event_attributes:amount[0]:denom), ''))::string as denom,
+				MAX(IFF(event_type = 'wasm', event_attributes:token_id, 0)) as tokenid
+				FROM 
+				terra.msg_events
+				WHERE 
+					tx_status = 'SUCCEEDED'
+					AND tx_id IN ( 
+						SELECT DISTINCT 
+							tx_id 
+						FROM terra.msgs 
+						WHERE 
+							msg_value:execute_msg:settle:auction_id is not null 
+							AND tx_status = 'SUCCEEDED' 
+							AND msg_value:contract = 'terra12v8vrgntasf37xpj282szqpdyad7dgmkgnq60j'
+					)
+				GROUP BY
+					block_timestamp,
+					tx_id
+
+				UNION
+
+				SELECT 
+				block_timestamp,
+				tx_id,
+				'Luart' as platform,
+				UPPER(event_attributes:order_type) as action,
+				event_attributes:order_creator as nft_from, -- for sells, no info about other types yet
+				event_attributes:recipient as nft_to,
+				event_attributes:nft_contract_address as nft_address,
+				event_attributes:price / 1e6 as amount,
+				event_attributes:denom::string as denom,
+				event_attributes:"0_token_id" as tokenid
+				FROM terra.msg_events
+				WHERE 
+				event_type = 'from_contract'
+				AND event_attributes:action = 'transfer_nft'
+				AND event_attributes:method = 'execute_order'
+				AND event_attributes:"0_contract_address" = 'terra1fj44gmt0rtphu623zxge7u3t85qy0jg6p5ucnk'
+			)
+			WHERE nft_address IN (
+				'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2',
+				'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
+				'terra1vhuyuwwr4rkdpez5f5lmuqavut28h5dt29rpn6',
+				'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7',
+				'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg',
+				'terra14gfnxnwl0yz6njzet4n33erq5n70wt79nm24el',
+				'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v'
+			)
+		)
+
+		select * from allsales
+	'''
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
-	sales.head()[[ 'token_id','sale_date','price' ]]
-	sales.columns
+	# tokens = pd.read_csv('./data/tokens.csv')
+	# tokens['tmp'] = tokens.token_id.apply(lambda x: (str(x)[:5]))
+	# tokens[tokens.collection == 'Galactic Punks'].to_csv('~/Downloads/tmp.csv', index=False)
+	sales['tokenid'] = sales.tokenid.apply(lambda x: str(int(float(x))) )
+	# tokens['token_id'] = tokens.token_id.astype(str)
+
+	# s = sales[sales.nft == 'Galactic Punks']
+	# t = tokens[tokens.collection == 'Galactic Punks'].token_id.values
+	# s[s.tokenid.isin(t)]
+
+	
+	sales = sales.rename(columns={
+		'nft':'collection'
+		, 'block_timestamp': 'sale_date'
+		, 'amount': 'price'
+		, 'tokenid': 'token_id'
+	})
+	# tmp = sales.merge(tokens[['collection','token_id','clean_token_id']])
+	# sales[sales.tx_id.isin(['6CA1966B42D02F07D1FB6A839B8276D501FDF3EF048DECA5601C74D82EBB9D12',
+    #    'F5643C0C805F3236F67CFF1A6AC1FC50CF9DB61B846B3CE6F9D4CD3806284D4E',
+    #    'BFD1D2571B303CEC9BA6B2C67590242799000E3B8D4560792CD16E31BF5D5D1E'])]
+	# sales.head()
+	# sales.columns
 	sales['chain'] = 'Terra'
 	sales = sales[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
+	print(sales.groupby(['chain','collection']).token_id.count())
 	sales['token_id'] = sales.token_id.apply(lambda x: re.sub('"', '', x) )
+	sales['collection'] = sales.collection.apply(lambda x: 'Levana Dragon Eggs' if x=='Levana Eggs' else x )
 	old = pd.read_csv('./data/sales.csv')
+	# print(old.groupby(['chain','collection']).token_id.count())
 	l0 = len(old)
 	if not 'chain' in old.columns:
 		old['chain'] = 'Solana'
 	old = old[ -(old.collection.isin(sales.collection.unique())) ]
 	old = old.append(sales)
 	old = old[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
-	old = old[-(old.collection == 'Levana Dragons')]
+	old = old.drop_duplicates(subset=['collection','token_id','price'])
+	# old = old[-(old.collection == 'Levana Dragons')]
+	# old = old[-(old.collection == 'Levana Dragon Eggs')]
 	l1 = len(old)
 	print('Added {} sales'.format(l1 - l0))
 	print(old.groupby(['chain','collection']).token_id.count())
