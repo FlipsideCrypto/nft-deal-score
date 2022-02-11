@@ -50,7 +50,7 @@ for c in m_df.collection.unique():
 print(m_df[(m_df.token_id=='1') & (m_df.collection == 'Solana Monkey Business')])
 print(m_df[(m_df.token_id=='10') & (m_df.collection == 'Aurory')])
 
-for c in [ 'nft_rank','adj_nft_rank_0','adj_nft_rank_1' ]:
+for c in [ 'nft_rank','adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2' ]:
     cur = rarities[[ 'collection','token_id',c ]].rename(columns={c: 'feature_value'})
     cur['feature_name'] = c
     m_df = m_df[ m_df.feature_name != c ]

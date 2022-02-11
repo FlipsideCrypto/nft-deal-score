@@ -17,6 +17,19 @@ from selenium.webdriver.common.keys import Keys
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
+# Updates
+# Final updates to NTR App
+# Helped gather mint_address data and metadata for solana hackathon
+# Updated NFT Deal score model to enable easy addition to 
+# Accomplishments
+# Version 1.0 of NTR app is now live at https://rstudio-connect.flipside.kitchen/ntr/ thanks to @eric
+# Problems Encountered
+# Still waiting for Harmony data to be released (was hoping it would be ready early this week)
+# Priorities
+# Assist with Solana <3 week where needed ()
+# Build DeFi Kingdoms query
+# Concerns
+
 # browser = webdriver.Chrome()
 
 # old = pd.read_csv('./data/tokens.csv')
@@ -380,9 +393,31 @@ def scrape_recent_sales():
 	del o_sales['tmp']
 	o_sales.to_csv('./data/sales.csv', index=False)
 
+def scrape_solanafloor():
+	browser.get('https://solanafloor.com/')
+	soup = BeautifulSoup(browser.page_source)
+	d0 = soup.find_all('div', class_='ag-pinned-left-cols-container')
+	d1 = soup.find_all('div', class_='ag-center-cols-clipper')
+	len(d0)
+	len(d1)
+	d0 = d0[1]
+	d1 = d1[1]
+	rows0 = d0.find_all('div', class_='ag-row')
+	rows1 = d1.find_all('div', class_='ag-row')
+	data = []
+	for r in rows1:
+		cell1 = r.find_all('div', class_='ag-cell')
+		a = cell1[0].find_all('a')[0]
+		project = re.split('/', a.attrs['href'])[-1]
+		data += [[ project, int('Lite' in cell1[0].text) ]]
+	df = pd.DataFrame(data, columns=['project','is_lite'])
+	df.to_csv('./data/sf_projects.csv', index=False)
+
+
 def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
 	data = []
+	m_data = []
 	# collections = [ 'aurory','thugbirdz','meerkatmillionaires','aurory','degenapes' ]
 	# collections = [ 'aurory','thugbirdz','smb','degenapes' ]
 	# collections = [ 'smb' ]
@@ -391,7 +426,11 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 		, 'degenapes': 'degen-ape-academy'
 		, 'peskypenguinclub': 'pesky-penguins'
 	}
-	collection = 'smb'
+	collections = ['the-suites']
+	sf_projects = pd.read_csv('./data/sf_projects.csv')
+	old = pd.read_csv('./data/solana_rarities.csv')
+	collections = sf_projects[(sf_projects.to_scrape==1) & (sf_projects.is_lite==0) & (-sf_projects.collection.isin(old.collection.unique()))].collection.unique()
+	collection = 'portals'
 	for collection in collections:
 		if collection == 'boryokudragonz':
 			continue
@@ -410,6 +449,7 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 			page += 1
 			for j in [20, 30, 30, 30, 30, 30, 30, 30] * 1:
 				for _ in range(1):
+					pass
 					soup = BeautifulSoup(browser.page_source)
 					# for row in browser.find_elements_by_class_name('ag-row'):
 					# 	cells = row.find_elements_by_class_name('ag-cell')
@@ -419,12 +459,16 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 					# 		data += [[ collection, token_id, price ]]
 					d0 = soup.find_all('div', class_='ag-pinned-left-cols-container')
 					d1 = soup.find_all('div', class_='ag-center-cols-clipper')
+					h1 = soup.find_all('div', class_='ag-header-row')
 					if not len(d0) or not len(d1):
 						continue
 					d0 = d0[0]
 					d1 = d1[0]
+					h1 = h1[1]
 					rows0 = d0.find_all('div', class_='ag-row')
 					rows1 = d1.find_all('div', class_='ag-row')
+					hs1 = h1.find_all('div', class_='ag-header-cell')
+					hs1 = [ x.text.strip() for x in hs1 ]
 					for k in range(len(rows0)):
 						# for row in soup.find_all('div', class_='ag-row'):
 						# 	# print(row.text)
@@ -432,6 +476,7 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 						cell1 = rows1[k].find_all('div', class_='ag-cell')
 						if len(cell1) > 2:
 							token_id = cell0[0].text
+							mint_address = re.split('/', cell0[0].find_all('a')[0].attrs['href'])[-1] if len(cell0[0].find_all('a')) else None
 							price = cell1[2 if is_listings else 0].text
 							if len(token_id) and len(price):
 								# token_id = int(token_id[0].text)
@@ -443,7 +488,12 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 								if not price and is_listings:
 									continue
 								if not token_id in seen:
-									data += [[ collection, token_id, price ]]
+									if not is_listings:
+										data += [[ collection, token_id, mint_address, price ]]
+										for l in range(len(hs1)):
+											m_data += [[ collection, token_id, mint_address, hs1[l], cell1[l].text.strip() ]]
+									else:
+										data += [[ collection, token_id, price ]]
 									seen.append(token_id)
 							# else:
 							# 	print(row.text)
@@ -459,12 +509,25 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 			else:
 				has_more = False
 				break
-	if not is_listings:
-		old = pd.read_csv('./data/solana_rarities.csv')
-		rarities = pd.DataFrame(data, columns=['collection','token_id','nft_rank']).drop_duplicates()
-		rarities = rarities.append(old).drop_duplicates()
-		print(rarities.groupby('collection').token_id.count())
-		rarities.to_csv('./data/solana_rarities.csv', index=False)
+		if not is_listings:
+			old = pd.read_csv('./data/solana_rarities.csv')
+			rarities = pd.DataFrame(data, columns=['collection','token_id','mint_address','nft_rank']).drop_duplicates()
+			rarities = rarities.append(old).drop_duplicates()
+			rarities = rarities[-rarities.collection.isin(rem)]
+			print(rarities.groupby('collection').token_id.count().reset_index().sort_values('token_id'))
+			rarities.to_csv('./data/solana_rarities.csv', index=False)
+
+			old = pd.read_csv('./data/sf_metadata.csv')
+			metadata = pd.DataFrame(m_data, columns=['collection','token_id','mint_address','feature_name','feature_value']).drop_duplicates()
+			metadata = metadata[ -metadata.feature_name.isin(['Rank *','Owner','Listed On','Price','USD','Buy Link']) ]
+			metadata = metadata.append(old).drop_duplicates()
+			metadata.feature_name.unique()
+			g = metadata[[ 'collection','token_id' ]].drop_duplicates().groupby('collection').token_id.count().reset_index().sort_values('token_id')
+			rem = g[g.token_id<99].collection.unique()
+			metadata = metadata[-metadata.collection.isin(rem)]
+			print(g)
+			# g.to_csv('~/Downloads')
+			metadata.to_csv('./data/sf_metadata.csv', index=False)
 
 	old = pd.read_csv('./data/listings.csv')
 	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
@@ -893,6 +956,108 @@ def scratch():
 	o_metadata.head()
 	o_sales.head()
 	o_sales.to_csv('./data/md_sales.csv', index=False)
+
+def create_mint_csv():
+	mints = pd.DataFrame()
+	auth_to_mint = {}
+	for collection, update_authority in d.items():
+		auth_to_mint[update_authority] = collection
+	for fname in [ './data/mints/'+f for f in os.listdir('./data/mints') ]:
+		pass
+		with open(fname, 'r') as f:
+			j = json.load(f)
+			cur = pd.DataFrame(j)
+			cur.columns = ['mint_address']
+			cur['update_authority'] = re.split('/|_', fname)[3]
+			cur['collection'] = re.split('/|_', fname)[3]
+
+def scrape_how_rare_is():
+	d = {
+		'degenapes': 40
+		,'aurory': 40
+	}
+	data = []
+	for collection, num_pages in d.items():
+		for page in range(num_pages):
+			if len(data):
+				print(data[-1])
+			url = 'https://howrare.is/{}/?page={}&ids=&sort_by=rank'.format(collection, page)
+			browser.get(url)
+			sleep(0.1)
+			soup = BeautifulSoup(browser.page_source)
+			len(soup.find_all('div', class_='featured_item_img'))
+			for div in soup.find_all('div', class_='featured_item_img'):
+				image_url = div.find_all('img')[0].attrs['src']
+				token_id = re.split('/', div.find_all('a')[0].attrs['href'])[-2]
+				data += [[ collection, token_id, image_url ]]
+	df = pd.DataFrame(data, columns=['collection','token_id','image_url'])
+	df['collection'] = df.collection.apply(lambda x: clean_name(x) )
+	df['clean_token_id'] = df.token_id
+	df['chain'] = 'Solana'
+	tokens = pd.read_csv('./data/tokens.csv')
+	tokens = tokens[-tokens.collection.isin(df.collection.unique())]
+	tokens = tokens.append(df)
+	tokens.to_csv('./data/tokens.csv', index=False)
+
+			
+
+def scrape_mints():
+
+	nft_mint_addresses = pd.read_csv('./data/nft_mint_addresses.csv')
+	nft_mint_addresses['collection'] = nft_mint_addresses.collection.apply(lambda x: clean_name(x) )
+	nft_mint_addresses.head()
+
+	solana_nfts = pd.read_csv('./data/solana_nfts.csv')
+	solana_nfts = solana_nfts[solana_nfts.update_authority.notnull()]
+	solana_nfts = solana_nfts[solana_nfts.collection != 'Boryoku Baby Dragonz']
+	print(solana_nfts.groupby('update_authority').collection.count().reset_index().sort_values('collection', ascending=0).head(10))
+	
+	nft_mint_addresses.collection.unique()
+	nft_mint_addresses = nft_mint_addresses.merge( solana_nfts )
+	nft_mint_addresses.collection.unique()
+	mints = pd.read_csv('./data/solana_mints.csv')
+	mints = mints[-mints.collection.isin(nft_mint_addresses.collection.unique())]
+	mints = mints.append(nft_mint_addresses[list(mints.columns)])
+	mints.head()
+	seen = list(mints.update_authority.unique())
+	rpc = 'https://red-cool-wildflower.solana-mainnet.quiknode.pro/a1674d4ab875dd3f89b34863a86c0f1931f57090/'
+	d = {}
+	for row in solana_nfts.iterrows():
+		row = row[1]
+		d[row['collection']] = row['update_authority']
+
+	remaining = sorted(solana_nfts[-solana_nfts.collection.isin(mints.collection.unique())].collection.unique())
+	print('{}'.format(len(remaining)))
+	collection = 'Boryoku Dragonz'
+	for collection in remaining:
+		update_authority = d[collection]
+		if update_authority in seen or collection in [ 'Solana Monkey Business','Thugbirdz','Degenerate Ape Academy','Pesky Penguins','Aurory' ]:
+			print('Seen '+collection)
+			continue
+		else:
+			print('Working on '+collection)
+			sleep(.10 * 60)
+			os.system('metaboss -r {} -t 300 snapshot mints --update-authority {} --output ~/git/nft-deal-score/data/mints '.format(rpc, update_authority))
+
+	mints = pd.DataFrame()
+	auth_to_mint = {}
+	for collection, update_authority in d.items():
+		auth_to_mint[update_authority] = collection
+	for fname in [ './data/mints/'+f for f in os.listdir('./data/mints') ]:
+		if not '.json' in fname:
+			continue
+		with open(fname, 'r') as f:
+			j = json.load(f)
+			cur = pd.DataFrame(j)
+			if len(cur):
+				cur.columns = ['mint_address']
+				cur['update_authority'] = re.split('/|_', fname)[3]
+				cur['collection'] = cur.update_authority.apply(lambda x: auth_to_mint[x] )
+				mints = mints.append(cur)
+	g = mints.groupby('collection').update_authority.count().reset_index()
+	mints[mints.update_authority == 'DRGNjvBvnXNiQz9dTppGk1tAsVxtJsvhEmojEfBU3ezf']
+	g.to_csv('~/Downloads/tmp.csv', index=False)
+	mints.to_csv('./data/solana_mints.csv', index=False)
 
 # scrape_listings(['smb'])
 # alerted = []

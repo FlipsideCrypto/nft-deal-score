@@ -1,6 +1,8 @@
 server <- function(input, output, session) {
 	load('data.Rdata')
 
+    metadata <- unique(attributes[, list(collection, feature_name, feature_value)])
+
 	SD_MULT = 3
 	SD_SCALE = 1.95
 
@@ -52,6 +54,343 @@ server <- function(input, output, session) {
 		textInput(
 			inputId = 'maxnftrank'
 			, label = NULL
+			, width = "100%"
+		)
+	})
+
+	output$maxnftrankinput2 <- renderUI({
+		textInput(
+			inputId = 'maxnftrank2'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+	output$minnftrankinput2 <- renderUI({
+		textInput(
+			inputId = 'minnftrank2'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+
+	output$maxrarityrankinput2 <- renderUI({
+		textInput(
+			inputId = 'maxrarityrank2'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+	output$minrarityrankinput2 <- renderUI({
+		textInput(
+			inputId = 'minrarityrank2'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+
+	output$filter1select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 1) {
+            return(NULL)
+        }
+        name <- name[1]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter1'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter2select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 2) {
+            return(NULL)
+        }
+        name <- name[2]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter2'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter3select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 3) {
+            return(NULL)
+        }
+        name <- name[3]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter3'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter4select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 4) {
+            return(NULL)
+        }
+        name <- name[4]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter4'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter5select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 5) {
+            return(NULL)
+        }
+        name <- name[5]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter5'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter6select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 6) {
+            return(NULL)
+        }
+        name <- name[6]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter6'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter7select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 7) {
+            return(NULL)
+        }
+        name <- name[7]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter7'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter8select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 8) {
+            return(NULL)
+        }
+        name <- name[8]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter8'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter9select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 9) {
+            return(NULL)
+        }
+        name <- name[9]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter9'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter10select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 10) {
+            return(NULL)
+        }
+        name <- name[10]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter10'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter11select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 11) {
+            return(NULL)
+        }
+        name <- name[11]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter11'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter12select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 12) {
+            return(NULL)
+        }
+        name <- name[12]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter12'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter13select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 13) {
+            return(NULL)
+        }
+        name <- name[13]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter13'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter14select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 14) {
+            return(NULL)
+        }
+        name <- name[14]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter14'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter15select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 15) {
+            return(NULL)
+        }
+        name <- name[15]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter15'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter16select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 16) {
+            return(NULL)
+        }
+        name <- name[16]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter16'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter17select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 17) {
+            return(NULL)
+        }
+        name <- name[17]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter17'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
+			, width = "100%"
+		)
+	})
+	output$filter18select <- renderUI({
+		selected <- getCollection()
+        name <- getMetadataColumns()
+        if(length(name) < 18) {
+            return(NULL)
+        }
+        name <- name[18]
+        m <- metadata[ collection == eval(selected) & feature_name == eval(name) ]
+		choices <- c('Any', sort(m$feature_value))
+		selectInput(
+			inputId = 'filter18'
+			, label = NULL
+			, selected = 'Any'
+			, choices = choices
 			, width = "100%"
 		)
 	})
@@ -128,7 +467,40 @@ server <- function(input, output, session) {
 			cur_0 <- pred_price[collection == eval(selected) ]
 			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
 			if (nrow(cur_1)) {
-				t <- paste0("Market Rank #", format(cur_1$rk[1], big.mark=",")," / ",format(nrow(cur_0), big.mark=","))
+				t <- paste0("Deal Score Rank #", format(cur_1$rk[1], big.mark=",")," / ",format(nrow(cur_0), big.mark=","))
+			}
+		}
+		paste0(t)
+	})
+
+	output$salesAverage <- renderText({
+        data <- getSalesData()
+        t <- ''
+        if (nrow(data)) {
+            p <- format(round(mean(head(data$price, 100)), 1), big.mark=',')
+            f <- format(round(mean(head(data$vs_floor, 100)), 1), big.mark=',')
+            print('p')
+            print(p)
+            print(f)
+            t <- paste0(p, ' $SOL (+',f,' vs the floor)')
+        }
+		paste0(t)
+	})
+
+	output$rarityrank <- renderText({
+		id <- getTokenId()
+		selected <- getCollection()
+		chain <- getChain()
+		t <- ""
+		if( length(id) == 0 | length(selected) == 0 ) {
+			return(t)
+		}
+		if (!is.na(id) & !is.na(selected)) {
+			cur_0 <- pred_price[collection == eval(selected) ]
+			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
+			if (nrow(cur_1)) {
+                a <- ifelse( chain == 'Solana', 'HowRare', 'NotFoundTerra' )
+				t <- paste0(a, " Rank #", format(cur_1$nft_rank[1], big.mark=",")," / ",format(nrow(cur_0), big.mark=","))
 			}
 		}
 		paste0(t)
@@ -213,7 +585,7 @@ server <- function(input, output, session) {
 			return(head(attributes, 0))
 		}
 		cur <- attributes[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
-		# cur <- merge( cur, feature_values[collection == eval(selected), list(feature_name, feature_value, pred_vs_baseline, pct_vs_baseline) ], all.x=TRUE )
+		cur <- merge( cur, feature_values[collection == eval(selected), list(feature_name, feature_value, pct_vs_baseline) ], all.x=TRUE )
 		cur <- cur[order(rarity)]
 		# floor <- getFloors()[2]
 		# log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
@@ -228,9 +600,9 @@ server <- function(input, output, session) {
 		# 	mult <- ratio / s
 		# 	cur[, pct_vs_baseline := pct_vs_baseline * eval(mult) ]
 		# }
-		cur[, vs_baseline := 0 ]
-		cur[, pred_vs_baseline := 0 ]
-		cur[, vs_baseline := 0 ]
+		# cur[, vs_baseline := 0 ]
+		# cur[, pred_vs_baseline := 0 ]
+		# cur[, vs_baseline := 0 ]
 		# cur[, vs_baseline := round((pred_vs_baseline * eval(lin_coef)) + (pct_vs_baseline * eval(floor) * eval(log_coef) ), 1) ]
 		# cur[, pred_vs_baseline := round(pred_vs_baseline, 1) ]
 		# cur[, vs_baseline := round(pred_vs_baseline + (pct_vs_baseline * eval(floor)), 1) ]
@@ -246,7 +618,7 @@ server <- function(input, output, session) {
 
 		# reactable(data[, list( feature, value, rarity, vs_baseline, pred_vs_baseline, pct_vs_baseline )],
 		# data <- data[, list( feature, value, rarity, pct_vs_baseline )]
-		data <- data[, list( feature_name, feature_value, rarity )]
+		data <- data[, list( feature_name, feature_value, rarity, pct_vs_baseline )]
 		reactable(data,
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
@@ -256,16 +628,16 @@ server <- function(input, output, session) {
 			outlined = FALSE,
 			columns = list(
 				feature_name = colDef(name = "Attribute", align = "left"),
-				feature_value = colDef(name = "Value", align = "left"),
-				rarity = colDef(name = "Rarity", align = "left")
-				# pct_vs_baseline = colDef(
-				# 	name="Value", header=with_tooltip("Value", "The estimated price impact of this feature vs the floor")
-				# 	, html = TRUE
-				# 	, align = "left"
-				# 	, cell = function(x) {
-				# 		htmltools::tags$span(paste0('+', format(round(x*1000)/10, digits=4, decimal.mark=".", big.mark=","), '%'))
-				# 	}
-				# )
+				feature_value = colDef(name = "Name", align = "left"),
+				rarity = colDef(name = "Rarity", align = "left"),
+				pct_vs_baseline = colDef(
+					name="General Price Impact", header=with_tooltip("General Price Impact", "The estimated price impact of this feature vs the floor")
+					, html = TRUE
+					, align = "left"
+					, cell = function(x) {
+						htmltools::tags$span(paste0('+', format(round(x*1000)/10, digits=4, decimal.mark=".", big.mark=","), '%'))
+					}
+				)
 			)
 	    )
 	})
@@ -328,41 +700,221 @@ server <- function(input, output, session) {
 	    )
 	})
 
-	output$salestable <- renderReactable({
+    getFilteredSalesData <- function(data, selected, val, i) {
+        if(length(val) > 0) {
+            if(val != 'Any') {
+                att <- getMetadataColumns()
+                if(length(att) >= i) {
+                    att <- att[i]
+                    include <- attributes[collection == eval(selected) & feature_name == eval(att) & feature_value == eval(val), list(token_id) ]
+                    data <- merge(data, include)
+                }
+            }
+        }
+        return(data)
+    }
+
+    getSalesDataFn <- function(selected, sales, tokens, pred_price, attributes) {
+		data <- sales[ collection == eval(selected)]
+		m <- pred_price[collection == eval(selected), list(token_id, rk)]
+		data <- merge(data, m, all.x=TRUE)
+
+		data <- merge(data, tokens[collection == eval(selected), list(collection, token_id, image_url)], all.x=T )
+		data <- data[, list( token_id, image_url, block_timestamp, price, pred, mn_20, nft_rank, rk )]
+
+        data <- data[order(-block_timestamp)]
+
+        data[, vs_floor := pmax(0, price - mn_20) ]
+
+        m <- dcast(attributes[collection == eval(selected), list(token_id, feature_name, feature_value)], token_id ~ feature_name, value.var='feature_value')
+        names <- colnames(m)
+        data <- merge(data, m, all.x=TRUE)
+
+
+        data <- data[order(-block_timestamp)]
+        data[, mn_20 := pmin(mn_20, price) ]
+        data[, mn_20_label := paste0(format(round(mn_20, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+        data[, price_label := paste0(format(price, scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+        data[, block_timestamp := substr(block_timestamp, 1, 10) ]
+        return(data)
+    }
+
+    getSalesData <- reactive({
 		selected <- getCollection()
 		if( length(selected) == 0 ) {
 			return(NULL)
 		}
 		# data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred, mn_20 )]
-		data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price )]
-		data[, price := paste0(format(price, scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
-		# data[, pred := paste0(format(round(pred, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
-
+		data <- sales[ collection == eval(selected)]
 		m <- pred_price[collection == eval(selected), list(token_id, rk)]
 		data <- merge(data, m, all.x=TRUE)
 
-		m <- dcast(attributes[collection == eval(selected), list(token_id, feature_name, clean_name)], token_id ~ feature_name, value.var='clean_name')
-		data <- merge(data, m, all.x=TRUE)
+        if(input$maxnftrank2 != '') {
+            r <- as.numeric(input$maxnftrank2)
+            data <- data[ rk <= eval(r) ]
+        }
+        if(input$minnftrank2 != '') {
+            data <- data[ rk >= eval(as.numeric(input$minnftrank2)) ]
+        }
+        if(input$maxrarityrank2 != '') {
+            r <- as.numeric(input$maxrarityrank2)
+            data <- data[ nft_rank <= eval(r) ]
+        }
+        if(input$minrarityrank2 != '') {
+            data <- data[ nft_rank >= eval(as.numeric(input$minrarityrank2)) ]
+        }
+        data <- getFilteredSalesData(data, selected, input$filter1, 1)
+        data <- getFilteredSalesData(data, selected, input$filter2, 2)
+        data <- getFilteredSalesData(data, selected, input$filter3, 3)
+        data <- getFilteredSalesData(data, selected, input$filter4, 4)
+        data <- getFilteredSalesData(data, selected, input$filter5, 5)
+        data <- getFilteredSalesData(data, selected, input$filter6, 6)
+        data <- getFilteredSalesData(data, selected, input$filter7, 7)
+        data <- getFilteredSalesData(data, selected, input$filter8, 8)
+        data <- getFilteredSalesData(data, selected, input$filter9, 9)
+        data <- getFilteredSalesData(data, selected, input$filter10, 10)
+        data <- getFilteredSalesData(data, selected, input$filter11, 11)
+        data <- getFilteredSalesData(data, selected, input$filter12, 12)
+        data <- getFilteredSalesData(data, selected, input$filter13, 13)
+        data <- getFilteredSalesData(data, selected, input$filter14, 14)
+        data <- getFilteredSalesData(data, selected, input$filter15, 15)
+        data <- getFilteredSalesData(data, selected, input$filter16, 16)
+        data <- getFilteredSalesData(data, selected, input$filter17, 17)
+        data <- getFilteredSalesData(data, selected, input$filter18, 18)
+        data <- getFilteredSalesData(data, selected, input$filter19, 19)
+        data <- getFilteredSalesData(data, selected, input$filter20, 20)
 
-		data <- data[order(-block_timestamp)]
+		data <- merge(data, tokens[collection == eval(selected), list(collection, token_id, image_url)], all.x=T )
+		data <- data[, list( token_id, image_url, block_timestamp, price, pred, mn_20, nft_rank, rk )]
 
-		reactable(data,
-			defaultColDef = colDef(
-				headerStyle = list(background = "#10151A")
-			),
-			filterable = TRUE,
-			borderless = TRUE,
-			outlined = FALSE,
-			searchable = FALSE,
-			columns = list(
-				token_id = colDef(name = "Token ID", align = "left"),
-				block_timestamp = colDef(name = "Sale Date", align = "left"),
-				price = colDef(name = "Price", align = "left"),
-				# pred = colDef(name = "Fair Market Price", align = "left"),
-				rk = colDef(name = "DS Rank", align = "left")
-				# mn_20 = colDef(name = "Floor Price", align = "left")
-			)
-	    )
+        data <- data[order(-block_timestamp)]
+
+        data[, vs_floor := pmax(0, price - mn_20) ]
+
+        m <- dcast(attributes[collection == eval(selected), list(token_id, feature_name, feature_value)], token_id ~ feature_name, value.var='feature_value')
+        names <- colnames(m)
+        data <- merge(data, m, all.x=TRUE)
+
+
+        data <- data[order(-block_timestamp)]
+        data[, mn_20 := pmin(mn_20, price) ]
+        data[, mn_20_label := paste0(format(round(mn_20, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+        data[, price_label := paste0(format(price, scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+        data[, block_timestamp := substr(block_timestamp, 1, 10) ]
+        return(data)
+    })
+
+    getMetadataColumns <- reactive({
+        selected <- getCollection()
+        m <- unique(metadata[ collection == eval(selected), list(feature_name) ])
+		names <- sort(m$feature_name)
+        return(names)
+    })
+
+    getFilterText <- function(i) {
+		t <- ''
+        m <- getMetadataColumns()
+        if(length(m) >= i) {
+            t <- m[i]
+        }
+        return(t)
+    }
+
+
+	output$filter1 <- renderText({
+		paste0(getFilterText(1))
+	})
+	output$filter2 <- renderText({
+		paste0(getFilterText(2))
+	})
+	output$filter3 <- renderText({
+		paste0(getFilterText(3))
+	})
+	output$filter4 <- renderText({
+		paste0(getFilterText(4))
+	})
+	output$filter5 <- renderText({
+		paste0(getFilterText(5))
+	})
+	output$filter6 <- renderText({
+		paste0(getFilterText(6))
+	})
+	output$filter7 <- renderText({
+		paste0(getFilterText(7))
+	})
+	output$filter8 <- renderText({
+		paste0(getFilterText(8))
+	})
+	output$filter9 <- renderText({
+		paste0(getFilterText(9))
+	})
+	output$filter10 <- renderText({
+		paste0(getFilterText(10))
+	})
+	output$filter11 <- renderText({
+		paste0(getFilterText(11))
+	})
+	output$filter12 <- renderText({
+		paste0(getFilterText(12))
+	})
+	output$filter13 <- renderText({
+		paste0(getFilterText(13))
+	})
+	output$filter14 <- renderText({
+		paste0(getFilterText(14))
+	})
+	output$filter15 <- renderText({
+		paste0(getFilterText(15))
+	})
+	output$filter16 <- renderText({
+		paste0(getFilterText(16))
+	})
+	output$filter17 <- renderText({
+		paste0(getFilterText(17))
+	})
+	output$filter18 <- renderText({
+		paste0(getFilterText(18))
+	})
+	output$filter19 <- renderText({
+		paste0(getFilterText(19))
+	})
+	output$filter20 <- renderText({
+		paste0(getFilterText(20))
+	})
+
+	output$salestable <- renderReactable({
+		selected <- getCollection()
+		if( length(selected) == 0 ) {
+			return(NULL)
+		}
+        # data <- future(getSalesData()) %...>% head() %>% print()
+        data <- getSalesData()
+        # data <- future(getSalesDataFn(selected, sales, tokens, pred_price, attributes)) %...>% 
+            reactable(data, 
+                defaultColDef = colDef(
+                    headerStyle = list(background = "#10151A")
+                ),
+                # filterable = TRUE,
+                borderless = TRUE,
+                outlined = FALSE,
+                searchable = FALSE,
+                columns = list(
+                    token_id = colDef(name = "Token ID", align = "left"),
+                    image_url = colDef(name = "Token", align = "left", cell = function(value, index) {
+                        if(index <= 100) {
+                            htmltools::tags$img(src=value)
+                        } else {
+                            return(NULL)
+                        }
+                    }),
+                    block_timestamp = colDef(name = "Sale Date", align = "left"),
+                    price_label = colDef(name = "Price", align = "left"),
+                    pred = colDef(name = "Fair Market Price", align = "left"),
+                    rk = colDef(name = "Deal Score Rank", align = "left"),
+                    nft_rank = colDef(name = "Rarity Rank", align = "left"),
+                    mn_20_label = colDef(name = "Floor Price", align = "left")
+                )
+            )
 	})
 
 	getPriceDistributionData <- reactive({
@@ -538,6 +1090,9 @@ server <- function(input, output, session) {
 		df <- merge(df, tokens[collection == eval(selected), list(collection, token_id, image_url)] )
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
+        print('getListingData')
+        print(tuple)
+        print(floors)
 
 		df[, pred_price_0 := pred_price ]
 		df[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
@@ -550,7 +1105,7 @@ server <- function(input, output, session) {
 		df[, pred_price := paste0(format(round(pred_price, 1), digits=3, decimal.mark=".", big.mark=",")) ]
 
 		df <- df[, list(image_url, token_id, price, pred_price, deal_score, rk)]
-		m <- dcast(attributes[collection == eval(selected)], collection + token_id ~ feature_name, value.var='clean_name')
+		m <- dcast(attributes[collection == eval(selected)], collection + token_id ~ feature_name, value.var='feature_value')
 		df <- merge(df, m, all.x=TRUE)
 		df[, collection := NULL]
 		df <- df[order(-deal_score)]
@@ -564,6 +1119,8 @@ server <- function(input, output, session) {
 		if( nrow(df) == 0 ) {
 			return(NULL)
 		}
+        print('head(df)')
+        print(head(df))
 		df <- df[ deal_score >= 10 ]
 		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
         f <- min(df[price > 0]$price)
@@ -706,7 +1263,10 @@ server <- function(input, output, session) {
 		if (name == 'solana-monkey-business') name <- 'smb'
 		if (name == 'degen-ape-academy') name <- 'degenapes'
 		href <- paste0('https://howrare.is/',name,'/',id)
-		url <- span("*Rarity from ", a("howrare.is", href=href)," used in the model")
+        cur_0 <- pred_price[collection == eval(selected) ]
+        cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
+
+		url <- span("*Rarity from ", a("howrare.is", href=href),paste0(" (rank #",format(cur_1$nft_rank[1], big.mark = ','),") used in the model"))
 		HTML(paste(url))
     })
 
@@ -755,14 +1315,18 @@ server <- function(input, output, session) {
 			filterable = TRUE,
 			outlined = FALSE,
 			columns = list(
-				image_url = colDef(name = "Token", align = "left", cell = function(value) {
-                    htmltools::tags$img(src=value)
+                image_url = colDef(name = "Token", align = "left", cell = function(value, index) {
+                    if(index <= 100) {
+                        htmltools::tags$img(src=value)
+                    } else {
+                        return(NULL)
+                    }
                 }),
 				token_id = colDef(name = "Token ID", align = "left"),
 				price = colDef(name = "Listed Price", align = "left"),
 				pred_price = colDef(name = "Fair Market Price", align = "left"),
 				deal_score = colDef(name = "Deal Score", align = "left"),
-				rk = colDef(name = "Market Rank", align = "left")
+				rk = colDef(name = "Deal Score Rank", align = "left")
 			),
 			searchable = FALSE
 	    )

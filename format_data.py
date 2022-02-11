@@ -3,6 +3,7 @@ import os
 import math
 import json
 import pandas as pd
+from scrape_sol_nfts import clean_name
 import snowflake.connector
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
@@ -235,6 +236,80 @@ def levana():
 		with open('./data/metadata/levana_dragon_eggs/{}.txt'.format(i), 'w') as outfile:
 			outfile.write(json.dumps(newd))
 
+def solana():
+	mints = pd.read_csv('./data/solana_rarities.csv')
+	collection_info = pd.read_csv('./data/collection_info.csv')
+	metadata = pd.read_csv('./data/metadata.csv')
+	tokens = pd.read_csv('./data/tokens.csv')
+	tokens['token_id'] = tokens.token_id.astype(str)
+	metadata['token_id'] = metadata.token_id.astype(str)
+	metadata = metadata.merge(tokens)
+	metadata = metadata.merge(collection_info)
+	metadata['token_id'] = metadata.clean_token_id.fillna(metadata.token_id)
+	metadata = metadata[-metadata.feature_name.isin(['nft_rank','adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2'])]
+
+	metadata['token_id'] = metadata.token_id.astype(int)
+	mints['token_id'] = mints.token_id.astype(int)
+	mints['collection'] = mints.collection.apply(lambda x: clean_name(x) )
+
+	# metadata[['collection']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
+
+	for collection in metadata.collection.unique()[2:]:
+		print(collection)
+		mdf = metadata[metadata.collection == collection]
+		results = []
+		for token_id in mdf.token_id.unique():
+			pass
+			cur = mdf[mdf.token_id == token_id]
+			token_metadata = {}
+			m = mints[(mints.collection == collection) & (mints.token_id == token_id) ]
+			if not len(m):
+				print(token_id)
+				continue
+			mint_address = m.mint_address.values[0]
+			for row in cur.iterrows():
+				row = row[1]
+				token_metadata[row['feature_name']] = row['feature_value']
+
+			d = {
+				'commission_rate': None
+				, 'mint_address': mint_address
+				, 'token_id': token_id
+				, 'contract_address': row['contract_address']
+				, 'contract_name': row['collection']
+				, 'created_at_block_id': 0
+				, 'created_at_timestamp': str(row['created_at_timestamp'])
+				, 'created_at_tx_id': ''
+				, 'creator_address': row['contract_address']
+				, 'creator_name': row['collection']
+				, 'image_url': row['image_url']
+				, 'project_name': row['collection']
+				, 'token_id': int(token_id)
+				, 'token_metadata': token_metadata
+				, 'token_metadata_uri': row['image_url']
+				, 'token_name': row['collection']
+			}
+			results.append(d)
+		print('Uploading {} results'.format(len(results)))
+
+		n = 50
+		r = math.ceil(len(results) / n)
+		for i in range(r):
+			newd = {
+				"model": {
+					"blockchain": "solana",
+					"sinks": [
+						{
+							"destination": "{database_name}.silver.nft_metadata",
+							"type": "snowflake",
+							"unique_key": "blockchain || contract_address || token_id"
+						}
+					],
+				},
+				"results": results[(i * n):((i * n)+r)]
+			}
+			with open('./data/metadata/{}/{}.txt'.format(collection, i), 'w') as outfile:
+				outfile.write(json.dumps(newd))
 def bayc():
 	with open('./data/bayc.json') as f:
 		j = json.load(f)
