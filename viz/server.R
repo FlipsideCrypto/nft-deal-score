@@ -58,6 +58,14 @@ server <- function(input, output, session) {
 		)
 	})
 
+	output$maxrarityrankinput <- renderUI({
+		textInput(
+			inputId = 'maxrarityrank'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+
 	output$maxnftrankinput2 <- renderUI({
 		textInput(
 			inputId = 'maxnftrank2'
@@ -499,7 +507,15 @@ server <- function(input, output, session) {
 			cur_0 <- pred_price[collection == eval(selected) ]
 			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
 			if (nrow(cur_1)) {
-                a <- ifelse( chain == 'Solana', 'HowRare', 'NotFoundTerra' )
+                a <- ifelse( 
+					chain == 'Solana'
+					, 'HowRareIs'
+					, ifelse(
+						selected == 'Levana Dragon Eggs'
+						, 'Collection'
+						, 'NotFoundTerra'
+					)
+				)
 				t <- paste0(a, " Rank #", format(cur_1$nft_rank[1], big.mark=",")," / ",format(nrow(cur_0), big.mark=","))
 			}
 		}
@@ -619,6 +635,9 @@ server <- function(input, output, session) {
 		# reactable(data[, list( feature, value, rarity, vs_baseline, pred_vs_baseline, pct_vs_baseline )],
 		# data <- data[, list( feature, value, rarity, pct_vs_baseline )]
 		data <- data[, list( feature_name, feature_value, rarity, pct_vs_baseline )]
+		data[, pct_vs_baseline := ifelse( is.na(pct_vs_baseline), '', paste0('+', format(round(pct_vs_baseline*1000)/10, digits=4, decimal.mark=".", big.mark=",", trim = T), '%') ) ]
+		print('head(data, 10)')
+		print(head(data, 10))
 		reactable(data,
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
@@ -635,7 +654,7 @@ server <- function(input, output, session) {
 					, html = TRUE
 					, align = "left"
 					, cell = function(x) {
-						htmltools::tags$span(paste0('+', format(round(x*1000)/10, digits=4, decimal.mark=".", big.mark=","), '%'))
+						htmltools::tags$span(x)
 					}
 				)
 			)
@@ -720,7 +739,7 @@ server <- function(input, output, session) {
 		data <- merge(data, m, all.x=TRUE)
 
 		data <- merge(data, tokens[collection == eval(selected), list(collection, token_id, image_url)], all.x=T )
-		data <- data[, list( token_id, image_url, block_timestamp, price, pred, mn_20, nft_rank, rk )]
+		data <- data[, list( token_id, image_url, block_timestamp, price, pred, mn_20, rk, nft_rank )]
 
         data <- data[order(-block_timestamp)]
 
@@ -785,7 +804,7 @@ server <- function(input, output, session) {
         data <- getFilteredSalesData(data, selected, input$filter20, 20)
 
 		data <- merge(data, tokens[collection == eval(selected), list(collection, token_id, image_url)], all.x=T )
-		data <- data[, list( token_id, image_url, block_timestamp, price, pred, mn_20, nft_rank, rk )]
+		data <- data[, list( token_id, image_url, block_timestamp, price, pred, mn_20, rk, nft_rank )]
 
         data <- data[order(-block_timestamp)]
 
@@ -798,8 +817,6 @@ server <- function(input, output, session) {
 
         data <- data[order(-block_timestamp)]
         data[, mn_20 := pmin(mn_20, price) ]
-        data[, mn_20_label := paste0(format(round(mn_20, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
-        data[, price_label := paste0(format(price, scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
         data[, block_timestamp := substr(block_timestamp, 1, 10) ]
         return(data)
     })
@@ -889,6 +906,11 @@ server <- function(input, output, session) {
 		}
         # data <- future(getSalesData()) %...>% head() %>% print()
         data <- getSalesData()
+
+        data[, mn_20 := paste0(format(round(mn_20, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+        data[, price := paste0(format(round(price, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+        data[, pred := paste0(format(round(pred, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
+		data[, vs_floor := NULL ]
         # data <- future(getSalesDataFn(selected, sales, tokens, pred_price, attributes)) %...>% 
             reactable(data, 
                 defaultColDef = colDef(
@@ -908,11 +930,11 @@ server <- function(input, output, session) {
                         }
                     }),
                     block_timestamp = colDef(name = "Sale Date", align = "left"),
-                    price_label = colDef(name = "Price", align = "left"),
+                    price = colDef(name = "Price", align = "left"),
                     pred = colDef(name = "Fair Market Price", align = "left"),
                     rk = colDef(name = "Deal Score Rank", align = "left"),
                     nft_rank = colDef(name = "Rarity Rank", align = "left"),
-                    mn_20_label = colDef(name = "Floor Price", align = "left")
+                    mn_20 = colDef(name = "Floor Price", align = "left")
                 )
             )
 	})
@@ -1086,7 +1108,7 @@ server <- function(input, output, session) {
 			return(data.table())
 		}
 
-		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd, rk) ])
+		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd, rk, nft_rank) ])
 		df <- merge(df, tokens[collection == eval(selected), list(collection, token_id, image_url)] )
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
@@ -1104,7 +1126,7 @@ server <- function(input, output, session) {
 		# df[, pred_price := round(pred_price) ]
 		df[, pred_price := paste0(format(round(pred_price, 1), digits=3, decimal.mark=".", big.mark=",")) ]
 
-		df <- df[, list(image_url, token_id, price, pred_price, deal_score, rk)]
+		df <- df[, list(image_url, token_id, price, pred_price, deal_score, rk, nft_rank)]
 		m <- dcast(attributes[collection == eval(selected)], collection + token_id ~ feature_name, value.var='feature_value')
 		df <- merge(df, m, all.x=TRUE)
 		df[, collection := NULL]
@@ -1305,6 +1327,10 @@ server <- function(input, output, session) {
 		if(!is.na(mx)) {
 			df <- df[ rk <= eval(mx) ]
 		}
+		mx <- as.numeric(input$maxrarityrank)
+		if(!is.na(mx)) {
+			df <- df[ nft_rank <= eval(mx) ]
+		}
 		df[, price := round(price, 2)]
 
 		reactable(df,
@@ -1326,7 +1352,8 @@ server <- function(input, output, session) {
 				price = colDef(name = "Listed Price", align = "left"),
 				pred_price = colDef(name = "Fair Market Price", align = "left"),
 				deal_score = colDef(name = "Deal Score", align = "left"),
-				rk = colDef(name = "Deal Score Rank", align = "left")
+				rk = colDef(name = "Deal Score Rank", align = "left"),
+				nft_rank = colDef(name = "Rarity Rank", align = "left")
 			),
 			searchable = FALSE
 	    )

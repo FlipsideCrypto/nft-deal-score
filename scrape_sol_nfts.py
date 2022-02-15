@@ -17,19 +17,6 @@ from selenium.webdriver.common.keys import Keys
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
-# Updates
-# Final updates to NTR App
-# Helped gather mint_address data and metadata for solana hackathon
-# Updated NFT Deal score model to enable easy addition to 
-# Accomplishments
-# Version 1.0 of NTR app is now live at https://rstudio-connect.flipside.kitchen/ntr/ thanks to @eric
-# Problems Encountered
-# Still waiting for Harmony data to be released (was hoping it would be ready early this week)
-# Priorities
-# Assist with Solana <3 week where needed ()
-# Build DeFi Kingdoms query
-# Concerns
-
 # browser = webdriver.Chrome()
 
 # old = pd.read_csv('./data/tokens.csv')
@@ -426,10 +413,10 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 		, 'degenapes': 'degen-ape-academy'
 		, 'peskypenguinclub': 'pesky-penguins'
 	}
-	collections = ['the-suites']
-	sf_projects = pd.read_csv('./data/sf_projects.csv')
-	old = pd.read_csv('./data/solana_rarities.csv')
-	collections = sf_projects[(sf_projects.to_scrape==1) & (sf_projects.is_lite==0) & (-sf_projects.collection.isin(old.collection.unique()))].collection.unique()
+	# collections = ['the-suites']
+	# sf_projects = pd.read_csv('./data/sf_projects.csv')
+	# old = pd.read_csv('./data/solana_rarities.csv')
+	# collections = sf_projects[(sf_projects.to_scrape==1) & (sf_projects.is_lite==0) & (-sf_projects.collection.isin(old.collection.unique()))].collection.unique()
 	collection = 'portals'
 	for collection in collections:
 		if collection == 'boryokudragonz':
@@ -973,11 +960,19 @@ def create_mint_csv():
 
 def scrape_how_rare_is():
 	d = {
-		'degenapes': 40
-		,'aurory': 40
+		# 'degenapes': 40
+		# ,'aurory': 40
+		'shadowysupercoder': 40
+		,'boryokudragonz': 5
+		,'stonedapecrew': 17
+		,'taiyorobotics': 9
+		,'degods': 40
+		,'nyanheroes': 45
+		,'dazedducks': 40
 	}
 	data = []
 	for collection, num_pages in d.items():
+		print(collection)
 		for page in range(num_pages):
 			if len(data):
 				print(data[-1])
@@ -986,11 +981,12 @@ def scrape_how_rare_is():
 			sleep(0.1)
 			soup = BeautifulSoup(browser.page_source)
 			len(soup.find_all('div', class_='featured_item_img'))
-			for div in soup.find_all('div', class_='featured_item_img'):
+			for div in soup.find_all('div', class_='featured_item'):
 				image_url = div.find_all('img')[0].attrs['src']
+				nft_rank = re.sub('rank', '', div.find_all('div', class_='item_stat')[0].text.strip())
 				token_id = re.split('/', div.find_all('a')[0].attrs['href'])[-2]
-				data += [[ collection, token_id, image_url ]]
-	df = pd.DataFrame(data, columns=['collection','token_id','image_url'])
+				data += [[ collection, token_id, nft_rank, image_url ]]
+	df = pd.DataFrame(data, columns=['collection','token_id','nft_rank','image_url'])
 	df['collection'] = df.collection.apply(lambda x: clean_name(x) )
 	df['clean_token_id'] = df.token_id
 	df['chain'] = 'Solana'
@@ -999,11 +995,39 @@ def scrape_how_rare_is():
 	tokens = tokens.append(df)
 	tokens.to_csv('./data/tokens.csv', index=False)
 
-			
 
+def metadata_from_solscan():
+	collections = [
+		[ 'shadowy-super-coder', 'https://sld-gengo.s3.amazonaws.com/{}.json', 0, 10000 ]
+		, [ 'degods', 'https://sld-gengo.s3.amazonaws.com/{}.json', 1, 10000 ]
+		, [ 'balloonsville', 'https://bafybeih5i7lktx6o7rjceuqvlxmpqzwfh4nhr322wq5hjncxbicf4fbq2e.ipfs.dweb.link/{}.json', 0, 5000 ]
+	]
+	data = []
+	for i in range(0, 5000):
+		if i % 25 == 2:
+			print(i, len(data))
+			print(data[-1])
+		url = 'https://sld-gengo.s3.amazonaws.com/{}.json'.format(i)
+		url = 'https://metadata.degods.com/g/{}.json'.format(i)
+		url = 'https://bafybeih5i7lktx6o7rjceuqvlxmpqzwfh4nhr322wq5hjncxbicf4fbq2e.ipfs.dweb.link/{}.json'.format(i)
+		r = requests.get(url).json()
+		for a in r['attributes']:
+			data += [[ 'balloonsville', i, a['trait_type'], a['value'] ]]
+	df = pd.DataFrame(data, columns=['collection','token_id','feature_name','feature_value']).drop_duplicates()
+	if False:
+		df['token_id'] = df.token_id + 1
+	old = pd.read_csv('./data/solscan_metadata.csv')
+	old = old.append(df)
+	old = old.drop_duplicates(keep='last')
+	print(old[['collection','token_id']].drop_duplicates().groupby('collection').token_id.count())
+	old.to_csv('./data/solscan_metadata.csv', index=False)
+		
 def scrape_mints():
 
 	nft_mint_addresses = pd.read_csv('./data/nft_mint_addresses.csv')
+	sorted(nft_mint_addresses.collection.unique())
+	nft_mint_addresses.head()
+	nft_mint_addresses[nft_mint_addresses.collection == 'kaiju-cards']
 	nft_mint_addresses['collection'] = nft_mint_addresses.collection.apply(lambda x: clean_name(x) )
 	nft_mint_addresses.head()
 
@@ -1016,6 +1040,10 @@ def scrape_mints():
 	nft_mint_addresses = nft_mint_addresses.merge( solana_nfts )
 	nft_mint_addresses.collection.unique()
 	mints = pd.read_csv('./data/solana_mints.csv')
+	sorted(mints.collection.unique())
+	mints[mints.collection == 'Kaiju Cards']
+	# mints['tmp'] = mints.mint_address.apply(lambda x: x.lower() )
+	# mints[(mints.collection == 'Kaiju Cards') & (mints.tmp == '4omp7eincl8pyuuesjromqdmet2v88wqhrvcfzaapcng')]
 	mints = mints[-mints.collection.isin(nft_mint_addresses.collection.unique())]
 	mints = mints.append(nft_mint_addresses[list(mints.columns)])
 	mints.head()
@@ -1028,7 +1056,7 @@ def scrape_mints():
 
 	remaining = sorted(solana_nfts[-solana_nfts.collection.isin(mints.collection.unique())].collection.unique())
 	print('{}'.format(len(remaining)))
-	collection = 'Boryoku Dragonz'
+	collection = 'Balloonsville'
 	for collection in remaining:
 		update_authority = d[collection]
 		if update_authority in seen or collection in [ 'Solana Monkey Business','Thugbirdz','Degenerate Ape Academy','Pesky Penguins','Aurory' ]:
@@ -1058,6 +1086,7 @@ def scrape_mints():
 	mints[mints.update_authority == 'DRGNjvBvnXNiQz9dTppGk1tAsVxtJsvhEmojEfBU3ezf']
 	g.to_csv('~/Downloads/tmp.csv', index=False)
 	mints.to_csv('./data/solana_mints.csv', index=False)
+	mints[mints.collection == 'Balloonsville'].to_csv('./data/solana_mints_2.csv', index=False)
 
 # scrape_listings(['smb'])
 # alerted = []

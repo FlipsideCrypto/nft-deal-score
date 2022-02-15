@@ -128,6 +128,13 @@ fluidPage(
 				)
 				, fluidRow(uiOutput("maxnftrankinput"))
 			)
+			, column(4
+				, div(
+					class = "inputtitle"
+					, "Max Rarity Rank"
+				)
+				, fluidRow(uiOutput("maxrarityrankinput"))
+			)
 		)
 		, div(class = "table", reactableOutput("listingtable"))
 		, div(class = "description", 'This app is still in beta - listings updates will be periodic (but at least 3x a week)')

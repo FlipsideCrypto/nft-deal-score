@@ -60,12 +60,11 @@ ssn.scrape_listings(browser)
 # ssn.convert_collection_names()
 # sm.train_model(True, False)
 # sm.train_model(False, False)
-# sm.train_model(False, True)
 
-sales = pd.read_csv('./data/sales.csv')
-listings = pd.read_csv('./data/listings.csv')
-listings.price.max()
-sales.price.max()
+# sales = pd.read_csv('./data/sales.csv')
+# listings = pd.read_csv('./data/listings.csv')
+# listings.price.max()
+# sales.price.max()
 
 def add_model_sales():
     sales = pd.read_csv('./data/sales.csv').rename(columns={'sale_date':'block_timestamp'})
@@ -100,7 +99,7 @@ def update_token_ids():
     tokens[ (tokens.collection == 'Pesky Penguins') & (tokens.token_id == '3362') ]
     tokens[ (tokens.collection == 'Pesky Penguins') & (tokens.token_id == 3362) ]
     # df.token_id.unique()
-    c = 'sales'
+    c = 'listings'
     for c in [ 'attributes','sales','listings' ]:
         print(c)
         df = pd.read_csv('./data/{}.csv'.format(c))
@@ -148,4 +147,6 @@ def update_token_ids():
         df.to_csv('./data/{}.csv'.format(c), index=False)
 
 update_token_ids()
-add_model_sales()
+# add_model_sales()
+# sm.train_model(False, True)
+

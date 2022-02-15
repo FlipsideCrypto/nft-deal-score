@@ -1,12 +1,13 @@
+from curses import meta
 import re
 import os
 import math
 import json
 import pandas as pd
-from scrape_sol_nfts import clean_name
 import snowflake.connector
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
+from scrape_sol_nfts import clean_name
 
 
 #########################
@@ -233,18 +234,19 @@ def levana():
 			},
 			"results": results[(i * n):((i * n)+r)]
 		}
-		with open('./data/metadata/levana_dragon_eggs/{}.txt'.format(i), 'w') as outfile:
+		with open('./data/metadata/Levana Dragon Eggs/{}.txt'.format(i), 'w') as outfile:
 			outfile.write(json.dumps(newd))
 
 def solana():
 	mints = pd.read_csv('./data/solana_rarities.csv')
 	collection_info = pd.read_csv('./data/collection_info.csv')
 	metadata = pd.read_csv('./data/metadata.csv')
+	metadata.collection.unique()
 	tokens = pd.read_csv('./data/tokens.csv')
 	tokens['token_id'] = tokens.token_id.astype(str)
 	metadata['token_id'] = metadata.token_id.astype(str)
 	metadata = metadata.merge(tokens)
-	metadata = metadata.merge(collection_info)
+	# metadata = metadata.merge(collection_info)
 	metadata['token_id'] = metadata.clean_token_id.fillna(metadata.token_id)
 	metadata = metadata[-metadata.feature_name.isin(['nft_rank','adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2'])]
 
@@ -252,21 +254,45 @@ def solana():
 	mints['token_id'] = mints.token_id.astype(int)
 	mints['collection'] = mints.collection.apply(lambda x: clean_name(x) )
 
+	metadata = pd.read_csv('./data/sf_metadata.csv')
+	print(sorted(metadata.collection.unique()))
+	# metadata = metadata[-metadata.collection.isin([''])]
+	metadata['image_url'] = 'None'
+	metadata = metadata.drop_duplicates()
+
+	a = metadata.groupby('collection').token_id.count().reset_index()
+	b = metadata[metadata.feature_value.isnull()].groupby('collection').token_id.count().reset_index()
+	c = a.merge(b, on=['collection'])
+	c['pct'] = c.token_id_y / c.token_id_x
+	c.sort_values('pct')
+	metadata[ (metadata.feature_value.isnull()) & (metadata.collection == 'mindfolk')]
+
+	metadata = pd.read_csv('./data/solscan_metadata.csv')
+	assert(len(metadata[metadata.feature_value.isnull()]) == 0)
+	metadata['collection'] = metadata.collection.apply(lambda x: re.sub('-', ' ', x).title() )
+	metadata['collection'] = metadata.collection.apply(lambda x: re.sub(' Cc', ' CC', x) )
+	metadata['collection'] = metadata.collection.apply(lambda x: re.sub('Og ', 'OG ', x) )
+
+	print(metadata.collection.unique())
+
 	# metadata[['collection']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
 
-	for collection in metadata.collection.unique()[2:]:
+	for collection in metadata.collection.unique():
 		print(collection)
 		mdf = metadata[metadata.collection == collection]
 		results = []
-		for token_id in mdf.token_id.unique():
-			pass
+		for token_id in sorted(mdf.token_id.unique()):
+			if token_id % 1000 == 1:
+				print(token_id, len(results))
 			cur = mdf[mdf.token_id == token_id]
 			token_metadata = {}
-			m = mints[(mints.collection == collection) & (mints.token_id == token_id) ]
+			# m = mints[(mints.collection == collection) & (mints.token_id == token_id) ]
+			m = metadata[(metadata.collection == collection) & (metadata.token_id == token_id) ]
+			m = m.fillna('None')
 			if not len(m):
 				print(token_id)
 				continue
-			mint_address = m.mint_address.values[0]
+			mint_address = m.mint_address.values[0] if 'mint_address' in m.columns else ''
 			for row in cur.iterrows():
 				row = row[1]
 				token_metadata[row['feature_name']] = row['feature_value']
@@ -275,14 +301,14 @@ def solana():
 				'commission_rate': None
 				, 'mint_address': mint_address
 				, 'token_id': token_id
-				, 'contract_address': row['contract_address']
+				, 'contract_address': mint_address
 				, 'contract_name': row['collection']
 				, 'created_at_block_id': 0
-				, 'created_at_timestamp': str(row['created_at_timestamp'])
+				, 'created_at_timestamp': str('2021-01-01')
 				, 'created_at_tx_id': ''
-				, 'creator_address': row['contract_address']
+				, 'creator_address': mint_address
 				, 'creator_name': row['collection']
-				, 'image_url': row['image_url']
+				, 'image_url': 'None'
 				, 'project_name': row['collection']
 				, 'token_id': int(token_id)
 				, 'token_metadata': token_metadata
@@ -291,6 +317,10 @@ def solana():
 			}
 			results.append(d)
 		print('Uploading {} results'.format(len(results)))
+
+		dir = './data/metadata/{}/'.format(collection)
+		if not os.path.exists(dir):
+			os.makedirs(dir)
 
 		n = 50
 		r = math.ceil(len(results) / n)

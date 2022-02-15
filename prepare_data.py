@@ -11,6 +11,20 @@ m_df = pd.read_csv('./data/metadata.csv')
 solana_rarities = pd.read_csv('./data/solana_rarities.csv')
 lp_ranks = pd.read_csv('./data/lp_ranks.csv')
 gp_ranks = pd.read_csv('./data/gp_ranks.csv')
+if False:
+	metadata = pd.read_csv('./data/metadata.csv')
+	levana_ranks = metadata[(metadata.collection == 'Levana Dragon Eggs') & (metadata.feature_name == 'collection_rank')]
+	levana_ranks['feature_value'] = levana_ranks.feature_value.apply(lambda x: int(x))
+	levana_ranks['adj_nft_rank_0'] = levana_ranks.feature_value.apply(lambda x: (x+1) ** -0.2 )
+	levana_ranks['adj_nft_rank_1'] = levana_ranks.feature_value.apply(lambda x: (x+1) ** -0.9 )
+	levana_ranks['adj_nft_rank_2'] = levana_ranks.feature_value.apply(lambda x: (x+1) ** -1.4 )
+	metadata = metadata[ -( (metadata.collection == 'Levana Dragon Eggs') & (metadata.feature_name.isin(['adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2'])) ) ]
+	for c in ['adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2']:
+		cur = levana_ranks[[ 'collection','token_id',c ]].rename(columns={c:'feature_value'})
+		cur['feature_name'] = c
+		metadata = metadata.append(cur)
+	metadata['chain'] = metadata.collection.apply(lambda x: 'Terra' if x in ['LunaBulls','Galactic Punks','Levana Dragon Eggs'] else 'Solana' )
+	metadata.to_csv('./data/metadata.csv', index=False)
 
 rarities = solana_rarities.append(lp_ranks).append(gp_ranks)
 rarities = rarities[[ 'collection','token_id','nft_rank' ]]
@@ -77,23 +91,3 @@ m_df.collection.unique()
 m_df['chain'] = m_df.collection.apply(lambda x: 'Terra' if x in ['LunaBulls','Galactic Punks','Levana Dragon Eggs'] else 'Solana' )
 
 m_df.to_csv('./data/metadata.csv', index=False)
-
-d = {
-    'nft_rank': 'NFT Rank'
-    , 'adj_nft_rank_0': 'NFT Rank'
-}
-
-s_df = get_sales()
-s_df['token_id'] = s_df.token_id.astype(str)
-rarities['token_id'] = rarities.token_id.astype(str)
-
-df = s_df.merge( rarities )
-print(df.groupby('collection').token_id.count())
-print(s_df.groupby('collection').token_id.count())
-s_df[s_df.collection]
-print(s_df[['collection','token_id']].drop_duplicates().groupby('collection').token_id.count())
-print(df[['collection','nft_rank']].drop_duplicates().groupby('collection').nft_rank.count())
-
-df['rel_price_0'] = df.price - df.mn_20
-df['rel_price_1'] = df.price / df.mn_20
-df[[ 'collection','nft_rank','rel_price_0','rel_price_1' ]].dropna().to_csv('./data/tableau_sales_vs_rank.csv', index=False)
