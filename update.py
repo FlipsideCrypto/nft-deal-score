@@ -60,29 +60,29 @@ ssn.scrape_listings(browser)
 # ssn.convert_collection_names()
 # sm.train_model(True, False)
 # sm.train_model(False, False)
-# sm.train_model(False, True)
 
-sales = pd.read_csv('./data/sales.csv')
-listings = pd.read_csv('./data/listings.csv')
-listings.price.max()
-sales.price.max()
+# sales = pd.read_csv('./data/sales.csv')
+# listings = pd.read_csv('./data/listings.csv')
+# listings.price.max()
+# sales.price.max()
 
 def add_model_sales():
     sales = pd.read_csv('./data/sales.csv').rename(columns={'sale_date':'block_timestamp'})
+    print(sales.groupby('collection').token_id.count())
     sales.token_id.unique()
     sales.groupby('collection').token_id.count()
     sales[sales.collection == 'Galactic Punks']
     del sales['tx_id']
-    old = pd.read_csv('./data/pred_price copy.csv').rename(columns={'rank':'nft_rank'})
     old = pd.read_csv('./data/pred_price.csv').rename(columns={'rank':'nft_rank'})
+    old = pd.read_csv('./data/pred_price copy.csv').rename(columns={'rank':'nft_rank'})
     old.groupby('collection').token_id.count()
     sales['token_id'] = sales.token_id.astype(int).astype(str)
     old['token_id'] = old.token_id.astype(str)
     sales = sales.merge( old[['collection','token_id','nft_rank']] )
-    sales.groupby('collection').token_id.count()
     sales.head()
     sales['block_timestamp'] = sales.block_timestamp.apply(lambda x: str(x)[:19] )
     sales['price'] = sales.price.apply(lambda x: round(x, 2))
+    print(sales.groupby('collection').token_id.count())
     sales.to_csv('./data/model_sales.csv', index=False)
 
 
@@ -99,19 +99,12 @@ def update_token_ids():
     tokens[ (tokens.collection == 'Pesky Penguins') & (tokens.token_id == '3362') ]
     tokens[ (tokens.collection == 'Pesky Penguins') & (tokens.token_id == 3362) ]
     # df.token_id.unique()
-    c = 'sales'
+    c = 'listings'
     for c in [ 'attributes','sales','listings' ]:
         print(c)
         df = pd.read_csv('./data/{}.csv'.format(c))
         df['token_id'] = df.token_id.apply(lambda x: str(int(float(x))) )
         df['tmp'] = df.token_id.apply(lambda x: (str(x)[:5]))
-        df[(df.collection == 'Galactic Punks') & (df.price == 99)]
-        df[(df.collection == 'Galactic Punks') & (df.price == 99) & (df.tx_id == 'B57DB0555DED1D9593765EB9EF09796068268B91CF211CC5BF445AA0006205EC')]
-        df[(df.collection == 'Galactic Punks') & (df.price == 99) & (df.tx_id == 'B57DB0555DED1D9593765EB9EF09796068268B91CF211CC5BF445AA0006205EC')].token_id.values
-        tokens[(tokens.collection == 'Galactic Punks') ].token_id.values
-        tokens[(tokens.collection == 'Galactic Punks') & (tokens.token_id == '25984997114855597728010029317878710272') ].token_id.values
-        tokens[(tokens.token_id == '25984997114855597728010029317878710272') ].token_id.values
-        tokens[(tokens.token_id == '"25984997114855597728010029317878710272"') ].token_id.values
         df['tmp'] = df.token_id.apply(lambda x: x[:10] )
         tokens['tmp'] = tokens.token_id.apply(lambda x: x[:10] )
         len(tokens)
@@ -152,5 +145,8 @@ def update_token_ids():
         df[df.collection == 'Galactic Punks']
         print(df.groupby('collection').token_id.count() )
         df.to_csv('./data/{}.csv'.format(c), index=False)
+
 update_token_ids()
+# add_model_sales()
+# sm.train_model(False, True)
 

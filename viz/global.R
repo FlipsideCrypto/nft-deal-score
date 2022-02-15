@@ -11,6 +11,10 @@ library(shinyjs)
 require(dplyr)
 library(htmlwidgets)
 library(reactable)
+# library(promises)
+# library(future)
+# plan(multisession)
+
 
 plotly.style <- list(
   plot_bgcolor = "rgba(0, 0, 0, 0)", 

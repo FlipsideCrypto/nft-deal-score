@@ -78,13 +78,16 @@ fluidPage(
 					div(class = "subtitle", textOutput("tokenrank", inline=TRUE), icon(class="padding-left-5", id="rank-tooltip", "info-circle") )
 					, bsTooltip(id = "rank-tooltip", title = "Dynamic value rank based on the estimated fair market price modeled from historical sales. Model and rank will update periodically as we get more sales data.", placement = "bottom", trigger = "hover")
 				)
+				, div(
+					div(class = "subtitle", textOutput("rarityrank", inline=TRUE))
+				)
 				, div(class = "link", uiOutput('randomearthurl'))
 			)
 			, fluidRow(
-				column(6
+				column(5
 					, div(class = "token-img", uiOutput("tokenimg"))
 				)
-				, column(6, div(
+				, column(7, div(
 					class = "table"
 					, reactableOutput("attributestable")
 					, bsTooltip(id = "value-tooltip", title = "Represents the dollar impact this feature has on the price vs the floor", placement = "bottom", trigger = "hover")
@@ -110,12 +113,11 @@ fluidPage(
 			, div(class='description', 'Click a dot to select the token')
 		)
 		, fluidRow(
-			column(4
+            class = 'filters'
+			, column(4
 				, div(
 					class = "inputtitle"
 					, "Max Price"
-					# , icon(id="floor-price-tooltip", "info-circle")
-					# , bsTooltip(id = "floor-price-tooltip", title = "Update this number to the current floor price of the collection, which will update the rest of the numbers on this page", placement = "bottom", trigger = "hover")
 				)
 				, fluidRow(uiOutput("maxpriceinput"))
 			)
@@ -126,6 +128,13 @@ fluidPage(
 				)
 				, fluidRow(uiOutput("maxnftrankinput"))
 			)
+			, column(4
+				, div(
+					class = "inputtitle"
+					, "Max Rarity Rank"
+				)
+				, fluidRow(uiOutput("maxrarityrankinput"))
+			)
 		)
 		, div(class = "table", reactableOutput("listingtable"))
 		, div(class = "description", 'This app is still in beta - listings updates will be periodic (but at least 3x a week)')
@@ -135,6 +144,126 @@ fluidPage(
 		class="grey8row"
 		, h2("Historical Sales", icon(class="padding-left-10", id="historical-sales-tooltip", "info-circle"))
 		, bsTooltip(id = "historical-sales-tooltip", title = "This app is still in beta - sales data may be incomplete or delayed", placement = "bottom", trigger = "hover")
+		, fluidRow(
+            class = 'filters'
+			, column(3
+				, div(
+					class = "inputtitle"
+					, "Min Deal Score Rank"
+				)
+				, fluidRow(uiOutput("minnftrankinput2"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, "Max Deal Score Rank"
+				)
+				, fluidRow(uiOutput("maxnftrankinput2"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, "Min Rarity Rank"
+				)
+				, fluidRow(uiOutput("minrarityrankinput2"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, "Max Rarity Rank"
+				)
+				, fluidRow(uiOutput("maxrarityrankinput2"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter1', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter1select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter2', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter2select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter3', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter3select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter4', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter4select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter5', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter5select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter6', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter6select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter7', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter7select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter8', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter8select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter9', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter9select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter10', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter10select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter11', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter11select"))
+			)
+			, column(3
+				, div(
+					class = "inputtitle"
+					, textOutput('filter12', inline=TRUE)
+				)
+				, fluidRow(uiOutput("filter12select"))
+			)
+		)
+        , div(
+            class = 'padding-bottom-1'
+            , 'Average from most recent 100 sales using these filters: '
+            , textOutput('salesAverage', inline=TRUE)
+        )
 		, div(class = "table", reactableOutput("salestable"))
 		, div(class = "description", 'This app is still in beta - sales data may be incomplete or delayed')
 	)
