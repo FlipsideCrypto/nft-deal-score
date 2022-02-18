@@ -1,6 +1,8 @@
+from operator import index
 import os
 import re
 import json
+from secrets import token_bytes
 import time
 import requests
 import functools
@@ -17,40 +19,19 @@ from selenium.webdriver.common.keys import Keys
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
+from utils import merge, clean_name
+
 # browser = webdriver.Chrome()
 
 # old = pd.read_csv('./data/tokens.csv')
 # metadata[(metadata.collection == 'Galactic Punks') & (metadata.feature_name=='attribute_count')].drop_duplicates(subset=['feature_value']).merge(old)
 
-clean_names = {
-	'aurory': 'Aurory'
-	,'thugbirdz': 'Thugbirdz'
-	,'smb': 'Solana Monkey Business'
-	,'degenapes': 'Degen Apes'
-	,'peskypenguinclub': 'Pesky Penguins'
-	,'meerkatmillionaires': 'Meerkat Millionaires'
-	,'boryokudragonz': 'Boryoku Dragonz'
-}
-
-def clean_name(name):
-	if name in clean_names.keys():
-		return(clean_names[name])
-	return(name)
 
 def convert_collection_names():
-	d = {
-		'aurory': 'Aurory'
-		,'thugbirdz': 'Thugbirdz'
-		,'smb': 'Solana Monkey Business'
-		,'degenapes': 'Degen Apes'
-		,'peskypenguinclub': 'Pesky Penguins'
-		,'meerkatmillionaires': 'Meerkat Millionaires'
-		,'boryokudragonz': 'Boryoku Dragonz'
-	}
 	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
 		try:
 			df = pd.read_csv('./data/{}.csv'.format(c))
-			df['collection'] = df.collection.apply(lambda x: clean_name(x) if x in d.keys() else x )
+			df['collection'] = df.collection.apply(lambda x: clean_name(x) if x in clean_names.keys() else x )
 			df.to_csv('./data/{}.csv'.format(c), index=False)
 		except:
 			print('error',c)
@@ -401,7 +382,7 @@ def scrape_solanafloor():
 	df.to_csv('./data/sf_projects.csv', index=False)
 
 
-def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
+def scrape_listings(browser, collections = [ 'degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
 	data = []
 	m_data = []
@@ -418,6 +399,7 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 	# old = pd.read_csv('./data/solana_rarities.csv')
 	# collections = sf_projects[(sf_projects.to_scrape==1) & (sf_projects.is_lite==0) & (-sf_projects.collection.isin(old.collection.unique()))].collection.unique()
 	collection = 'portals'
+	collection = 'degods'
 	for collection in collections:
 		if collection == 'boryokudragonz':
 			continue
@@ -528,6 +510,7 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 		,'peskypenguinclub': 'Pesky Penguins'
 		,'meerkatmillionaires': 'Meerkat Millionaires'
 		,'boryokudragonz': 'Boryoku Dragonz'
+		,'degods': 'DeGods'
 	}
 	listings['collection'] = listings.collection.apply(lambda x: clean_name(x))
 	listings[listings.token_id=='1656']
@@ -546,6 +529,7 @@ def scrape_listings(browser, collections = [ 'aurory','thugbirdz','smb','degenap
 	listings = listings.append(old)
 	print(listings.groupby('collection').token_id.count())
 	listings.to_csv('./data/listings.csv', index=False)
+	return
 
 	listings = listings.sort_values('price')
 	t1 = listings.groupby('collection').head(1).rename(columns={'price':'t1'})
@@ -694,10 +678,17 @@ def scrape_solanafloor(browser):
 	len(tokens.token_id.unique())
 	tokens[ tokens.collection == 'degenapes' ].sort_values('token_id')
 	old = pd.read_csv('./data/tokens.csv')
+
+	old[old.collection == 'degods']
+	old['collection'] = old.collection.apply(lambda x: clean_name(x) )
+	# old['image_url'] = old.apply(lambda x: 'https://metadata.degods.com/g/{}.png'.format(int(x['token_id']) - 1) if x['collection'] == 'DeGods' else x['image_url'], 1 )
+	old.head()
+	old[ old.collection == 'DeGods' ].head()
 	old[ old.collection == 'LunaBulls' ].head()
 	tokens = old.append(tokens).drop_duplicates()
 	print(tokens.groupby('collection').token_id.count())
 	tokens.to_csv('./data/tokens.csv', index=False)
+	# old.to_csv('./data/tokens.csv', index=False)
 
 def scrape_solana_explorer(browser):
 	url = 'https://explorer.solana.com/address/9uBX3ASjxWvNBAD1xjbVaKA74mWGZys3RGSF7DdeDD3F/tokens'
@@ -794,6 +785,7 @@ def scrape_how_rare():
 		'meerkatmillionaires': 10000,
 		'peskypenguinclub': 8888,
 		'boryokudragonz': 1111,
+		'degods': 1111,
 	}
 	k = 'degenapes'
 	v = collections[k]
@@ -933,30 +925,10 @@ def save_img():
 		urllib.request.urlretrieve(src, './viz/www/img/{}/{}.png'.format('smb', i))
 
 def scratch():
-	o_metadata = pd.read_csv('./data/metadata.csv')
-	o_sales = pd.read_csv('./data/sales.csv')
-	o_sales[ o_sales.collection == 'Solana Monkey Business' ].head()
-	o_sales[ o_sales.collection == 'Solana Monkey Business' ].sort_values('sale_date', ascending=0).head()
-	o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
-	o_sales['n_sales'] = 1
-	o_sales.groupby(['collection','tmp'])[['price','n_sales']].sum().reset_index().to_csv('./data/tableau_sales_data.csv', index=False)
-	o_metadata.head()
-	o_sales.head()
-	o_sales.to_csv('./data/md_sales.csv', index=False)
+	# get metadata
+	# add rank
+	pass
 
-def create_mint_csv():
-	mints = pd.DataFrame()
-	auth_to_mint = {}
-	for collection, update_authority in d.items():
-		auth_to_mint[update_authority] = collection
-	for fname in [ './data/mints/'+f for f in os.listdir('./data/mints') ]:
-		pass
-		with open(fname, 'r') as f:
-			j = json.load(f)
-			cur = pd.DataFrame(j)
-			cur.columns = ['mint_address']
-			cur['update_authority'] = re.split('/|_', fname)[3]
-			cur['collection'] = re.split('/|_', fname)[3]
 
 def scrape_how_rare_is():
 	d = {
@@ -991,10 +963,82 @@ def scrape_how_rare_is():
 	df['clean_token_id'] = df.token_id
 	df['chain'] = 'Solana'
 	tokens = pd.read_csv('./data/tokens.csv')
+	tokens.collection.unique()
 	tokens = tokens[-tokens.collection.isin(df.collection.unique())]
 	tokens = tokens.append(df)
 	tokens.to_csv('./data/tokens.csv', index=False)
 
+def scrape_howrare_token_id_mint_map():
+	mints = pd.read_csv('./data/solana_mints.csv')
+	collection = 'DeGods'
+	s = requests.Session()
+	s.get('https://magiceden.io/')
+	r = s.get('https://httpbin.org/cookies')
+	browser.manage().getCookies()
+	cookie_list = browser.get_cookies()
+	cookies = {}
+	for c in cookie_list:
+		cookies[c['name']] = c['value']
+
+
+	for collection in [ 'DeGods' ]:
+		it = 0
+		for mint_address in sorted(mints[mints.collection == collection].mint_address.unique()):
+			it += 1
+			url = 'https://api-mainnet.magiceden.io/rpc/getNFTByMintAddress/{}'.format(mint_address)
+			headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+			headers = {'authority': 'api-mainnet.magiceden.io',
+			'cache-control': 'max-age=0',
+			'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="98", "Google Chrome";v="98"',
+			'sec-ch-ua-mobile': '?0',
+			'sec-ch-ua-platform': '"macOS"',
+			'upgrade-insecure-requests': '1',
+			'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36',
+			'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+			'sec-fetch-site': 'none',
+			'sec-fetch-mode': 'navigate',
+			'sec-fetch-user': '?1',
+			'sec-fetch-dest': 'document',
+			'accept-language': 'en-US,en;q=0.9',
+			'cookie': 'ajs_anonymous_id=eba2f8f7-3519-4110-a1c2-4fbb1c350ae4; rl_page_init_referrer=RudderEncrypt%3AU2FsdGVkX19wSK5HkzEPJocowXJThl3gTmPeTtvkaH8%3D; rl_page_init_referring_domain=RudderEncrypt%3AU2FsdGVkX18tu9VUWzMjRFJLT3XFToyFsfZjjQBl4HM%3D; _clck=1xl6xwz|1|ez0|0; __cf_bm=BgwftpyDbLNKxpuLYvLE1ekRTn2MWF7KU5Suu3SRMlo-1644967874-0-ATSK7m2xYwOl+xF+SGhqbInjBZiL4ywBWBVroe1O22PBjZQtMzt8Pno6Q4panpaxXuaj7ys/wWkSRSAqGYih8PCDdzizesQyOA/U9HVidpqTXFRU/ckeufeFfxhesga4Sg==; rl_user_id=RudderEncrypt%3AU2FsdGVkX189KreVOKsVULLvR9eM%2FKE7IkW6qokXvIvedAi9vH71haADdBNKEtqdFIzVlBAeHTR411o5svVVeQ%3D%3D; rl_anonymous_id=RudderEncrypt%3AU2FsdGVkX184cKLxwy%2FrsyLEVzTyifhXO8CNRjMrODDx8Xe%2FukvGqi7V%2FMgmldWtnjIq1VLhmwusKYIZ%2FFAeSQ%3D%3D; rl_group_id=RudderEncrypt%3AU2FsdGVkX1%2FCcC9ITF5hwaucXM%2Bz4tvMxvI0YaIIGa0%3D; rl_trait=RudderEncrypt%3AU2FsdGVkX19PxxarpffnZFAUNe2tgmUmZC6txkvO2Z7ccbw4JrssvPZMZ9w2c1g3%2FUuHawkxfqu5d2FvhirmPn7f0dSP29A9UVJ3eHmXYBliJzuT8XW1B9prqWgRWWz3GpqGGJGXa%2BoqX1MQLCvltunTqQR%2Fxw2CKW%2BZDPsas89XXY0NlmixoT81TgLEPKddSjZDBihP09u9aM1YvCCxuw%3D%3D; rl_group_trait=RudderEncrypt%3AU2FsdGVkX1%2BUocb9WeinM5mlF6NiPC8ISK%2FYcQgmPYk%3D; _clsk=fewr53|1644967907370|3|0|e.clarity.ms/collect',
+			'if-none-match': 'W/"564-Uw9zGORiLyOok/cpoNblXV6SsrI"'}
+			r = s.get(url, headers=headers)
+			browser.get(url)
+			s = json.loads(BeautifulSoup(browser.page_source).text)
+			token_id = re.split('#', s['results']['title'])[-1]
+			data += [[ collection, mint_address, token_id ]]
+			if it % 25 == 0:
+				print(it, len(data))
+				print(data[-2:])
+
+			r = requests.get(url, cookies = dict(cookies), headers=headers)
+			s.get(url, cookies = dict(cookies), headers=headers)
+			r = s.get(url)
+	sorted(mints.collection.unique())
+	data = []
+	s_data = []
+	for i in range(1, 10001):
+		if i % 25 == 0:
+			print(i, len(data), len(s_data))
+			if len(data) > 1:
+				print(data[-2:])
+			if len(s_data) > 1:
+				print(s_data[-2:])
+		url = 'https://howrare.is/{}/{}/'.format(collection, i)
+		browser.get(url)
+		sleep(0.01)
+		soup = BeautifulSoup(browser.page_source)
+		mint_address = re.split('/', soup.find_all('div', class_="nft_title")[0].find_all('div', class_='overflow')[0].find_all('a')[0].attrs['href'])[-1]
+		data += [[ collection, i, mint_address ]]
+		table = soup.find_all('div', class_='sales_history')
+		if len(table) == 0:
+			continue
+		for row in table[0].find_all('div', class_='all_coll_row')[1:]:
+			cells = row.find_all('div', class_='all_coll_col')
+			if len(cells) > 1:
+				s_data += [[ collection, i, cells[0].text.strip(), cells[1].text.strip() ]]
+	df = pd.DataFrame(data, columns=['collection','token_id','mint_address'])
+	df.to_csv('./data/solana_token_id_mint_map.csv', index=False)
 
 def metadata_from_solscan():
 	collections = [
@@ -1003,16 +1047,20 @@ def metadata_from_solscan():
 		, [ 'balloonsville', 'https://bafybeih5i7lktx6o7rjceuqvlxmpqzwfh4nhr322wq5hjncxbicf4fbq2e.ipfs.dweb.link/{}.json', 0, 5000 ]
 	]
 	data = []
+	token_data = []
+	collection = 'DeGods'
 	for i in range(0, 5000):
 		if i % 25 == 2:
 			print(i, len(data))
 			print(data[-1])
+			print(token_data[-1])
 		url = 'https://sld-gengo.s3.amazonaws.com/{}.json'.format(i)
-		url = 'https://metadata.degods.com/g/{}.json'.format(i)
 		url = 'https://bafybeih5i7lktx6o7rjceuqvlxmpqzwfh4nhr322wq5hjncxbicf4fbq2e.ipfs.dweb.link/{}.json'.format(i)
+		url = 'https://metadata.degods.com/g/{}.json'.format(i)
 		r = requests.get(url).json()
+		token_data += [[ collection, i, r['image'] ]]
 		for a in r['attributes']:
-			data += [[ 'balloonsville', i, a['trait_type'], a['value'] ]]
+			data += [[ collection, i, a['trait_type'], a['value'] ]]
 	df = pd.DataFrame(data, columns=['collection','token_id','feature_name','feature_value']).drop_duplicates()
 	if False:
 		df['token_id'] = df.token_id + 1
@@ -1021,7 +1069,22 @@ def metadata_from_solscan():
 	old = old.drop_duplicates(keep='last')
 	print(old[['collection','token_id']].drop_duplicates().groupby('collection').token_id.count())
 	old.to_csv('./data/solscan_metadata.csv', index=False)
-		
+
+def add_solscan_metadata():
+	solscan_metadata = pd.read_csv('./data/solscan_metadata.csv')
+	metadata = pd.read_csv('./data/metadata.csv')
+	solscan_metadata['collection'] = solscan_metadata.collection.apply(lambda x: clean_name(x) )
+	metadata['collection'] = metadata.collection.apply(lambda x: clean_name(x) )
+	rem = solscan_metadata[['collection','feature_name']].drop_duplicates()
+	rem['rem'] = 1
+	metadata = merge(metadata, rem, how='left', ensure=True)
+	metadata = metadata[metadata.rem.isnull()]
+	del metadata['rem']
+	metadata[metadata.collection == 'DeGods'][['collection','feature_name']].drop_duplicates()
+	metadata = metadata.append(solscan_metadata)
+	metadata[metadata.collection == 'DeGods'][['collection','feature_name']].drop_duplicates()
+	metadata.to_csv('./data/metadata.csv', index=False)
+
 def scrape_mints():
 
 	nft_mint_addresses = pd.read_csv('./data/nft_mint_addresses.csv')
@@ -1040,6 +1103,8 @@ def scrape_mints():
 	nft_mint_addresses = nft_mint_addresses.merge( solana_nfts )
 	nft_mint_addresses.collection.unique()
 	mints = pd.read_csv('./data/solana_mints.csv')
+	mints[mints.collection == 'DeGods'].to_csv('~/Downloads/tmp.csv', index=False)
+	mints[mints.collection == 'DeGods'].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
 	sorted(mints.collection.unique())
 	mints[mints.collection == 'Kaiju Cards']
 	# mints['tmp'] = mints.mint_address.apply(lambda x: x.lower() )
@@ -1087,6 +1152,10 @@ def scrape_mints():
 	g.to_csv('~/Downloads/tmp.csv', index=False)
 	mints.to_csv('./data/solana_mints.csv', index=False)
 	mints[mints.collection == 'Balloonsville'].to_csv('./data/solana_mints_2.csv', index=False)
+
+	url = 'https://solscan.io/token/GxERCTcBDmB6pfEoYYNWvioAhACifEGdn3dXNqVh5rXz'
+	url = 'https://explorer.solana.com/address/6CCprsgJT4nxBMSitGathXcLshDTL3BE4LcJXvSFwoe2'
+	r = requests.get(url)
 
 # scrape_listings(['smb'])
 # alerted = []

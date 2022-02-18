@@ -49,6 +49,51 @@ def manual_clean():
 			df['clean_token_id'] = df.token_id
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
+def add_solana_sales():
+	my_file = open('./scripts/solana-rpc-app/output.txt', 'r')
+	content = my_file.read()
+	my_file.close()
+	content_list = content.split('[')
+	data = []
+	for c in content_list:
+		s = re.split(',', c)
+		if len(s) > 1 and '#' in s[1]:
+			data += [[ re.split('"', s[0])[1], int(re.split('#', re.split('"', s[1])[1])[1]) ]]
+	df = pd.DataFrame(data, columns=['mint','token_id']).drop_duplicates()
+	query = '''
+		SELECT tx_id
+		, n.mint
+		, n.block_timestamp AS sale_date
+		, (inner_instruction:instructions[0]:parsed:info:lamports 
+		+ inner_instruction:instructions[1]:parsed:info:lamports 
+		+ inner_instruction:instructions[2]:parsed:info:lamports 
+		+ inner_instruction:instructions[3]:parsed:info:lamports) / POWER(10, 9) AS price
+		FROM solana.nfts n
+		LEFT JOIN crosschain.address_labels l ON LOWER(n.mint) = LOWER(l.address)
+		WHERE block_timestamp >= CURRENT_DATE - 200
+		AND instruction:data like '3UjLyJvuY4%'
+		AND l.project_name ilike 'degods'
+	'''
+	sales = ctx.cursor().execute(query)
+	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
+	sales = clean_colnames(sales)
+	print('Queried {} sales'.format(len(sales)))
+	sales['chain'] = 'Solana'
+	sales['collection'] = 'DeGods'
+	m = sales.merge(df, how='left', on=['mint'])
+	s_df = pd.read_csv('./data/sales.csv')
+	l0 = len(s_df)
+	s_df = s_df[-s_df.collection.isin(sales.collection.unique())]
+	s_df = s_df.append(m)
+	print(s_df.groupby('collection').token_id.count())
+	l1 = len(s_df)
+	print('Added {} sales'.format(l1 - l0))
+	for c in [ 'mint','tmp' ]:
+		if c in s_df:
+			del s_df[c]
+	s_df.to_csv('./data/sales.csv', index=False)
+	pass
+
 def solana_metadata():
 	metadata = pd.read_csv('./data/metadata.csv')
 	metadata[metadata.collection == 'Solana Monkey Business'].feature_name.unique()
