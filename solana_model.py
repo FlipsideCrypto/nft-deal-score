@@ -19,8 +19,9 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression, RidgeCV, Lasso, Ridge
 from sklearn.model_selection import train_test_split, KFold, GridSearchCV, RandomizedSearchCV
 
+from utils import merge, clean_name
+
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
-from scrape_sol_nfts import clean_name
 
 warnings.filterwarnings('ignore')
 
@@ -41,22 +42,6 @@ def standardize_df(df, cols, usedf=None, verbose=False):
 			df['std_{}'.format(c)] = df[c]
 		else:
 			df['std_{}'.format(c)] = (df[c] - mu) / sd
-	return(df)
-
-def merge(left, right, on=None, how='inner', ensure=True, verbose=True, message = ''):
-	df = left.merge(right, on=on, how=how)
-	if len(df) != len(left) and (ensure or verbose):
-		if message:
-			print(message)
-		print('{} -> {}'.format(len(left), len(df)))
-		cur = left.merge(right, on=on, how='left')
-		cols = set(right.columns).difference(set(left.columns))
-		print(cols)
-		if ensure:
-			col = list(cols)[0]
-			missing = cur[cur[col].isnull()]
-			print(missing.head())
-			assert(False)
 	return(df)
 
 def just_float(x):
@@ -170,6 +155,8 @@ def train_model(check_exclude, supplement_with_listings):
 	#     Load Metadata     #
 	#########################
 	m_df = pd.read_csv('./data/metadata.csv')
+	m_df[m_df.collection == 'DeGods'][['feature_name']].drop_duplicates()
+	sorted(m_df.collection.unique())
 	# m_df[m_df.collection == 'Aurory'][['collection','feature_name']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
 	sorted([x for x in m_df.feature_name.unique() if 'nft_' in x])
 	m_df['token_id'] = m_df.token_id.astype(str)
@@ -187,11 +174,11 @@ def train_model(check_exclude, supplement_with_listings):
 	tokens = pd.read_csv('./data/tokens.csv')
 	tokens['collection'] = tokens.collection.apply(lambda x: clean_name(x))
 	tokens['token_id'] = tokens.token_id.astype(str)
-	m_df = merge(m_df, tokens[['collection','token_id','clean_token_id']], how='left', ensure=True, on=['collection','token_id'], message='m_df x tokens')
-	m_df['token_id'] = m_df.clean_token_id.fillna(m_df.token_id).astype(int).astype(str)
+	m_df = merge(m_df, tokens[['collection','token_id','clean_token_id']].dropna().drop_duplicates() , how='left', ensure=True, on=['collection','token_id'], message='m_df x tokens')
+	m_df['token_id'] = m_df.clean_token_id.fillna(m_df.token_id).astype(float).astype(int).astype(str)
 	s_df = merge(s_df, tokens[['collection','token_id','clean_token_id']], how='left', ensure=True, on=['collection','token_id'], message='s_df x tokens')
-	s_df['token_id'] = s_df.clean_token_id.fillna(s_df.token_id).astype(int).astype(str)
-	tokens.token_id.unique()
+	s_df[s_df.token_id.isnull()]
+	s_df['token_id'] = (s_df.clean_token_id.replace('nan', None).fillna(s_df.token_id.replace('nan', None))).astype(float).astype(int).astype(str)
 	lunabullsrem = tokens[tokens.clean_token_id>=10000].token_id.unique()
 	m_df = m_df[ -((m_df.collection == 'LunaBulls') & (m_df.token_id.isin(lunabullsrem))) ]
 	s_df = s_df[ -((s_df.collection == 'LunaBulls') & (s_df.token_id.isin(lunabullsrem))) ]
@@ -292,7 +279,7 @@ def train_model(check_exclude, supplement_with_listings):
 
 	collection = 'Aurory'
 	collection = 'Solana Monkey Business'
-	collection = 'Levana Dragon Eggs'
+	collection = 'DeGods'
 	# for collection in [ 'Solana Monkey Business' ]:
 	# for collection in [ 'Aurory' ]:
 	# for collection in [ 'Aurory','Solana Monkey Business' ]:
@@ -300,8 +287,8 @@ def train_model(check_exclude, supplement_with_listings):
 	sorted(pred_price.collection.unique())
 	sorted(s_df.collection.unique())
 	print(sorted(m_df.collection.unique()))
-	# for collection in [ 'Solana Monkey Business' ]:
-	for collection in m_df.collection.unique():
+	# for collection in m_df.collection.unique():
+	for collection in [ 'DeGods' ]:
 		coefsdf = coefsdf[coefsdf.collection != collection]
 		salesdf = salesdf[salesdf.collection != collection]
 		attributes = attributes[attributes.collection != collection]
@@ -310,8 +297,9 @@ def train_model(check_exclude, supplement_with_listings):
 		print('Working on collection {}'.format(collection))
 		sales = s_df[ s_df.collection == collection ]
 		metadata = m_df[ m_df.collection == collection ]
-		metadata.groupby(['feature_name','feature_value']).token_id.count().reset_index().to_csv('~/Downloads/tmp.csv', index=False)
-		metadata[metadata.token_id == '1']
+		sorted(metadata.feature_name.unique())
+		# metadata.groupby(['feature_name','feature_value']).token_id.count().reset_index().to_csv('~/Downloads/tmp.csv', index=False)
+		# metadata[metadata.token_id == '1']
 		metadata['feature_name'] = metadata.feature_name.apply(lambda x: x.strip() )
 		metadata[metadata.token_id == '1']
 		metadata[metadata.feature_name == 'rank']
@@ -688,24 +676,28 @@ def train_model(check_exclude, supplement_with_listings):
 
 	coefsdf.to_csv('./data/coefsdf.csv', index=False)
 	salesdf.to_csv('./data/model_sales.csv', index=False)
-	old = pd.read_csv('./data/pred_price copy.csv')
-	old['token_id'] = old.token_id.astype(str)
-	old = pred_price.merge(old, on=['collection','token_id'])
-	old['ratio'] = old.pred_price_x / old.pred_price_y
-	old = old.sort_values('ratio')
-	old.columns = [ 'collection', 'token_id', 'nft_rank', 'rk_new', 'pred_price_new', 'pred_sd_x', 'rank', 'rk_old', 'pred_price_old', 'pred_sd_y', 'clean_token_id', 'ratio' ]
-	m = m_df[(m_df.collection.isin(pred_price.collection.unique())) & (-(m_df.feature_name.isin(['nft_rank','adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2'])))]
-	m_p = m.pivot(['collection','token_id'], ['feature_name'], ['feature_value']).reset_index()
-	m_p.columns = [ 'collection','token_id' ] + sorted(m.feature_name.unique())
-	m_p.head()
-	old = old.merge(m_p, on=['collection','token_id'])
-	if len(old) and 'rank' in old.columns:
-		old = old[[ 'token_id', 'nft_rank', 'rk_old', 'rk_new', 'pred_price_old', 'pred_price_new', 'ratio' ] + [c for c in m_p.columns if not c in ['token_id','collection']]]
-		old.to_csv('~/Downloads/tmp1.csv', index=False)
-		pred_price.head()
-		old[old.token_id == '4857']
-		old.head()
-		old.tail()
+	pred_price[pred_price.collection == 'DeGods'].to_csv('~/Downloads/tmp1.csv', index=False)
+	# old = pd.read_csv('./data/pred_price.csv')
+	# old = old[old.collection == 'DeGods']
+	# old['token_id'] = old.token_id.astype(str)
+	# old = pred_price.merge(old, on=['collection','token_id'])
+	# old['ratio'] = old.pred_price_x / old.pred_price_y
+	# old = old.sort_values('ratio')
+	# old.columns = [ 'collection', 'token_id', 'nft_rank', 'rk_new', 'pred_price_new', 'pred_sd_x', 'rank', 'rk_old', 'pred_price_old', 'pred_sd_y', 'ratio' ]
+	# # old.columns = [ 'collection', 'token_id', 'nft_rank', 'rk_new', 'pred_price_new', 'pred_sd_x', 'rank', 'rk_old', 'pred_price_old', 'pred_sd_y', 'clean_token_id', 'ratio' ]
+	# m = m_df[(m_df.collection.isin(pred_price.collection.unique())) & (-(m_df.feature_name.isin(['nft_rank','adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2'])))]
+	# m_p = m.pivot(['collection','token_id'], ['feature_name'], ['feature_value']).reset_index()
+	# m_p.columns = [ 'collection','token_id' ] + sorted(m.feature_name.unique())
+	# m_p.head()
+	# old = old.merge(m_p, on=['collection','token_id'])
+	# if len(old) and 'rank' in old.columns:
+	# 	# old = old[[ 'token_id', 'nft_rank', 'rk_old', 'rk_new', 'pred_price_old', 'pred_price_new', 'ratio' ] + [c for c in m_p.columns if not c in ['token_id','collection']]]
+	# 	old = old[[ 'token_id', 'nft_rank', 'rk_old', 'rk_new', 'pred_price_old', 'pred_price_new', 'ratio' ] + [c for c in m_p.columns if not c in ['token_id','collection','rank']]]
+	# 	old.to_csv('~/Downloads/tmp1.csv', index=False)
+	# 	pred_price.head()
+	# 	old[old.token_id == '4857']
+	# 	old.head()
+	# 	old.tail()
 
 	# nft_rank = m_df[m_df.feature_name=='nft_rank'][['collection','token_id','feature_value']].rename(columns={'feature_value': 'nft_rank'})
 	# nft_rank['token_id'] = nft_rank.token_id.astype(str)
