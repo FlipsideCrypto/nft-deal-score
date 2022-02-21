@@ -8,6 +8,7 @@ import requests
 import pandas as pd
 import urllib.request
 import snowflake.connector
+from utils import clean_name, clean_token_id
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
@@ -41,6 +42,20 @@ def clean_colnames(df):
 	df.columns = names
 	return(df)
 
+def add_collection_steps():
+	# 1. mint_address_token_id_map
+	# 2. scrape metadata
+	metadata = pd.read_csv('./data/metadata.csv')
+	metadata['collection'] = metadata.collection.apply(lambda x: clean_name(x) )
+	sorted(metadata.collection.unique())
+	metadata.to_csv('./data/metadata.csv', index=False)
+	metadata[metadata.collection == 'Stoned Ape Crew']
+	metadata[metadata.collection == 'Stoned Ape Crew'].feature_name.unique()
+	# 3. scrape howrareis
+	# 4. add sales
+	# 5. run model
+	pass
+
 def manual_clean():
 	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
 		df = pd.read_csv('./data/{}.csv'.format(c))
@@ -49,7 +64,32 @@ def manual_clean():
 			df['clean_token_id'] = df.token_id
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
-def add_solana_sales():
+def mint_address_token_id_map_2():
+	old = pd.read_csv('./data/mint_address_token_id_map.csv')
+	old = pd.DataFrame()
+	mints = pd.read_csv('./data/solana_mints.csv')
+	data = []
+	for collection in [ 'Stoned Ape Crew','DeGods' ]:
+		for m in mints[mints.collection == collection].mint_address.unique():
+			pass
+			f = open('./data/mints/{}/{}.json'.format(collection, m))
+			j = json.load(f)
+			try:
+				token_id = int(re.split('#', j['name'])[1])
+				data += [[ collection, m, token_id, j['uri'] ]]
+			except:
+				print(m)
+		df = pd.DataFrame(data, columns=['collection','mint','token_id','uri'])
+		old = old.append(df).drop_duplicates()
+		print(old[old.token_id.notnull()].groupby('collection').token_id.count())
+	old.to_csv('./data/mint_address_token_id_map.csv', index=False)
+
+def mint_address_token_id_map():
+	mints = pd.read_csv('./data/solana_mints.csv')
+	mints[mints.collection == 'Stoned Ape Crew'][['mint_address']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
+	mints[mints.collection == 'Degods'][['mint_address']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
+	mints[mints.collection == 'DeGods'][['mint_address']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
+	old = pd.read_csv('./data/mint_address_token_id_map.csv')
 	my_file = open('./scripts/solana-rpc-app/output.txt', 'r')
 	content = my_file.read()
 	my_file.close()
@@ -60,9 +100,20 @@ def add_solana_sales():
 		if len(s) > 1 and '#' in s[1]:
 			data += [[ re.split('"', s[0])[1], int(re.split('#', re.split('"', s[1])[1])[1]) ]]
 	df = pd.DataFrame(data, columns=['mint','token_id']).drop_duplicates()
+	df['collection'] = 'DeGods'
+	df.to_csv('./data/mint_address_token_id_map.csv', index=False)
+
+def add_solana_sales():
+	print('Adding Solana sales...')
+	# read id map
+	id_map = pd.read_csv('./data/mint_address_token_id_map.csv')
+	id_map['collection'] = id_map.collection.apply(lambda x: clean_name(x) )
+	id_map.collection.unique()
+
 	query = '''
 		SELECT tx_id
 		, n.mint
+		, l.project_name
 		, n.block_timestamp AS sale_date
 		, (inner_instruction:instructions[0]:parsed:info:lamports 
 		+ inner_instruction:instructions[1]:parsed:info:lamports 
@@ -72,16 +123,23 @@ def add_solana_sales():
 		LEFT JOIN crosschain.address_labels l ON LOWER(n.mint) = LOWER(l.address)
 		WHERE block_timestamp >= CURRENT_DATE - 200
 		AND instruction:data like '3UjLyJvuY4%'
-		AND l.project_name ilike 'degods'
+		AND l.project_name IN ('degods','stoned ape crew')
 	'''
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
 	print('Queried {} sales'.format(len(sales)))
 	sales['chain'] = 'Solana'
-	sales['collection'] = 'DeGods'
-	m = sales.merge(df, how='left', on=['mint'])
+	sales['collection'] = sales.project_name.apply(lambda x: clean_name(x) )
+	# m = sales.merge(id_map, how='left', on=['mint','collection'])
+	m = sales.merge(id_map, how='inner', on=['mint','collection'])
+	m.sort_values('collection')
+	m = m[[ 'collection','token_id','sale_date','price','chain' ]]
 	s_df = pd.read_csv('./data/sales.csv')
+	if 'collection_x' in s_df.columns and 'collection_y' in s_df.columns:
+		s_df['collection'] = s_df.collection.fillna(s_df.collection_x).fillna(s_df.collection_y)
+		del s_df['collection_x']
+		del s_df['collection_y']
 	l0 = len(s_df)
 	s_df = s_df[-s_df.collection.isin(sales.collection.unique())]
 	s_df = s_df.append(m)
@@ -91,6 +149,8 @@ def add_solana_sales():
 	for c in [ 'mint','tmp' ]:
 		if c in s_df:
 			del s_df[c]
+	if 'project_name' in s_df.columns:
+		del s_df['project_name']
 	s_df.to_csv('./data/sales.csv', index=False)
 	pass
 
@@ -428,7 +488,7 @@ def add_terra_sales():
 			WHEN 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2' THEN 'LunaBulls'
 			WHEN 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k' THEN 'Galactic Punks'
 			WHEN 'terra1vhuyuwwr4rkdpez5f5lmuqavut28h5dt29rpn6' THEN 'Levana Dragons'
-			WHEN 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' THEN 'Levana Meteor Dust'
+			WHEN 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' THEN 'Levana Dust'
 			WHEN 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' THEN 'Levana Eggs'
 			WHEN 'terra14gfnxnwl0yz6njzet4n33erq5n70wt79nm24el' THEN 'Levana Loot'
 			WHEN 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' THEN 'Levana Meteors'
@@ -555,6 +615,7 @@ def add_terra_sales():
 	# tokens = pd.read_csv('./data/tokens.csv')
 	# tokens['tmp'] = tokens.token_id.apply(lambda x: (str(x)[:5]))
 	# tokens[tokens.collection == 'Galactic Punks'].to_csv('~/Downloads/tmp.csv', index=False)
+	sales.tokenid.values[:4]
 	sales['tokenid'] = sales.tokenid.apply(lambda x: str(int(float(x))) )
 	# tokens['token_id'] = tokens.token_id.astype(str)
 
@@ -569,6 +630,10 @@ def add_terra_sales():
 		, 'amount': 'price'
 		, 'tokenid': 'token_id'
 	})
+	sales = clean_token_id(sales)
+	sales.token_id.values[:4]
+	# sales['token_id'] = sales.token_id.astype(int)
+
 	# tmp = sales.merge(tokens[['collection','token_id','clean_token_id']])
 	# sales[sales.tx_id.isin(['6CA1966B42D02F07D1FB6A839B8276D501FDF3EF048DECA5601C74D82EBB9D12',
     #    'F5643C0C805F3236F67CFF1A6AC1FC50CF9DB61B846B3CE6F9D4CD3806284D4E',
@@ -577,9 +642,9 @@ def add_terra_sales():
 	# sales.columns
 	sales['chain'] = 'Terra'
 	sales = sales[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
-	print(sales.groupby(['chain','collection']).token_id.count())
-	sales['token_id'] = sales.token_id.apply(lambda x: re.sub('"', '', x) )
-	sales['collection'] = sales.collection.apply(lambda x: 'Levana Dragon Eggs' if x=='Levana Eggs' else x )
+	# print(sales.groupby(['chain','collection']).token_id.count())
+	# sales['token_id'] = sales.token_id.apply(lambda x: re.sub('"', '', x) )
+	# sales['collection'] = sales.collection.apply(lambda x: 'Levana Dragon Eggs' if x=='Levana Eggs' else x )
 	old = pd.read_csv('./data/sales.csv')
 	# print(old.groupby(['chain','collection']).token_id.count())
 	l0 = len(old)
@@ -588,6 +653,7 @@ def add_terra_sales():
 	old = old[ -(old.collection.isin(sales.collection.unique())) ]
 	old = old.append(sales)
 	old = old[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
+	# old['collection'] = old.collection.apply(lambda x: 'Levana Dust' if x == 'Levana Meteor Dust' else x )
 	old = old.drop_duplicates(subset=['collection','token_id','price'])
 	# old = old[-(old.collection == 'Levana Dragons')]
 	# old = old[-(old.collection == 'Levana Dragon Eggs')]

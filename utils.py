@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 
 
@@ -10,12 +11,28 @@ clean_names = {
 	,'meerkatmillionaires': 'Meerkat Millionaires'
 	,'boryokudragonz': 'Boryoku Dragonz'
 	,'degods': 'DeGods'
+	,'lunabulls': 'LunaBulls'
+	# ,'stonedapecrew': 'Stoned Ape Crew'
 }
 
+def clean_token_id(df):
+	tokens = pd.read_csv('./data/tokens.csv')
+	df['collection'] = df.collection.apply(lambda x: clean_name(x))
+	df['token_id'] = df.token_id.apply(lambda x: re.sub('"', '', x) if type(x)==str else x )
+	df['tmp'] = df.token_id.apply(lambda x: x[:10] )
+	tokens['tmp'] = tokens.token_id.apply(lambda x: x[:10] )
+	df = df.merge(tokens[['collection','tmp','clean_token_id']], how='left', on=['collection','tmp'])
+	df['token_id'] = df.clean_token_id.fillna(df.token_id)
+	df['token_id'] = df.token_id.astype(int)
+	del df['tmp']
+	del df['clean_token_id']
+	return(df)
+
 def clean_name(name):
-	if name.lower() in clean_names.keys():
-		return(clean_names[name.lower()])
-	name = re.sub('-', '', name.title())
+	x = re.sub('-', '', name).lower()
+	if x in clean_names.keys():
+		return(clean_names[x])
+	name = re.sub('-', ' ', name.title())
 	return(name)
 
 
@@ -27,7 +44,7 @@ def merge(left, right, on=None, how='inner', ensure=True, verbose=True, message 
 		print('{} -> {}'.format(len(left), len(df)))
 		cur = left.merge(right, on=on, how='left')
 		cols = set(right.columns).difference(set(left.columns))
-		print(cols)
+		# print(cols)
 		if ensure:
 			col = list(cols)[0]
 			missing = cur[cur[col].isnull()]
