@@ -10,3 +10,4 @@
 data/*
 *.twb
 viz/.DS_Store
+data/mints/*.json

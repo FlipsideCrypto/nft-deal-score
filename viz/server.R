@@ -408,7 +408,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'DeGods'
+			, selected = 'Stoned Ape Crew'
 			, choices = choices
 			, width = "100%"
 		)
@@ -454,7 +454,11 @@ server <- function(input, output, session) {
 				, ifelse(
 					selected == 'Solana Monkey Business'
 					, selected
-					, substr(selected, 1, nchar(selected) - 1)
+					, ifelse(
+						selected == 'Stoned Ape Crew'
+						, 'Stoned Ape'
+						, substr(selected, 1, nchar(selected) - 1)
+					)
 				)
 			)
 		)

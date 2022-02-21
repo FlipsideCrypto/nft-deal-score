@@ -19,7 +19,7 @@ from selenium.webdriver.common.keys import Keys
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
-from utils import merge, clean_name
+from utils import clean_token_id, merge, clean_name
 
 # browser = webdriver.Chrome()
 
@@ -42,6 +42,69 @@ def scrape_magic_eden_sales():
 	results = requests.get(url).json()['results']
 	df = pd.DataFrame([ x['parsedTransaction'] for x in results if 'parsedTransaction' in x.keys()])
 	df[[ 'blockTime','collection_symbol','total_amount' ]]
+
+def metadata_from_uri():
+	df = pd.read_csv('./data/mint_address_token_id_map.csv')
+	tokens = pd.read_csv('./data/tokens.csv')
+	tokens['collection'] = tokens.collection.apply(lambda x: clean_name(x))
+	tokens[tokens.collection == 'Stoned Ape Crew']
+	sorted(tokens.collection.unique())
+	collections = [ 'Stoned Ape Crew' ]
+	data = []
+	t_data = []
+	# seen = [ x[1] for x in t_data]
+	for collection in collections:
+		print(collection)
+		it = 0
+		cur = df[df.collection == collection]
+		seen = []
+		for row in cur.iterrows():
+			it += 1
+			if it % 250 == 2:
+				print('{} {} {}'.format(it, len(data), len(t_data)))
+			row = row[1]
+			uri = row['uri']
+			token_id = row['token_id']
+			if token_id in seen:
+				continue
+			try:
+				j = requests.get(uri, timeout=3).json()
+				for a in j['attributes']:
+					data += [[ collection, token_id, a['trait_type'], a['value'] ]]
+				t_data += [[ collection, token_id, j['image'] ]]
+				seen.append(token_id)
+			except:
+				print(row['uri'])
+	old = pd.read_csv('./data/metadata.csv')
+	l0 = len(old)
+	metadata = pd.DataFrame(data, columns=['collection','token_id','feature_name','feature_value'])
+	metadata['chain'] = 'Solana'
+	old['token_id'] = old.token_id.astype(str)
+	metadata['token_id'] = metadata.token_id.astype(str)
+	old = old.append(metadata).drop_duplicates(subset=['collection','token_id','feature_name'])
+	l1 = len(old)
+	print('Adding {} rows to metadata'.format(l1 - l0))
+	# old['chain'] = old.collection.apply(lambda x: 'Terra' if x in ['Galactic Punks','Levana Dragon Eggs','LunaBulls'] else 'Solana')
+	print(old.groupby(['chain','collection']).token_id.count())
+	old.to_csv('./data/metadata.csv', index=False)
+
+	old = pd.read_csv('./data/tokens.csv')
+	l0 = len(old)
+	tokens = pd.DataFrame(t_data, columns=['collection','token_id','image_url'])
+	old['collection'] = old.collection.apply(lambda x: clean_name(x))
+	old['token_id'] = old.token_id.astype(str)
+	tokens['token_id'] = tokens.token_id.astype(str)
+	old = old.merge(tokens, how='left', on=['collection','token_id'])
+	old['image_url'] = old.image_url_y.fillna(old.image_url_x)
+	del old['image_url_x']
+	del old['image_url_y']
+	tmp = old[old.collection == 'Stoned Ape Crew']
+	tmp['tmp'] = tmp.image_url.apply(lambda x: x[:20] )
+	tmp.groupby('tmp').token_id.count()
+	old = old.drop_duplicates(subset=['collection','token_id'], keep='last')
+	l1 = len(old)
+	print('Adding {} rows to tokens'.format(l1 - l0))
+	old.to_csv('./data/tokens.csv', index=False)
 
 def scrape_not_found(browser):
 	url = 'https://notfoundterra.com/lunabulls'
@@ -198,7 +261,8 @@ def scrape_randomearth(browser):
 				for i in j['items']:
 					data += [[ 'Terra', collection, i['token_id'], i['price'] / (10 ** 6) ]]
 		df = pd.DataFrame(data, columns=['chain','collection','token_id','price'])
-		df.to_csv('~/Downloads/tmp.csv', index=False)
+		df = clean_token_id(df)
+		# df.to_csv('~/Downloads/tmp.csv', index=False)
 		old = pd.read_csv('./data/listings.csv')
 		old = old[-old.collection.isin(df.collection.unique())]
 		old = old.append(df)
@@ -382,7 +446,7 @@ def scrape_solanafloor():
 	df.to_csv('./data/sf_projects.csv', index=False)
 
 
-def scrape_listings(browser, collections = [ 'degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
+def scrape_listings(browser, collections = [ 'stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
 	data = []
 	m_data = []
@@ -468,7 +532,16 @@ def scrape_listings(browser, collections = [ 'degods','aurory','thugbirdz','smb'
 							# 	print(row.text)
 					scroll = browser.find_elements_by_class_name('ag-row-even')
 					j = min(j, len(scroll) - 1)
-					browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
+					try:
+						browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
+					except:
+						sleep(1)
+						try:
+							browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
+						except:
+							sleep(10)
+							browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
+
 					sleep(.1)
 			next = browser.find_elements_by_class_name('ag-icon-next')
 			a = browser.find_element_by_id('ag-17-start-page-number').text
@@ -1045,6 +1118,7 @@ def metadata_from_solscan():
 		[ 'shadowy-super-coder', 'https://sld-gengo.s3.amazonaws.com/{}.json', 0, 10000 ]
 		, [ 'degods', 'https://sld-gengo.s3.amazonaws.com/{}.json', 1, 10000 ]
 		, [ 'balloonsville', 'https://bafybeih5i7lktx6o7rjceuqvlxmpqzwfh4nhr322wq5hjncxbicf4fbq2e.ipfs.dweb.link/{}.json', 0, 5000 ]
+		, [ 'Stoned Ape Crew', 'https://bafybeih5i7lktx6o7rjceuqvlxmpqzwfh4nhr322wq5hjncxbicf4fbq2e.ipfs.dweb.link/{}.json', 0, 5000 ]
 	]
 	data = []
 	token_data = []
@@ -1134,6 +1208,11 @@ def scrape_mints():
 
 	mints = pd.DataFrame()
 	auth_to_mint = {}
+	# metaboss -r https://red-cool-wildflower.solana-mainnet.quiknode.pro/a1674d4ab875dd3f89b34863a86c0f1931f57090/ decode mint --list-file ./data/mints/etc/degods.json -o ~/Downloads/degods
+	# metaboss -r https://red-cool-wildflower.solana-mainnet.quiknode.pro/a1674d4ab875dd3f89b34863a86c0f1931f57090/ derive metadata ChANfqf7AP9x1rFRjZkE6n19u3tQckv65Z6r6xPqkRKR  --output ~/Downloads
+	# metaboss decode mint --list-file <LIST_FILE> -o <OUPUT_DIRECTORY>
+
+
 	for collection, update_authority in d.items():
 		auth_to_mint[update_authority] = collection
 	for fname in [ './data/mints/'+f for f in os.listdir('./data/mints') ]:

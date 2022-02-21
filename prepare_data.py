@@ -28,12 +28,15 @@ def add_att_count():
 
 
 m_df = pd.read_csv('./data/metadata.csv')
+l0 = len(m_df)
 
 solana_rarities = pd.read_csv('./data/solana_rarities.csv')
 tokens = pd.read_csv('./data/tokens.csv')[['collection','token_id','nft_rank']]
 solana_rarities = pd.read_csv('./data/solana_rarities.csv')
 lp_ranks = pd.read_csv('./data/lp_ranks.csv')
 gp_ranks = pd.read_csv('./data/gp_ranks.csv')
+lev_egg_ranks = m_df[m_df.feature_name == 'collection_rank'][['collection','token_id','feature_value']].rename(columns={'feature_value':'nft_rank'})
+lev_egg_ranks['nft_rank'] = lev_egg_ranks.nft_rank.astype(int)
 if False:
 	metadata = pd.read_csv('./data/metadata.csv')
 	levana_ranks = metadata[(metadata.collection == 'Levana Dragon Eggs') & (metadata.feature_name == 'collection_rank')]
@@ -49,9 +52,13 @@ if False:
 	metadata['chain'] = metadata.collection.apply(lambda x: 'Terra' if x in ['LunaBulls','Galactic Punks','Levana Dragon Eggs'] else 'Solana' )
 	metadata.to_csv('./data/metadata.csv', index=False)
 
-rarities = solana_rarities.append(lp_ranks).append(gp_ranks).append(tokens).drop_duplicates(keep='first')
-rarities = rarities[[ 'collection','token_id','nft_rank' ]]
+rarities = solana_rarities.append(lp_ranks).append(gp_ranks).append(lev_egg_ranks).append(tokens)[[ 'collection','token_id','nft_rank' ]].dropna().drop_duplicates(subset=['collection','token_id'], keep='first')
+rarities[rarities.collection == 'Levana Dragon Eggs']
+# rarities = rarities[[ 'collection','token_id','nft_rank' ]].dropna()
 rarities['collection'] = rarities.collection.apply(lambda x: clean_name(x) )
+# rarities[rarities.nft_rank.isnull()]
+# solana_rarities[solana_rarities.nft_rank.isnull()]
+rarities['nft_rank'] = rarities.nft_rank.astype(int)
 # rarities[ (rarities.collection == 'Solana Monkey Business') & (rarities.token_id == 903) ]
 rarities.loc[ (rarities.collection == 'Solana Monkey Business') & (rarities.token_id == 903) , 'nft_rank' ] = 18
 rarities['adj_nft_rank_0'] = rarities.nft_rank.apply(lambda x: (x+1) ** -0.2 )
@@ -104,10 +111,15 @@ print(m_df[(m_df.token_id=='10') & (m_df.collection == 'Aurory')])
 
 m_df['feature_value'] = m_df.feature_value.apply(lambda x: x.strip() if type(x) == str else x )
 m_df['chain'] = m_df.collection.apply(lambda x: 'Terra' if x in ['LunaBulls','Galactic Punks','Levana Dragon Eggs'] else 'Solana' )
-m_df.to_csv('./data/metadata.csv', index=False)
 
 g = m_df[['collection','token_id']].drop_duplicates().groupby('collection').token_id.count().reset_index()
 a = m_df.groupby('collection').token_id.count().reset_index().rename(columns={'token_id':'atts'})
 g = g.merge(a)
 g['rat'] = g.atts / g.token_id
 print(g)
+
+l1 = len(m_df)
+m_df[m_df.collection == 'Levana Dragon Eggs'].feature_name.unique()
+print('Adding {} rows'.format(l1 - l0))
+m_df[m_df.collection == 'Levana Dragon Eggs']
+m_df.to_csv('./data/metadata.csv', index=False)

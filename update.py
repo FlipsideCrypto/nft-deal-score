@@ -5,6 +5,8 @@ from time import sleep
 from copy import deepcopy
 import random
 
+from utils import clean_name
+
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
@@ -13,8 +15,6 @@ import load_data as ld
 import solana_model as sm
 
 browser = webdriver.Chrome()
-
-
 
 if False:
 	alerted = []
@@ -50,6 +50,7 @@ if False:
 ssn.scrape_recent_smb_sales(browser)
 ssn.scrape_recent_sales()
 ld.add_terra_sales()
+ld.add_solana_sales()
 
 # update listings
 ssn.scrape_randomearth(browser)
@@ -93,24 +94,29 @@ def add_model_sales():
 
 def update_token_ids():
 	tokens = pd.read_csv('./data/tokens.csv')
+	tokens['collection'] = tokens.collection.apply(lambda x: clean_name(x))
+	tokens = tokens.drop_duplicates(subset=['collection','token_id'], keep='last')
+	tokens.to_csv('./data/tokens.csv', index=False)
 	tokens.groupby('collection').token_id.count()
 	tokens['tmp'] = tokens.token_id.apply(lambda x: (int(float(x))) )
 	tokens[tokens.token_id == 223838831896070003935953339589523931136]
 	tokens[tokens.collection=='Galactic Punks']
 	tokens['token_id'] = tokens.token_id.apply(lambda x: str(int(float(x))) )
-	tokens['tmp'] = tokens.token_id.apply(lambda x: len(x) )
+	# tokens['tmp'] = tokens.token_id.apply(lambda x: len(x) )
 	tokens.tmp.max()
 	# df[ (df.collection == 'Pesky Penguins') & (df.token_id == '3362') ]
 	tokens[ (tokens.collection == 'Pesky Penguins') & (tokens.token_id == '3362') ]
 	tokens[ (tokens.collection == 'Pesky Penguins') & (tokens.token_id == 3362) ]
 	# df.token_id.unique()
-	c = 'listings'
+	c = 'sales'
+	# for c in [ 'listings' ]:
 	for c in [ 'attributes','sales','listings' ]:
 		print(c)
 		df = pd.read_csv('./data/{}.csv'.format(c))
+		df['collection'] = df.collection.apply(lambda x: clean_name(x))
 		# df.token_id.unique()
 		df = df[df.token_id.notnull()]
-		df['token_id'] = df.token_id.apply(lambda x: None if x == 'nan' else str(int(float(x))) )
+		# df['token_id'] = df.token_id.apply(lambda x: None if x == 'nan' else str(int(float(x))) )
 		df['token_id'] = df.token_id.apply(lambda x: None if x == 'nan' else str(int(float(x))) )
 		# df['tmp'] = df.token_id.apply(lambda x: (str(x)[:5]))
 		df['tmp'] = df.token_id.apply(lambda x: x[:10] )
