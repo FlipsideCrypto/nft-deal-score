@@ -25,6 +25,16 @@ os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
 warnings.filterwarnings('ignore')
 
+# 1-att (naked 1-att?)
+# matching aesthetics
+# type
+# laser eyes
+# vipers
+# pirate hat
+# sombrero
+# cowboy hat
+# admiral hat
+
 ###################################
 #     Define Helper Functions     #
 ###################################
@@ -120,7 +130,17 @@ def get_coefs(cols, coef):
 	# coefs.to_csv('~/Downloads/{}_lin_coefs.csv'.format(collection), index=False)
 	# coefs['tmp'] = coefs.col.apply(lambda x: 'nft_rank' in x )
 	# coefs['mult'] = coefs.col.apply(lambda x: -1 if x == 'std_nft_rank' else 1 )
-	coefs['mult'] = coefs.apply(lambda x: -1 if x['col'] in ['std_nft_rank','collection_rank'] else 1 if x['coef'] >= 0 or 'adj_nft_rank' in x['col'] or 'is_top_' in x['col'] or 'y_pred_' in x['col'] else -1 , 1 )
+	def f(x):
+		if x['col'] in ['std_nft_rank','collection_rank']:
+			return(-1)
+		pos = ['adj_nft_rank','is_top_','y_pred_','matching','naked_1_att']
+		for p in pos:
+			if p in x['col']:
+				return(1)
+		if x['coef'] >= 0:
+			return(1)
+		return(-1)
+	coefs['mult'] = coefs.apply(lambda x: f(x), 1 )
 	coefs['val'] = coefs.mult * coefs.coef
 	coefs = coefs.sort_values('val', ascending=0)
 	return(coefs)
@@ -212,7 +232,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 	# s_df.groupby(['collection','tmp']).mn_20.mean().reset_index().to_csv('~/Downloads/mn_20.csv', index=False)
 
 	listings = pd.read_csv('./data/listings.csv')
-	listings.collection.unique()
+	sorted(listings.collection.unique())
 	if supplement_with_listings:
 		pred_price = pd.read_csv('./data/pred_price.csv')
 		pred_price['collection'] = pred_price.collection.apply(lambda x: clean_name(x))
@@ -258,7 +278,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 	# non-binary in model; exclude from rarity: pct, rank, score
 	# exclude from model: lucky_number, shower
 	# exclude from model and rarity %: meteor_id, attribute_count, cracking_date
-	ALL_NUMERIC_COLS = ['rank','score','pct']
+	ALL_NUMERIC_COLS = ['rank','score','pct','Pct']
 	ALL_NUMERIC_COLS = ['nft_rank','adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2']
 	MODEL_EXCLUDE_COLS = {
 		# 'Levana Dragon Eggs': ['collection_rank','meteor_id','shower','lucky_number','cracking_date','attribute_count','weight','temperature']
@@ -300,6 +320,8 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 	collections = ['Levana Dragon Eggs']
 	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	collections = ['Stoned Ape Crew']
+	collections = ['Solana Monkey Business']
+	collections = ['Galactic Angels']
 	for collection in collections:
 		# if collection == 'Stoned Ape Crew':
 		# 	continue
@@ -322,7 +344,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 		metadata['feature_name'] = metadata.feature_name.apply(lambda x: x.strip() )
 		metadata[metadata.token_id == '1']
 		metadata[metadata.feature_name == 'rank']
-		metadata = metadata[-metadata.feature_name.isin(['rank','pct','ipfs_image'])]
+		metadata = metadata[-metadata.feature_name.isin(['rank','pct','Pct','ipfs_image'])]
 		metadata.feature_name.unique()
 		metadata[(metadata.token_id=='1') & (metadata.collection == 'Solana Monkey Business')]
 		# print(sorted(metadata.feature_name.unique()))
@@ -352,8 +374,9 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 			dummies['matching_white'] = ((dummies['Clothes_Beige Smoking'] == 1) & ((dummies['Hat_White Fedora 1'] + dummies['Hat_White Fedora 2']) == 1)).astype(int)
 			dummies['matching_black'] = ((dummies['Clothes_Black Smoking'] == 1) & ((dummies['Hat_Black Fedora 1'] + dummies['Hat_Black Fedora 2'] + dummies['Hat_Black Top Hat']) == 1)).astype(int)
 			dummies['matching_top'] = ((dummies['matching_black'] == 1) | (dummies['matching_white']== 1)).astype(int)
+			dummies['matching_cop'] = ((dummies['Clothes_Cop Vest'] == 1) & ((dummies['Hat_Cop Hat']==1))).astype(int)
 			# dummies['matching_green'] = ((dummies['Clothes_Green Smoking'] == 1) & ((dummies['Hat_Green Top Hat']) == 1)).astype(int)
-			# dummies['naked_1_att'] = ((dummies['Attribute Count_1'] == 1) & (dummies['Clothes_None'] == 1)).astype(int)
+			dummies['naked_1_att'] = ((dummies['Attribute Count_1'] == 1) & (dummies['Clothes_None'] == 1)).astype(int)
 			# dummies['naked_1_att_hat'] = ((dummies['Attribute Count_1'] == 1) & (dummies['Hat_None'] == 0)).astype(int)
 			dummies['fedora'] = (dummies['Hat_Black Fedora 1'] + dummies['Hat_Black Fedora 2'] + dummies['Hat_White Fedora 1'] + dummies['Hat_White Fedora 2'] + dummies['Hat_White Fedora 2'] >= 1 ).astype(int)
 			dummies['backwards_cap'] = (dummies['Hat_Black Backwards Cap'] + dummies['Hat_Blue Backwards Cap'] + dummies['Hat_Green Backwards Cap'] + dummies['Hat_Orange Backwards Cap'] + dummies['Hat_Purple Backwards Cap'] + dummies['Hat_Solana Backwards Cap'] >= 1 ).astype(int)
@@ -368,6 +391,9 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 				del dummies[c]
 		pred_cols = num_features + list(dummies.columns)
 		pred_cols = [ c for c in pred_cols if not c in model_exclude ]
+
+		if len(sales) < 1000:
+			pred_cols = [ x for x in pred_cols if 'rank' in x or 'is_top_' in x ]
 
 		# create training df
 		sales['token_id'] = sales.token_id.astype(str)
@@ -388,6 +414,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 			matching = hat[['token_id','color']].merge(clothes[['token_id','color']])
 			matching['matching'] = 1
 			matching = matching[['token_id','matching']]
+			dummies = merge(dummies, matching, on=['token_id'], how='left').fillna(0)
 			df = merge(df, matching, on=['token_id'], how='left').fillna(0)
 			test = merge(test, matching, on=['token_id'], how='left').fillna(0)
 			pred_cols.append('matching')
@@ -499,7 +526,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 			df[rar_adj_target_col] = df[target_col] - df['rarity_value_'+it]
 			# test[rar_adj_target_col] = test[target_col] - test['rarity_value_'+it]
 			y_val_rar_adj = df[rar_adj_target_col].values
-			models = ['las','ridge'] if target_col == 'rel_price_1' else ['las','ridge','rfr']
+			models = ['las','ridge'] if target_col == 'rel_price_1' or len(sales) < 1000 else ['las','ridge','rfr']
 			for model in models:
 				cur_std_pred_cols = deepcopy(std_pred_cols)
 				print(model)
@@ -648,6 +675,9 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 		len(test[test.pred <= CUR_FLOOR * 1.02])
 		if not check_exclude:
 			test['pred_price'] = test.pred_price.apply(lambda x: (x*0.985) )
+		dff = test.pred_price.min() - CUR_FLOOR
+		if dff > 0:
+			test['pred_price'] = test.pred_price - dff
 		len(test[test.pred_price <= CUR_FLOOR])
 		test['pred_sd'] = test.pred_price * pe_sd
 		test = test.sort_values(['collection','token_id'])
@@ -695,6 +725,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 	# feature_values = feature_values.merge(n)
 	# feature_values['pct_vs_baseline'] = feature_values.pct_vs_baseline / feature_values.n
 	# del feature_values['n']
+	feature_values[ (feature_values.collection == 'Galactic Angels') ]
 	feature_values[ (feature_values.collection == 'Solana Monkey Business') &  (feature_values.feature_name == 'Clothes')  ]
 	feature_values[ (feature_values.collection == 'Solana Monkey Business') & (feature_values.feature_name == 'Clothes') & (feature_values.feature_value == 'Poncho') ]
 	attributes[ (attributes.collection == 'Solana Monkey Business') & (attributes.feature_name == 'Clothes') & (attributes.feature_value == 'Poncho') & (attributes.token_id == '1') ]
@@ -739,6 +770,9 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 	attributes = pd.read_csv('./data/attributes.csv')
 	attributes[attributes.rarity.isnull()]
 	feature_values.to_csv('./data/feature_values.csv', index=False)
+	feature_values[feature_values.collection == 'Galactic Angels'].pct_vs_baseline.unique()
+	feature_values[ (feature_values.collection == 'Galactic Angels') & (feature_values.feature_name == 'Background')].feature_value.unique()
+	attributes[attributes.collection == 'Galactic Angels'].head()
 
 	# metadata = pd.read_csv('./data/metadata.csv')
 	# metadata['collection'] = metadata.collection.apply(lambda x: clean_name(x))
@@ -752,7 +786,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 	# metadata.to_csv('./data/metadata.csv', index=False)
 
 
-	feature_values.to_csv('./data/feature_values.csv', index=False)
+	# feature_values.to_csv('./data/feature_values.csv', index=False)
 
 	file_to_store = open('./objects/saved_params.pickle', 'wb')
 	pickle.dump(saved_params, file_to_store)
@@ -776,5 +810,5 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 
 # train_model(True, False)
 # train_model(False, False)
-train_model(False, True)
+# train_model(False, True)
 

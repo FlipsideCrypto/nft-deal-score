@@ -5,7 +5,6 @@ from time import sleep
 from copy import deepcopy
 import random
 
-from utils import clean_name
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
@@ -13,6 +12,7 @@ os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 import scrape_sol_nfts as ssn
 import load_data as ld
 import solana_model as sm
+from utils import clean_name
 
 browser = webdriver.Chrome()
 
@@ -160,7 +160,7 @@ def update_token_ids():
 		print(df.groupby('collection').token_id.count() )
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
-update_token_ids()
+# update_token_ids()
 # add_model_sales()
 # sm.train_model(False, True)
 

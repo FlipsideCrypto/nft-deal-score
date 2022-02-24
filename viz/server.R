@@ -408,7 +408,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Stoned Ape Crew'
+			, selected = 'Galactic Angels'
 			, choices = choices
 			, width = "100%"
 		)
@@ -491,9 +491,6 @@ server <- function(input, output, session) {
         if (nrow(data)) {
             p <- format(round(mean(head(data$price, 100)), 1), big.mark=',')
             f <- format(round(mean(head(data$vs_floor, 100)), 1), big.mark=',')
-            print('p')
-            print(p)
-            print(f)
             t <- paste0(p, ' $SOL (+',f,' vs the floor)')
         }
 		paste0(t)
@@ -515,9 +512,13 @@ server <- function(input, output, session) {
 					chain == 'Solana'
 					, 'HowRareIs'
 					, ifelse(
-						selected == 'Levana Dragon Eggs'
+						selected %in% c('Levana Dragon Eggs')
 						, 'Collection'
-						, 'NotFoundTerra'
+						, ifelse(
+							selected %in% c('Galactic Angels')
+							, 'Rarity'
+							, 'NotFoundTerra'
+						)
 					)
 				)
 				t <- paste0(a, " Rank #", format(cur_1$nft_rank[1], big.mark=",")," / ",format(nrow(cur_0), big.mark=","))
@@ -606,6 +607,8 @@ server <- function(input, output, session) {
 		}
 		cur <- attributes[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
 		cur <- merge( cur, feature_values[collection == eval(selected), list(feature_name, feature_value, pct_vs_baseline) ], all.x=TRUE )
+		print('cur')
+		print(cur)
 		cur <- cur[order(rarity)]
 		# floor <- getFloors()[2]
 		# log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
@@ -639,9 +642,9 @@ server <- function(input, output, session) {
 		# reactable(data[, list( feature, value, rarity, vs_baseline, pred_vs_baseline, pct_vs_baseline )],
 		# data <- data[, list( feature, value, rarity, pct_vs_baseline )]
 		data <- data[, list( feature_name, feature_value, rarity, pct_vs_baseline )]
+		print('head(data, 3)')
+		print(head(data, 3))
 		data[, pct_vs_baseline := ifelse( is.na(pct_vs_baseline), '', paste0('+', format(round(pct_vs_baseline*1000)/10, digits=4, decimal.mark=".", big.mark=",", trim = T), '%') ) ]
-		print('head(data, 10)')
-		print(head(data, 10))
 		reactable(data,
 			defaultColDef = colDef(
 				headerStyle = list(background = "#10151A")
@@ -908,7 +911,6 @@ server <- function(input, output, session) {
 		if( length(selected) == 0 ) {
 			return(NULL)
 		}
-        # data <- future(getSalesData()) %...>% head() %>% print()
         data <- getSalesData()
 
         data[, mn_20 := paste0(format(round(mn_20, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
@@ -1116,9 +1118,6 @@ server <- function(input, output, session) {
 		df <- merge(df, tokens[collection == eval(selected), list(collection, token_id, image_url)] )
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
-        print('getListingData')
-        print(tuple)
-        print(floors)
 
 		df[, pred_price_0 := pred_price ]
 		df[, pred_price := pred_price + eval(tuple[1]) + ( eval(tuple[2]) * pred_price / eval(floors[1]) ) ]
@@ -1145,8 +1144,6 @@ server <- function(input, output, session) {
 		if( nrow(df) == 0 ) {
 			return(NULL)
 		}
-        print('head(df)')
-        print(head(df))
 		df <- df[ deal_score >= 10 ]
 		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
         f <- min(df[price > 0]$price)

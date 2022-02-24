@@ -238,6 +238,7 @@ def calculate_deal_scores(listings, alerted):
 def scrape_randomearth(browser):
 	print('Querying randomearth.io sales...')
 	d_address = {
+		'Galactic Angels': 'terra13nccm82km0ttah37hkygnvz67hnvkdass24yzv',
 		'Galactic Punks': 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
 		'LunaBulls': 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2',
 		'Levana Dragon Eggs': 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg',
