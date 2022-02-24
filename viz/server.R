@@ -491,7 +491,9 @@ server <- function(input, output, session) {
         if (nrow(data)) {
             p <- format(round(mean(head(data$price, 100)), 1), big.mark=',')
             f <- format(round(mean(head(data$vs_floor, 100)), 1), big.mark=',')
-            t <- paste0(p, ' $SOL (+',f,' vs the floor)')
+			chain <- getChain()
+			currency <- ifelse( chain == 'Solana', 'SOL', 'LUNA' )
+            t <- paste0(p, ' $',currency,' (+',f,' vs the floor)')
         }
 		paste0(t)
 	})
