@@ -408,7 +408,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Galactic Angels'
+			, selected = 'Solana Monkey Business'
 			, choices = choices
 			, width = "100%"
 		)

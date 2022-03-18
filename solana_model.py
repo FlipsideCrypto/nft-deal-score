@@ -145,7 +145,7 @@ def get_coefs(cols, coef):
 	coefs = coefs.sort_values('val', ascending=0)
 	return(coefs)
 
-def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
+def train_model(check_exclude=False, supplement_with_listings=True, use_saved_params=True):
 	exclude = [
 		( 'aurory', 2239, 3500 )
 		, ( 'aurory', 1876, 789 )
@@ -243,7 +243,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 		# listings = listings[listings.collection.isin(pred_price.collection.unique())]
 		floor = s_df.sort_values('timestamp').groupby('collection').tail(1)[['collection','mn_20']]
 		tmp = merge(listings, pred_price, ensure=False)
-		tmp = tmp[tmp.price < tmp.pred_price]
+		tmp = tmp[ (tmp.price < tmp.pred_price) | ((tmp.collection == 'Galactic Angels') & (tmp.pred_price >= 20) & (tmp.price < (tmp.pred_price * 2))) ]
 		tmp['timestamp'] = tmp.block_timestamp.astype(int)
 		tmp['days_ago'] = tmp.block_timestamp.apply(lambda x: (datetime.today() - x).days ).astype(int)
 		tmp = merge(tmp, floor)
@@ -318,10 +318,10 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 	collection = 'Galactic Punks'
 	collection = 'Stoned Ape Crew'
 	collections = ['Levana Dragon Eggs']
-	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	collections = ['Stoned Ape Crew']
 	collections = ['Solana Monkey Business']
 	collections = ['Galactic Angels']
+	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	for collection in collections:
 		# if collection == 'Stoned Ape Crew':
 		# 	continue
@@ -414,7 +414,7 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 			matching = hat[['token_id','color']].merge(clothes[['token_id','color']])
 			matching['matching'] = 1
 			matching = matching[['token_id','matching']]
-			dummies = merge(dummies, matching, on=['token_id'], how='left').fillna(0)
+			# dummies = merge(dummies, matching, on=['token_id'], how='left').fillna(0)
 			df = merge(df, matching, on=['token_id'], how='left').fillna(0)
 			test = merge(test, matching, on=['token_id'], how='left').fillna(0)
 			pred_cols.append('matching')
@@ -675,6 +675,8 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 		len(test[test.pred <= CUR_FLOOR * 1.02])
 		if not check_exclude:
 			test['pred_price'] = test.pred_price.apply(lambda x: (x*0.985) )
+		if collection == 'Galactic Angels':
+			test['pred_price'] = test.pred_price.apply(lambda x: (x** 1.05) * 1.2 ) 
 		dff = test.pred_price.min() - CUR_FLOOR
 		if dff > 0:
 			test['pred_price'] = test.pred_price - dff
@@ -812,3 +814,4 @@ def train_model(check_exclude, supplement_with_listings, use_saved_params=True):
 # train_model(False, False)
 # train_model(False, True)
 
+# train_model()

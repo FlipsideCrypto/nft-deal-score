@@ -27,8 +27,6 @@ if False:
 		alerted = ssn.calculate_deal_scores(listings, alerted)
 		sleep(10 * 60)
 
-
-
 # sales = pd.read_csv('./data/sales.csv')
 # pred_price = pd.read_csv('./data/pred_price.csv').sort_values('token_id')
 # pred_price['rank'] = pred_price.groupby('collection').pred_price.rank(ascending=0)
@@ -162,5 +160,5 @@ def update_token_ids():
 
 # update_token_ids()
 # add_model_sales()
-# sm.train_model(False, True)
+sm.train_model()
 
