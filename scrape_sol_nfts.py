@@ -404,7 +404,8 @@ def scrape_recent_sales():
 		cur = pd.DataFrame(j)
 		cur['collection'] = 'degenapes' if collection == 'degenape' else collection
 		cur['sale_date'] = cur.date.apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S.000Z'))
-		cur['token_id'] = cur.name.apply(lambda x: int(re.split('#', x)[1]) )
+		cur['token_id'] = cur.name.apply(lambda x: int(re.split('#', x)[1]) if '#' in x else -1 )
+		cur = cur[cur.token_id >= 0]
 		sales = sales.append( cur[['collection','token_id','price','sale_date']] )
 	l0 = len(o_sales)
 	print(sales.groupby('collection').token_id.count())
