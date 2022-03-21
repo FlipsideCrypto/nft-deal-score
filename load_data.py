@@ -3,15 +3,20 @@ import re
 import os
 import json
 import math
+from tokenize import Imagnumber
 from pandas.io.pytables import Selection
 import requests
 import pandas as pd
 import urllib.request
 import snowflake.connector
+from bs4 import BeautifulSoup
+from time import sleep
+
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
-from utils import clean_name, clean_token_id
+from solana_model import just_float
+from utils import clean_name, clean_token_id, format_num
 
 #########################
 #     Connect to DB     #
@@ -130,7 +135,7 @@ def add_solana_sales():
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
-	print('Queried {} sales'.format(len(sales)))
+	print('Queried {} sales'.format(format_num(len(sales))))
 	sales['chain'] = 'Solana'
 	sales['collection'] = sales.project_name.apply(lambda x: clean_name(x) )
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
@@ -147,13 +152,49 @@ def add_solana_sales():
 	s_df = s_df.append(m)
 	print(s_df.groupby('collection').token_id.count())
 	l1 = len(s_df)
-	print('Added {} sales'.format(l1 - l0))
+	print('Added {} sales'.format(format_num(l1 - l0)))
 	for c in [ 'mint','tmp' ]:
 		if c in s_df:
 			del s_df[c]
 	if 'project_name' in s_df.columns:
 		del s_df['project_name']
 	s_df.to_csv('./data/sales.csv', index=False)
+	pass
+
+def add_eth_sales():
+	print('Adding ETH sales...')
+
+	query = '''
+		SELECT project_name
+		, token_id
+		, block_timestamp AS sale_date
+		, price
+		FROM ethereum.nft_events
+		WHERE project_name IN (
+			'BoredApeYachtClub'
+			, 'MutantApeYachtClub'
+			, 'BoredApeKennelClub'
+		)
+	'''
+	sales = ctx.cursor().execute(query)
+	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
+	sales = clean_colnames(sales)
+	print('Queried {} sales'.format(len(sales)))
+	sales['chain'] = 'Ethereum'
+	sales['collection'] = sales.project_name.apply(lambda x: clean_name(x) )
+	sorted(sales.collection.unique())
+	# m = sales.merge(id_map, how='left', on=['mint','collection'])
+	# m = sales.merge(id_map, how='inner', on=['mint','collection'])
+	# m.sort_values('collection')
+	m = sales[[ 'collection','token_id','sale_date','price','chain' ]]
+	old = pd.read_csv('./data/sales.csv')
+	l0 = len(old)
+	old = old[-old.collection.isin(sales.collection.unique())]
+	old = old.append(m)
+	print(old.groupby('collection').token_id.count())
+	l1 = len(old)
+	print('Added {} sales'.format(l1 - l0))
+	old.to_csv('./data/sales.csv', index=False)
 	pass
 
 def solana_metadata():
@@ -384,64 +425,6 @@ def add_terra_metadata():
 		old.to_csv('./data/metadata.csv', index=False)
 
 def add_terra_sales():
-	# galactic punks
-	# contracts = [
-	# 	'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7'
-	# 	, 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v'
-	# 	, 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg'
-	# 	, 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2'
-	# 	, 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k'
-	# ]
-	# query = '''
-	# WITH orders AS (
-	# 	SELECT tx_id
-	# 	, block_timestamp AS sale_date
-	# 	, msg_value:execute_msg:execute_order:order:order:maker_asset:info:nft:token_id AS token_id
-	# 	, msg_value:execute_msg:execute_order:order:order:maker_asset:info:nft:contract_addr::string AS contract
-	# 	, msg_value:execute_msg:execute_order:order:order:taker_asset:amount::decimal/pow(10,6) AS price
-	# 	FROM terra.msgs 
-	# 	WHERE msg_value:contract::string = 'terra1eek0ymmhyzja60830xhzm7k7jkrk99a60q2z2t' 
-	# 	AND tx_status = 'SUCCEEDED'
-	# 	AND msg_value:execute_msg:execute_order IS NOT NULL
-	# 	AND contract IN ( '{}' )
-	# ), Lorders AS (
-	# 	SELECT tx_id
-	# 	, block_timestamp AS sale_date
-	# 	, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:maker_asset:info:nft:token_id AS token_id
-	# 	, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:maker_asset:info:nft:contract_addr::string AS contract
-	# 	, msg_value:execute_msg:ledger_proxy:msg:execute_order:order:order:taker_asset:amount::decimal/pow(10,6) AS price
-	# 	FROM terra.msgs 
-	# 	WHERE msg_value:contract::string = 'terra1eek0ymmhyzja60830xhzm7k7jkrk99a60q2z2t' 
-	# 	AND tx_status = 'SUCCEEDED'
-	# 	AND msg_value:execute_msg:ledger_proxy:msg:execute_order IS NOT NULL
-	# 	AND contract IN ( '{}' )
-	# ), unioned AS (
-	# 	SELECT * FROM orders
-	# 	UNION ALL 
-	# 	SELECT * FROM Lorders
-	# )
-	# SELECT CASE 
-	# 	WHEN contract = 'terra1p70x7jkqhf37qa7qm4v23g4u4g8ka4ktxudxa7' THEN 'Levana Dust'
-	# 	WHEN contract = 'terra1chrdxaef0y2feynkpq63mve0sqeg09acjnp55v' THEN 'Levana Meteors'
-	# 	WHEN contract = 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg' THEN 'Levana Dragon Eggs'
-	# 	WHEN contract = 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2' THEN 'LunaBulls'
-	# 	WHEN contract = 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k' THEN 'Galactic Punks'
-	# 	ELSE 'Other' 
-	# END AS collection
-	# , sale_date
-	# , token_id
-	# , tx_id
-	# , price
-	# FROM unioned
-	# '''.format( '\', \''.join(contracts), '\', \''.join(contracts) )
-	# sales = ctx.cursor().execute(query)
-	# sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
-	# sales = clean_colnames(sales)
-	# sales.head()
-	# tokens.to_csv('~/Downloads/tmp3.csv', index=False)
-	# tokens[tokens.token_id == '25984997114855639851202718743284654443']
-	
-
 	query = '''
 		WITH 
 		RE_events AS (
@@ -654,6 +637,144 @@ def add_terra_sales():
 	print('Added {} sales'.format(l1 - l0))
 	print(old.groupby(['chain','collection']).token_id.count())
 	old.to_csv('./data/sales.csv', index=False)
+	return
+
+def rarity_tools(browser):
+	data = []
+	collection = 'boredapeyachtclub'
+	collection = 'mutant-ape-yacht-club'
+	collection = 'bored-ape-kennel-club'
+	url = 'https://rarity.tools/{}'.format(collection)
+	browser.get(url)
+	for i in range(201):
+		print(i, len(data))
+		sleep(0.1)
+		soup = BeautifulSoup(browser.page_source)
+		for div in soup.find_all('div', class_='bgCard'):
+			rk = div.find_all('div', class_='font-extrabold')
+			img = div.find_all('img')
+			if len(rk) and len(img):
+				# try:
+				rk = int(just_float(rk[0].text))
+				img_url = re.split('\?', img[0].attrs['src'])[0]
+				token_id = int(re.split('/|\.', img_url)[6])
+				data += [[ collection, token_id, img_url, rk ]]
+				# except:
+				# 	pass
+		# bs = browser.find_elements_by_class_name('smallBtn')
+		browser.find_elements_by_class_name('smallBtn')[4 + int(i > 0)].click()
+		sleep(0.1)
+		# for i in range(len(bs)):
+		# 	print(i, browser.find_elements_by_class_name('smallBtn')[i].text)
+	df = pd.DataFrame(data, columns=['collection','token_id','image_url','nft_rank']).drop_duplicates()
+	len(df)
+	df['chain'] = 'Ethereum'
+	df['clean_token_id'] = df.token_id
+	df['collection'] = df.collection.apply(lambda x: clean_name(x) )
+	len(df)
+	old = pd.read_csv('./data/tokens.csv')
+	l0 = len(old)
+	old = old[-old.collection.isin(df.collection.unique())]
+	old = old.append(df)
+	l1 = len(old)
+	print('Added {} rows'.format(format_num(l1 - l0)))
+	old.tail()
+	old[old.chain == 'Ethereum'].collection.unique()
+	old.to_csv('./data/tokens.csv', index=False)
+
+def eth_metadata_api():
+	old = pd.read_csv('./data/metadata.csv')
+	collection = 'MAYC'
+	seen = sorted(old[old.collection == collection].token_id.unique())
+	a_data = []
+	t_data = []
+	errs = []
+	for i in range(30005):
+		if i % 100 == 1:
+			print(i, len(t_data), len(a_data), len(errs))
+		if i in seen:
+			continue
+		try:
+			url = 'https://boredapeyachtclub.com/api/mutants/{}'.format(i)
+			j = requests.get(url).json()
+
+			t_data += [[ i, j['image'] ]]
+			for a in j['attributes']:
+				a_data += [[ i, a['trait_type'], a['value'] ]]
+		except:
+			errs.append(i)
+	new_mdf = pd.DataFrame(a_data, columns=['token_id','feature_name','feature_value'])
+	new_mdf['collection'] = 'MAYC'
+	new_mdf['chain'] = 'Ethereum'
+	old = old.append(new_mdf)
+	old.to_csv('./data/metadata.csv', index=False)
+
+	new_tdf = pd.DataFrame(t_data, columns=['token_id','image_url'])
+	old = pd.read_csv('./data/tokens.csv')
+	a = old[old.collection == 'MAYC'].token_id.unique()
+	b = new_tdf.token_id.unique()
+	[x for x in b if not x in a]
+	new_mdf['collection'] = 'MAYC'
+	new_mdf['chain'] = 'Ethereum'
+	old = old.append(new_mdf)
+	old.to_csv('./data/metadata.csv', index=False)
+
+def eth_metadata():
+
+	query = '''
+		SELECT contract_name
+		, token_id
+		, token_metadata:Background AS background
+		, token_metadata:Clothes AS clother
+		, token_metadata:Earring AS earring
+		, token_metadata:Eyes AS eyes
+		, token_metadata:Fur AS fur
+		, token_metadata:Hat AS hat
+		, token_metadata:Mouth AS mouth
+		FROM ethereum.nft_metadata
+		WHERE contract_name IN ('MutantApeYachtClub','bayc')
+	'''
+	metadata = ctx.cursor().execute(query)
+	metadata = pd.DataFrame.from_records(iter(metadata), columns=[x[0] for x in metadata.description])
+	metadata = clean_colnames(metadata)
+	metadata['collection'] = metadata.contract_name.apply(lambda x: x[0].upper()+'AYC' )
+
+	ndf = pd.DataFrame()
+	e = [ 'contract_name', 'token_id', 'collection' ]
+	for c in [ c for c in metadata.columns if not c in e ]:
+		cur = metadata[['collection','token_id',c]]
+		cur.columns = [ 'collection','token_id','feature_value' ]
+		cur['feature_name'] = c.title()
+		cur.feature_value.unique()
+		cur['feature_value'] = cur.feature_value.apply(lambda x: x[1:-1] if x else 'None' )
+		ndf = ndf.append(cur)
+	ndf = ndf.drop_duplicates()
+	ndf['chain'] = 'Ethereum'
+	g = ndf.groupby(['collection', 'feature_name', 'feature_value']).token_id.count().reset_index()
+
+
+	old = pd.read_csv('./data/metadata.csv')
+	old.head()
+	l0 = len(old)
+	old = old.append(ndf)
+	l1 = len(old)
+	print('Adding {} rows'.format(l1 - l0))
+	old.to_csv('./data/metadata.csv', index=False)
+
+
+	t_data = []
+	a_data = []
+	for i in range(10000):
+		if i % 100 == 1:
+			print(i, len(t_data), len(a_data))
+		token_id = i + 1
+		url = 'https://us-central1-bayc-metadata.cloudfunctions.net/api/tokens/{}'.format(i)
+		j = requests.get(url).json()
+		t_data += [[ token_id, j['image'] ]]
+		for a in j['attributes']:
+			a_data += [[ token_id, a['trait_type'], a['value'] ]]
+	df = pd.DataFrame(t_data, columns=['token_id',''])
+
 
 ######################################
 #     Grab Data From OpenSea API     #
@@ -662,6 +783,7 @@ def load_api_data():
 	data = []
 	traits_data = []
 	contract_address = '0x60e4d786628fea6478f785a6d7e704777c86a7c6'
+	# url = 'https://api.opensea.io/api/v1/assets?asset_contract_address=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d&limit=20&token_ids=8179'
 	for o in [ 'asc', 'desc' ]:
 		l = 1
 		it = 0
@@ -670,6 +792,7 @@ def load_api_data():
 			if offset % 1000 == 0:
 				print("#{}/{}".format(offset, 20000))
 			r = requests.get('https://api.opensea.io/api/v1/assets?asset_contract_address={}&order_by=pk&order_direction={}&offset={}&limit=50'.format(contract_address, o, offset))
+			# r = requests.get(url)
 			assets = r.json()['assets']
 			l = len(assets)
 			for a in assets:
@@ -690,6 +813,10 @@ def load_api_data():
 	traits['token_id'] = traits.token_id.astype(int)
 	traits.to_csv('./data/mayc_traits.csv', index=False)
 	opensea_data.to_csv('./data/mayc_data.csv', index=False)
+
+	traits = pd.read_csv('./data/mayc_traits.csv')
+	opensea_data = pd.read_csv('./data/mayc_data.csv')
+
 	len(traits.token_id.unique())
 	opensea_data['token_id'] = opensea_data.token_id.astype(int)
 	opensea_data.token_id.max()
@@ -705,7 +832,6 @@ def load_api_data():
 			continue
 		row = row[1]
 		urllib.request.urlretrieve(row['image_url'], './viz/www/img/{}.png'.format(row['token_id']))
-
 
 def load_api_data():
 	results = []

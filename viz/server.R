@@ -30,7 +30,7 @@ server <- function(input, output, session) {
 
 	output$floorpriceinput <- renderUI({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
+		if( selected == '' ) {
 			return(NULL)
 		}
 		textInput(
@@ -416,7 +416,7 @@ server <- function(input, output, session) {
 
 	output$nftselect <- renderUI({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
+		if( selected == '' ) {
 			return(NULL)
 		}
 		choices <- sort(pred_price[collection == eval(selected)]$token_id)
@@ -428,22 +428,34 @@ server <- function(input, output, session) {
 		)
 	})
 	getTokenId <- reactive({
+		if(length(input$tokenid) == 0) {
+			return('')
+		}
 		return(input$tokenid)
 	})
 	getCollection <- reactive({
+		if(length(input$collectionname) == 0) {
+			return('')
+		}
 		return(input$collectionname)
 	})
 	getChain <- reactive({
 		selected <- getCollection()
-		chain <- tokens[collection == eval(selected) ]$chain[1]
-		return(chain)
+		if(selected == '') {
+			return('')
+		}
+		chain <- tokens[collection == eval(selected) ]
+		if(nrow(chain) == 0) {
+			return('')
+		}
+		return(chain$chain[1])
 	})
 
 	output$tokenid <- renderText({
 		id <- getTokenId()
 		t <- ""
 		selected <- getCollection()
-		if( length(id) == 0 | length(selected) == 0 ) {
+		if( length(id) == 0 | selected == '' ) {
 			return(t)
 		}
 		title <- ifelse(
@@ -472,12 +484,12 @@ server <- function(input, output, session) {
 		id <- getTokenId()
 		selected <- getCollection()
 		t <- ""
-		if( length(id) == 0 | length(selected) == 0 ) {
+		if( length(id) == 0 | selected == '' ) {
 			return(t)
 		}
 		if (!is.na(id) & !is.na(selected)) {
 			cur_0 <- pred_price[collection == eval(selected) ]
-			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
+			cur_1 <- cur_0[ token_id == eval(id) ]
 			if (nrow(cur_1)) {
 				t <- paste0("Deal Score Rank #", format(cur_1$rk[1], big.mark=",")," / ",format(nrow(cur_0), big.mark=","))
 			}
@@ -487,6 +499,9 @@ server <- function(input, output, session) {
 
 	output$salesAverage <- renderText({
         data <- getSalesData()
+		if(length(data) == 0) {
+			return(NULL)
+		}
         t <- ''
         if (nrow(data)) {
             p <- format(round(mean(head(data$price, 100)), 1), big.mark=',')
@@ -503,12 +518,12 @@ server <- function(input, output, session) {
 		selected <- getCollection()
 		chain <- getChain()
 		t <- ""
-		if( length(id) == 0 | length(selected) == 0 ) {
+		if( length(id) == 0 | selected == '' ) {
 			return(t)
 		}
 		if (!is.na(id) & !is.na(selected)) {
 			cur_0 <- pred_price[collection == eval(selected) ]
-			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
+			cur_1 <- cur_0[ token_id == eval(id) ]
 			if (nrow(cur_1)) {
                 a <- ifelse( 
 					chain == 'Solana'
@@ -535,6 +550,9 @@ server <- function(input, output, session) {
 		selected <- getCollection()
 		chain <- getChain()
 		t <- ""
+		if (length(id) == 0 | selected == '' | length(chain) == 0) {
+			return(t)
+		}
 		if ( chain == 'Solana' & !is.na(id) & !is.na(selected)) {
 			cur_0 <- pred_price[collection == eval(selected) ]
 			cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
@@ -547,7 +565,7 @@ server <- function(input, output, session) {
 
 	getConvertedPrice <- reactive({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
+		if( selected == '' ) {
 			return(NULL)
 		}
 		log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
@@ -576,7 +594,7 @@ server <- function(input, output, session) {
 		selected <- getCollection()
 
 		t <- ""
-		if( length(id) == 0 ) {
+		if( id == '' ) {
 			return(t)
 		}
 		if ( !is.na(id) ) {
@@ -596,6 +614,9 @@ server <- function(input, output, session) {
 	output$tokenimg <- renderUI({
 		id <- getTokenId()
 		selected <- getCollection()
+		if (length(id) == 0 | selected == '') {
+			return(NULL)
+		}
 		src <- tokens[ (collection == eval(selected)) & (token_id == eval(id)) ]$image_url[1]
 		t <- tags$img(src = src)
 		t
@@ -604,13 +625,11 @@ server <- function(input, output, session) {
 	getAttributesTable <- reactive({
 		id <- getTokenId()
 		selected <- getCollection()
-		if( length(id) == 0 | length(selected) == 0 ) {
+		if( length(id) == 0 | selected == '' ) {
 			return(head(attributes, 0))
 		}
 		cur <- attributes[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
 		cur <- merge( cur, feature_values[collection == eval(selected), list(feature_name, feature_value, pct_vs_baseline) ], all.x=TRUE )
-		print('cur')
-		print(cur)
 		cur <- cur[order(rarity)]
 		# floor <- getFloors()[2]
 		# log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
@@ -644,8 +663,6 @@ server <- function(input, output, session) {
 		# reactable(data[, list( feature, value, rarity, vs_baseline, pred_vs_baseline, pct_vs_baseline )],
 		# data <- data[, list( feature, value, rarity, pct_vs_baseline )]
 		data <- data[, list( feature_name, feature_value, rarity, pct_vs_baseline )]
-		print('head(data, 3)')
-		print(head(data, 3))
 		data[, pct_vs_baseline := ifelse( is.na(pct_vs_baseline), '', paste0('+', format(round(pct_vs_baseline*1000)/10, digits=4, decimal.mark=".", big.mark=",", trim = T), '%') ) ]
 		reactable(data,
 			defaultColDef = colDef(
@@ -672,7 +689,7 @@ server <- function(input, output, session) {
 
 	output$featurestable <- renderReactable({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
+		if( selected == '' ) {
 			return(NULL)
 		}
 		data <- feature_values[ collection == eval(selected)]
@@ -698,6 +715,9 @@ server <- function(input, output, session) {
 
 	getPredPrice <- reactive({
 		selected <- getCollection()
+		if (selected == '') {
+			return(t)
+		}
 		data <- pred_price[ collection == eval(selected), list( token_id, rk, pred_price )]
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
@@ -708,7 +728,7 @@ server <- function(input, output, session) {
 
 	output$nftstable <- renderReactable({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
+		if( selected == '' ) {
 			return(NULL)
 		}
 		data <- getPredPrice()
@@ -751,6 +771,9 @@ server <- function(input, output, session) {
 		data <- data[, list( token_id, image_url, block_timestamp, price, pred, mn_20, rk, nft_rank )]
 
         data <- data[order(-block_timestamp)]
+		if(nrow(data) == 0) {
+			return(data)
+		}
 
         data[, vs_floor := pmax(0, price - mn_20) ]
 
@@ -769,13 +792,16 @@ server <- function(input, output, session) {
 
     getSalesData <- reactive({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
+		if( selected == '' ) {
 			return(NULL)
 		}
 		# data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred, mn_20 )]
 		data <- sales[ collection == eval(selected)]
 		m <- pred_price[collection == eval(selected), list(token_id, rk)]
 		data <- merge(data, m, all.x=TRUE)
+		if(nrow(data) == 0) {
+			return(data.table())
+		}
 
         if(input$maxnftrank2 != '') {
             r <- as.numeric(input$maxnftrank2)
@@ -910,10 +936,13 @@ server <- function(input, output, session) {
 
 	output$salestable <- renderReactable({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
+		if( selected == '' ) {
 			return(NULL)
 		}
         data <- getSalesData()
+		if(nrow(data) == 0) {
+			return(NULL)
+		}
 
         data[, mn_20 := paste0(format(round(mn_20, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
         data[, price := paste0(format(round(price, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
@@ -951,7 +980,7 @@ server <- function(input, output, session) {
 		id <- getTokenId()
 		selected <- getCollection()
 		tuple <- getConvertedPrice()
-		if( length(id) == 0 | length(selected) == 0 ) {
+		if( length(id) == 0 | selected == '' ) {
 			return(data.table())
 		}
 		cur <- pred_price[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
@@ -1112,7 +1141,7 @@ server <- function(input, output, session) {
 
 	getListingData <- reactive({
 		selected <- getCollection()
-		if( length(selected) == 0 ) {
+		if( selected == '' ) {
 			return(data.table())
 		}
 
@@ -1234,7 +1263,7 @@ server <- function(input, output, session) {
 	output$listingurl <- renderUI({
 		selected <- getCollection()
 		chain <- getChain()
-		if(chain == 'Terra') {
+		if(chain != 'Solana') {
 			return(NULL)
 		}
 		name <- convertCollectionName(selected)
@@ -1247,6 +1276,9 @@ server <- function(input, output, session) {
 	output$solanaimg <- renderUI({
 		chain <- getChain()
 		class = ''
+		if(length(chain) == 0) {
+			return(NULL)
+		}
 		if(chain != 'Solana') {
 			class <- 'opacity50'
 		}
@@ -1257,6 +1289,9 @@ server <- function(input, output, session) {
 	output$terraimg <- renderUI({
 		chain <- getChain()
 		class = ''
+		if(length(chain) == 0) {
+			return(NULL)
+		}
 		if(chain != 'Terra') {
 			class <- 'opacity50'
 		}
@@ -1267,6 +1302,9 @@ server <- function(input, output, session) {
 	output$ethereumimg <- renderUI({
 		chain <- getChain()
 		class = ''
+		if(length(chain) == 0) {
+			return(NULL)
+		}
 		if(chain != 'Ethereum') {
 			class <- 'opacity50'
 		}
@@ -1278,7 +1316,10 @@ server <- function(input, output, session) {
 		id <- getTokenId()
 		selected <- getCollection()
 		chain <- getChain()
-		if( chain != 'Solana' | length(id) == 0 | length(selected) == 0 ) {
+		if(length(id) == 0 | selected == '' | length(chain) == 0) {
+			return(NULL)
+		}
+		if( chain != 'Solana' | length(id) == 0 | selected == '' ) {
 			return(NULL)
 		}
 		if (selected == 'Thugbirdz') {
@@ -1289,7 +1330,7 @@ server <- function(input, output, session) {
 		if (name == 'degen-ape-academy') name <- 'degenapes'
 		href <- paste0('https://howrare.is/',name,'/',id)
         cur_0 <- pred_price[collection == eval(selected) ]
-        cur_1 <- cur_0[ token_id == eval(as.numeric(input$tokenid)) ]
+        cur_1 <- cur_0[ token_id == eval(id) ]
 
 		url <- span("*Rarity from ", a("howrare.is", href=href),paste0(" (rank #",format(cur_1$nft_rank[1], big.mark = ','),") used in the model"))
 		HTML(paste(url))
@@ -1299,7 +1340,10 @@ server <- function(input, output, session) {
 		id <- getTokenId()
 		selected <- getCollection()
 		chain <- getChain()
-		if( chain != 'Terra' | length(id) == 0 | length(selected) == 0 ) {
+		if(chain == '') {
+			return(NULL)
+		}
+		if( chain != 'Terra' | length(id) == 0 | selected == '' ) {
 			return(NULL)
 		}
 		href <- tokens[ (collection == eval(selected)) & (token_id == eval(id)) ]$market_url[1]

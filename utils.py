@@ -12,8 +12,16 @@ clean_names = {
 	,'boryokudragonz': 'Boryoku Dragonz'
 	,'degods': 'DeGods'
 	,'lunabulls': 'LunaBulls'
+	,'boredapekennelclub': 'BAKC'
+	,'boredapeyachtclub': 'BAYC'
+	,'mutantapeyachtclub': 'MAYC'
+	,'bayc': 'BAYC'
+	,'mayc': 'MAYC'
 	# ,'stonedapecrew': 'Stoned Ape Crew'
 }
+
+def format_num(x):
+	return('{:,}'.format(round(x, 2)))
 
 def clean_token_id(df):
 	tokens = pd.read_csv('./data/tokens.csv')

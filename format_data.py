@@ -239,6 +239,8 @@ def levana():
 
 def solana():
 	mints = pd.read_csv('./data/solana_rarities.csv')
+	sorted(mints.collection.unique())
+	mints[mints.collection == 'smb'][['mint_address']].to_csv('~/Downloads/tmp.csv', index=False)
 	collection_info = pd.read_csv('./data/collection_info.csv')
 	metadata = pd.read_csv('./data/metadata.csv')
 	metadata.collection.unique()

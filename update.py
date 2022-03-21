@@ -51,9 +51,10 @@ ld.add_terra_sales()
 ld.add_solana_sales()
 
 # update listings
+# ssn.scrape_listings(browser, ['smb'])
+ssn.scrape_listings(browser)
 ssn.scrape_randomearth(browser)
 # ssn.scrape_listings(browser, ['smb','aurory'])
-ssn.scrape_listings(browser)
 
 # update model
 # ssn.convert_collection_names()
