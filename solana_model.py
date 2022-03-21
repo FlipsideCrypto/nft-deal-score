@@ -3,6 +3,7 @@ import os
 import re
 import json
 import pickle
+from textwrap import indent
 import warnings
 import requests
 import numpy as np
@@ -19,9 +20,9 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression, RidgeCV, Lasso, Ridge
 from sklearn.model_selection import train_test_split, KFold, GridSearchCV, RandomizedSearchCV
 
-from utils import merge, clean_name
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
+from utils import merge, clean_name
 
 warnings.filterwarnings('ignore')
 
@@ -154,6 +155,8 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		, ( 'aurory', 9239, 1700 )
 	]
 	s_df = get_sales(check_exclude, exclude)
+	s_df[s_df.collection == 'Solana Monkey Business'].to_csv('./tableau/data/smb_sales.csv', index=False)
+	s_df = s_df[-s_df.collection.isin(['BAYC','MAYC'])]
 	s_df[s_df.collection.isnull()]
 	# s_df = pd.read_csv('./data/sales.csv').rename(columns={'sale_date':'block_timestamp'})
 	# s_df['collection'] = s_df.collection.apply(lambda x: clean_name(x))
@@ -182,6 +185,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	sorted([x for x in m_df.feature_name.unique() if 'nft_' in x])
 	m_df['token_id'] = m_df.token_id.astype(str)
 	m_df['collection'] = m_df.collection.apply(lambda x: clean_name(x))
+	sorted(m_df.collection.unique())
 	# remove ones that are not actually metadata
 	m_df = m_df[ -m_df.feature_name.isin([ 'price','last_sale','feature_name','feature_value' ]) ]
 	m_df['feature_value'] = m_df.feature_value.apply(lambda x: re.split("\(", re.sub("\"", "", x))[0] if type(x)==str else x )
@@ -322,6 +326,9 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collections = ['Solana Monkey Business']
 	collections = ['Galactic Angels']
 	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
+	collections = [ x for x in collections if not x in ['BAYC','MAYC','Bakc'] ]
+	sorted(collections)
+	collection = 'BAYC'
 	for collection in collections:
 		# if collection == 'Stoned Ape Crew':
 		# 	continue
@@ -371,17 +378,17 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		dummies = pd.get_dummies(cat_metadata[cat_features])
 		# dummies.head(1).to_csv('~/Downloads/tmp2.csv', index=False)
 		if collection == 'Solana Monkey Business':
-			dummies['matching_white'] = ((dummies['Clothes_Beige Smoking'] == 1) & ((dummies['Hat_White Fedora 1'] + dummies['Hat_White Fedora 2']) == 1)).astype(int)
-			dummies['matching_black'] = ((dummies['Clothes_Black Smoking'] == 1) & ((dummies['Hat_Black Fedora 1'] + dummies['Hat_Black Fedora 2'] + dummies['Hat_Black Top Hat']) == 1)).astype(int)
-			dummies['matching_top'] = ((dummies['matching_black'] == 1) | (dummies['matching_white']== 1)).astype(int)
-			dummies['matching_cop'] = ((dummies['Clothes_Cop Vest'] == 1) & ((dummies['Hat_Cop Hat']==1))).astype(int)
+			# dummies['matching_white'] = ((dummies['Clothes_Beige Smoking'] == 1) & ((dummies['Hat_White Fedora 1'] + dummies['Hat_White Fedora 2']) == 1)).astype(int)
+			# dummies['matching_black'] = ((dummies['Clothes_Black Smoking'] == 1) & ((dummies['Hat_Black Fedora 1'] + dummies['Hat_Black Fedora 2'] + dummies['Hat_Black Top Hat']) == 1)).astype(int)
+			# dummies['matching_top'] = ((dummies['matching_black'] == 1) | (dummies['matching_white']== 1)).astype(int)
+			# dummies['matching_cop'] = ((dummies['Clothes_Cop Vest'] == 1) & ((dummies['Hat_Cop Hat']==1))).astype(int)
 			# dummies['matching_green'] = ((dummies['Clothes_Green Smoking'] == 1) & ((dummies['Hat_Green Top Hat']) == 1)).astype(int)
 			dummies['naked_1_att'] = ((dummies['Attribute Count_1'] == 1) & (dummies['Clothes_None'] == 1)).astype(int)
 			# dummies['naked_1_att_hat'] = ((dummies['Attribute Count_1'] == 1) & (dummies['Hat_None'] == 0)).astype(int)
 			dummies['fedora'] = (dummies['Hat_Black Fedora 1'] + dummies['Hat_Black Fedora 2'] + dummies['Hat_White Fedora 1'] + dummies['Hat_White Fedora 2'] + dummies['Hat_White Fedora 2'] >= 1 ).astype(int)
 			dummies['backwards_cap'] = (dummies['Hat_Black Backwards Cap'] + dummies['Hat_Blue Backwards Cap'] + dummies['Hat_Green Backwards Cap'] + dummies['Hat_Orange Backwards Cap'] + dummies['Hat_Purple Backwards Cap'] + dummies['Hat_Solana Backwards Cap'] >= 1 ).astype(int)
-			del dummies['matching_white']
-			del dummies['matching_black']
+			# del dummies['matching_white']
+			# del dummies['matching_black']
 
 		cat_metadata = pd.concat([ cat_metadata.reset_index(drop=True), dummies.reset_index(drop=True) ], axis=1)
 		# del cat_metadata['pct']
@@ -390,7 +397,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 			if c in dummies.columns:
 				del dummies[c]
 		pred_cols = num_features + list(dummies.columns)
-		pred_cols = [ c for c in pred_cols if not c in model_exclude ]
+		pred_cols = [ c for c in pred_cols if not c in model_exclude+['Matching_No'] ]
 
 		if len(sales) < 1000:
 			pred_cols = [ x for x in pred_cols if 'rank' in x or 'is_top_' in x ]
@@ -406,18 +413,21 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		ensure = not collection in ['Aurory','Stoned Ape Crew']
 		test = merge(num_metadata, cat_metadata, ['collection','token_id'], ensure=False)
 
-		if collection == 'Solana Monkey Business':
-			hat = metadata[ metadata.feature_name == 'Hat' ]
-			hat['color'] = hat.feature_value.apply(lambda x: re.split(' ', x)[0] )
-			clothes = metadata[ metadata.feature_name == 'Clothes' ]
-			clothes['color'] = clothes.feature_value.apply(lambda x: re.split(' ', x)[0] )
-			matching = hat[['token_id','color']].merge(clothes[['token_id','color']])
-			matching['matching'] = 1
-			matching = matching[['token_id','matching']]
-			# dummies = merge(dummies, matching, on=['token_id'], how='left').fillna(0)
-			df = merge(df, matching, on=['token_id'], how='left').fillna(0)
-			test = merge(test, matching, on=['token_id'], how='left').fillna(0)
-			pred_cols.append('matching')
+		# if collection == 'Solana Monkey Business':
+		# 	hat = metadata[ metadata.feature_name == 'Hat' ]
+		# 	hat['color'] = hat.feature_value.apply(lambda x: re.split(' ', x)[0] )
+		# 	clothes = metadata[ metadata.feature_name == 'Clothes' ]
+		# 	clothes['color'] = clothes.feature_value.apply(lambda x: re.split(' ', x)[0] )
+		# 	matching = hat[['token_id','color']].merge(clothes[['token_id','color']])
+		# 	app = cat_metadata[ (dummies.matching_top == 1) | (dummies.matching_cop == 1) ][['token_id']]
+		# 	matching = matching[['token_id']].append(app[['token_id']]).drop_duplicates()
+		# 	matching['matching'] = 1
+		# 	del dummies['matching_cop']
+		# 	del dummies['matching_top']
+		# 	# dummies = merge(dummies, matching, on=['token_id'], how='left').fillna(0)
+		# 	df = merge(df, matching, on=['token_id'], how='left').fillna(0)
+		# 	test = merge(test, matching, on=['token_id'], how='left').fillna(0)
+		# 	pred_cols.append('matching')
 
 		for c in num_features:
 			df[c] = df[c].apply(lambda x: just_float(x))
@@ -691,15 +701,22 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 
 
 		imp = []
-		for c in dummies.columns:
+		# a = [ 'matching' ] if collection == 'Solana Monkey Business' else []
+		for c in list(dummies.columns):
 			md = test[test[c] == 1].pred_price.median()
 			md_0 = test.pred_price.quantile(0.475)
 			imp += [[ collection, c, md_0, md ]]
 		# imp = pd.DataFrame(imp, columns=['collection','feature_name',''])
 		imp = pd.DataFrame(imp, columns=['collection','col','col_md','md']).sort_values('md', ascending=0)
 		imp['pct_vs_baseline'] = ((imp.md / imp.col_md) - 1).apply(lambda x: max(0, x))
-		imp['feature_name'] = imp.col.apply(lambda x: re.split('_', x)[0] )
+		imp['feature_name'] = imp.col.apply(lambda x: re.split('_', x)[0].title() )
 		imp['feature_value'] = imp.col.apply(lambda x: re.split('_', x)[1] if '_' in x else None )
+		sorted(imp.feature_name.unique())
+		imp.loc[imp.col == 'Matching_No', 'pct_vs_baseline'] = 0
+		imp[imp.feature_name == 'Matching']
+		# if 'matching' in a:
+		# 	imp.loc[imp.feature_name == 'Matching', 'feature_value'] = 'Yes'
+		# 	test[test.matching==1].to_csv('~/Downloads/tmp1.csv', index=False)
 		feature_values = feature_values.append(imp[['collection','feature_name','feature_value','pct_vs_baseline']])
 
 		cols = metadata.feature_name.unique()

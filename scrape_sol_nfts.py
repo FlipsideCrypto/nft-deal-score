@@ -21,6 +21,9 @@ os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
 from utils import clean_token_id, merge, clean_name
 
+# howrare.is api
+# https://api.howrare.is/v0.1/collections/smb/only_rarity
+
 # browser = webdriver.Chrome()
 
 # old = pd.read_csv('./data/tokens.csv')
@@ -447,6 +450,65 @@ def scrape_solanafloor():
 	df = pd.DataFrame(data, columns=['project','is_lite'])
 	df.to_csv('./data/sf_projects.csv', index=False)
 
+def scrape_opensea_listings(browser):
+	data = []
+	opensea_d = {
+		'BAYC': 'boredapeyachtclub'
+		, 'MAYC': 'mutant-ape-yacht-club'
+	}
+	for collection in [ 'BAYC','MAYC' ]:
+		c = opensea_d[collection]
+		url = 'https://opensea.io/collection/{}'.format(c)
+		browser.get(url)
+		browser.find_elements_by_class_name('Buttonreact__StyledButton-sc-glfma3-0')[-1].click()
+		seen = []
+		sleep(1)
+
+		it = 0
+		while True:
+			it += 1
+			prv = len(seen)
+			soup = BeautifulSoup(browser.page_source)
+			ars = soup.find_all('article', class_='AssetSearchList--asset')
+			print(i, len(ars), len(seen))
+			for a in ars:
+				if not 'Price' in a.text:
+					continue
+				try:
+					token_id = int(a.find_all('div', class_='AssetCardFooter--name')[0].text)
+					price = float(a.find_all('div', class_='Price--amount')[0].text)
+				except:
+					sleep(2)
+				token_id = int(a.find_all('div', class_='AssetCardFooter--name')[0].text)
+				price = float(a.find_all('div', class_='Price--amount')[0].text)
+				if not token_id in seen:
+					data += [[ collection, token_id, price ]]
+					seen.append(token_id)
+
+			browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+			# scroll = browser.find_elements_by_class_name('AssetSearchList--asset')
+			# scroll = browser.find_elements_by_class_name('Asset--loaded')
+			# j = len(scroll) - 1
+			# # j = 0
+			# try:
+			# 	browser.execute_script("arguments[0].scrollIntoView();", scroll[-1] )
+			# except:
+			# 	sleep(1)
+			# 	try:
+			# 		browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
+			# 	except:
+			# 		sleep(10)
+			# 		browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
+			if len(seen) == prv:
+				break
+			prv = len(seen)
+			sleep(4)
+	df = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
+	df['chain'] = 'Ethereum'
+	old = pd.read_csv('./data/listings.csv')
+	old = old[-old.collection.isin(df.collection.unique())]
+	old = old.append(df)
+	old.to_csv('./data/listings.csv', index=False)
 
 def scrape_listings(browser, collections = [ 'stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
@@ -998,12 +1060,6 @@ def save_img():
 		src = requests.get(url).json()['nft']['image']
 		src = 'https://arweave.net/{}'.format(src)
 		urllib.request.urlretrieve(src, './viz/www/img/{}/{}.png'.format('smb', i))
-
-def scratch():
-	# get metadata
-	# add rank
-	pass
-
 
 def scrape_how_rare_is():
 	d = {
