@@ -396,14 +396,16 @@ def scrape_recent_sales():
 	o_sales['collection'] = o_sales.collection.apply(lambda x: 'degenapes' if x == 'degenape' else x )
 	o_sales.groupby('collection').sale_date.max()
 	sales = pd.DataFrame()
+	collections = [ 'thugbirdz','degenape']
 	collections = [ 'aurory','thugbirdz','degenape']
 	collection = 'peskypenguinclub'
 	for collection in collections:
 		url = 'https://qzlsklfacc.medianetwork.cloud/all_sold_per_collection_day?collection={}'.format(collection)
-		# url = 'https://qzlsklfacc.medianetwork.cloud/all_sold_per_collection_day?collection={}'.format('degenape')
-		# url = 'https://hkgwtdvfyh.medianetwork.cloud/all_sold_per_collection_day?collection={}'.format(collection)
-		r = requests.get(url)
-		j = r.json()
+		try:
+			j = requests.get(url).json()
+		except:
+			sleep(2)
+			j = requests.get(url).json()
 		cur = pd.DataFrame(j)
 		cur['collection'] = 'degenapes' if collection == 'degenape' else collection
 		cur['sale_date'] = cur.date.apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S.000Z'))
@@ -412,16 +414,17 @@ def scrape_recent_sales():
 		sales = sales.append( cur[['collection','token_id','price','sale_date']] )
 	l0 = len(o_sales)
 	print(sales.groupby('collection').token_id.count())
-	sales['tmp'] = sales.sale_date.apply(lambda x: str(x)[:10] )
+	sales['tmp'] = sales.sale_date.apply(lambda x: str(x)[:5] )
 	sales['chain'] = 'Solana'
 	o_sales['chain'] = o_sales['chain'].fillna('Solana')
 	o_sales[['chain','collection']].drop_duplicates()
-	o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:10] )
+	o_sales['tmp'] = o_sales.sale_date.apply(lambda x: str(x)[:5] )
 	o_sales = o_sales.append(sales)
 	o_sales['token_id'] = o_sales.token_id.apply(lambda x: str(x) )
 	o_sales['collection'] = o_sales.collection.apply(lambda x: clean_name(x) )
 	o_sales = o_sales.drop_duplicates(subset=['collection','token_id','tmp','price'])
 	o_sales[o_sales.token_id=='1606']
+	o_sales = o_sales.drop_duplicates(subset=['collection','token_id','price'])
 	o_sales = o_sales.drop_duplicates(subset=['collection','token_id','tmp','price'])
 	l1 = len(o_sales)
 	print('{} -> {} (added {})'.format(l0, l1, l1 - l0))
@@ -456,6 +459,7 @@ def scrape_opensea_listings(browser):
 		'BAYC': 'boredapeyachtclub'
 		, 'MAYC': 'mutant-ape-yacht-club'
 	}
+	collection = 'BAYC'
 	for collection in [ 'BAYC','MAYC' ]:
 		c = opensea_d[collection]
 		url = 'https://opensea.io/collection/{}'.format(c)
@@ -465,12 +469,13 @@ def scrape_opensea_listings(browser):
 		sleep(1)
 
 		it = 0
+		counter = 0
 		while True:
 			it += 1
 			prv = len(seen)
 			soup = BeautifulSoup(browser.page_source)
 			ars = soup.find_all('article', class_='AssetSearchList--asset')
-			print(i, len(ars), len(seen))
+			print(it, len(ars), len(seen))
 			for a in ars:
 				if not 'Price' in a.text:
 					continue
@@ -500,14 +505,20 @@ def scrape_opensea_listings(browser):
 			# 		sleep(10)
 			# 		browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
 			if len(seen) == prv:
-				break
+				counter += 1
+				if counter >= 3:
+					break
+			else:
+				counter = 0
 			prv = len(seen)
-			sleep(4)
+			sleep(8)
 	df = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
 	df['chain'] = 'Ethereum'
 	old = pd.read_csv('./data/listings.csv')
 	old = old[-old.collection.isin(df.collection.unique())]
 	old = old.append(df)
+	old.collection.unique()
+	old.groupby('collection').token_id.count()
 	old.to_csv('./data/listings.csv', index=False)
 
 def scrape_listings(browser, collections = [ 'stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):

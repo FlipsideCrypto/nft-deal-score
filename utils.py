@@ -28,7 +28,7 @@ def clean_token_id(df):
 	df['collection'] = df.collection.apply(lambda x: clean_name(x))
 	df['token_id'] = df.token_id.apply(lambda x: re.sub('"', '', x) if type(x)==str else x )
 	df['tmp'] = df.token_id.apply(lambda x: x[:10] )
-	tokens['tmp'] = tokens.token_id.apply(lambda x: x[:10] )
+	tokens['tmp'] = tokens.token_id.apply(lambda x: str(x)[:10] )
 	df = df.merge(tokens[['collection','tmp','clean_token_id']], how='left', on=['collection','tmp'])
 	df['token_id'] = df.clean_token_id.fillna(df.token_id)
 	df['token_id'] = df.token_id.astype(int)

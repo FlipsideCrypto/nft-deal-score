@@ -49,11 +49,13 @@ ssn.scrape_recent_smb_sales(browser)
 ssn.scrape_recent_sales()
 ld.add_terra_sales()
 ld.add_solana_sales()
+ld.add_eth_sales()
 
 # update listings
 # ssn.scrape_listings(browser, ['smb'])
 ssn.scrape_listings(browser)
 ssn.scrape_randomearth(browser)
+ssn.scrape_opensea_listings(browser)
 # ssn.scrape_listings(browser, ['smb','aurory'])
 
 # update model
