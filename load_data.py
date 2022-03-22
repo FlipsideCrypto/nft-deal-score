@@ -182,6 +182,7 @@ def add_eth_sales():
 	print('Queried {} sales'.format(len(sales)))
 	sales['chain'] = 'Ethereum'
 	sales['collection'] = sales.project_name.apply(lambda x: clean_name(x) )
+	print(sales.groupby('collection').sale_date.max())
 	sorted(sales.collection.unique())
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
 	# m = sales.merge(id_map, how='inner', on=['mint','collection'])
@@ -189,6 +190,7 @@ def add_eth_sales():
 	m = sales[[ 'collection','token_id','sale_date','price','chain' ]]
 	old = pd.read_csv('./data/sales.csv')
 	l0 = len(old)
+	old = old[old.collection != 'Bakc']
 	old = old[-old.collection.isin(sales.collection.unique())]
 	old = old.append(m)
 	print(old.groupby('collection').token_id.count())
@@ -607,7 +609,7 @@ def add_terra_sales():
 		, 'tokenid': 'token_id'
 	})
 	sales = clean_token_id(sales)
-	sales.token_id.values[:4]
+	# sales.token_id.values[:4]
 	# sales['token_id'] = sales.token_id.astype(int)
 
 	# tmp = sales.merge(tokens[['collection','token_id','clean_token_id']])
@@ -684,25 +686,45 @@ def rarity_tools(browser):
 
 def eth_metadata_api():
 	old = pd.read_csv('./data/metadata.csv')
+	collection = 'BAYC'
 	collection = 'MAYC'
+	seen = []
 	seen = sorted(old[old.collection == collection].token_id.unique())
 	a_data = []
 	t_data = []
 	errs = []
-	for i in range(30005):
-		if i % 100 == 1:
+	# for i in range(10000):
+	it = 0
+	for i in ids[21:]:
+		sleep(.1)
+		it += 1
+		if it % 1 == 0:
 			print(i, len(t_data), len(a_data), len(errs))
 		if i in seen:
 			continue
+		# try:
+		url = 'https://boredapeyachtclub.com/api/mutants/{}'.format(i)
 		try:
-			url = 'https://boredapeyachtclub.com/api/mutants/{}'.format(i)
 			j = requests.get(url).json()
-
 			t_data += [[ i, j['image'] ]]
 			for a in j['attributes']:
 				a_data += [[ i, a['trait_type'], a['value'] ]]
 		except:
-			errs.append(i)
+			print('Re-trying once...')
+			sleep(30)
+			try:
+				j = requests.get(url).json()
+				t_data += [[ i, j['image'] ]]
+				for a in j['attributes']:
+					a_data += [[ i, a['trait_type'], a['value'] ]]
+			except:
+				print('Re-trying twice...')
+				sleep(30)
+				j = requests.get(url).json()
+				t_data += [[ i, j['image'] ]]
+				for a in j['attributes']:
+					a_data += [[ i, a['trait_type'], a['value'] ]]
+	# errs.append(i)
 	new_mdf = pd.DataFrame(a_data, columns=['token_id','feature_name','feature_value'])
 	new_mdf['collection'] = 'MAYC'
 	new_mdf['chain'] = 'Ethereum'
@@ -710,7 +732,25 @@ def eth_metadata_api():
 	old.to_csv('./data/metadata.csv', index=False)
 
 	new_tdf = pd.DataFrame(t_data, columns=['token_id','image_url'])
+	new_tdf['collection'] = 'MAYC'
+	m = pd.read_csv('./data/metadata.csv')
 	old = pd.read_csv('./data/tokens.csv')
+	l0 = len(old)
+	old = old.merge(new_tdf, on=['collection', 'token_id'], how='left')
+	old[old.image_url_y.notnull()]
+	old[old.image_url_y.notnull()][['image_url_x','image_url_y']]
+	old['image_url'] = old.image_url_y.fillna(old.image_url_x)
+	del old['image_url_x']
+	del old['image_url_y']
+	l1 = len(old)
+	print('Adding {} rows'.format(l1 - l0))
+	old.to_csv('./data/tokens.csv', index=False)
+
+
+	tmp = old[old.collection == 'MAYC']
+	tmp['tmp'] = tmp.image_url.apply(lambda x: int('nft-media' in x) )
+	tmp[tmp.tmp == 1].merge(m[['token_id']].drop_duplicates())[['token_id']].drop_duplicates()
+	ids = tmp[tmp.tmp == 1].merge(m[['token_id']].drop_duplicates()).token_id.unique()
 	a = old[old.collection == 'MAYC'].token_id.unique()
 	b = new_tdf.token_id.unique()
 	[x for x in b if not x in a]
@@ -718,6 +758,19 @@ def eth_metadata_api():
 	new_mdf['chain'] = 'Ethereum'
 	old = old.append(new_mdf)
 	old.to_csv('./data/metadata.csv', index=False)
+
+	collection = 'BAYC'
+	data = []
+	for i in range(0, 1000):
+		if i % 100 == 1:
+			print(i, len(data))
+		url = 'https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/{}'.format(i)
+		# try:
+		j = requests.get(url, verify=False, timeout=1).json()
+		data += [[ collection, i, j['image'] ]]
+		# except:
+		# 	print(i)
+
 
 def eth_metadata():
 
@@ -731,6 +784,7 @@ def eth_metadata():
 		, token_metadata:Fur AS fur
 		, token_metadata:Hat AS hat
 		, token_metadata:Mouth AS mouth
+		, image_url
 		FROM ethereum.nft_metadata
 		WHERE contract_name IN ('MutantApeYachtClub','bayc')
 	'''
@@ -738,6 +792,16 @@ def eth_metadata():
 	metadata = pd.DataFrame.from_records(iter(metadata), columns=[x[0] for x in metadata.description])
 	metadata = clean_colnames(metadata)
 	metadata['collection'] = metadata.contract_name.apply(lambda x: x[0].upper()+'AYC' )
+	metadata['image_url'] = metadata.image_url.apply(lambda x: 'https://ipfs.io/ipfs/{}'.format(re.split('/', x)[-1]) if 'ipfs' in x else x )
+	# metadata['image_url'] = metadata.tmp
+	old = pd.read_csv('./data/tokens.csv')
+	old = old.merge( metadata[[ 'collection','token_id','image_url' ]], how='left', on=['collection','token_id'] )
+	old[old.image_url_y.notnull()]
+	old['image_url'] = old.image_url_y.fillna(old.image_url_x)
+	del old['image_url_x']
+	del old['image_url_y']
+	del metadata['image_url']
+	old.to_csv('./data/tokens.csv', index=False)
 
 	ndf = pd.DataFrame()
 	e = [ 'contract_name', 'token_id', 'collection' ]

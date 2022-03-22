@@ -408,7 +408,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Solana Monkey Business'
+			, selected = 'BAYC'
 			, choices = choices
 			, width = "100%"
 		)
@@ -453,6 +453,7 @@ server <- function(input, output, session) {
 
 	output$tokenid <- renderText({
 		id <- getTokenId()
+		chain <- getChain()
 		t <- ""
 		selected <- getCollection()
 		if( length(id) == 0 | selected == '' ) {
@@ -464,7 +465,7 @@ server <- function(input, output, session) {
 				selected == 'Thugbirdz'
 				, 'THUG'
 				, ifelse(
-					selected == 'Solana Monkey Business'
+					selected == 'Solana Monkey Business' | chain == 'Ethereum'
 					, selected
 					, ifelse(
 						selected == 'Stoned Ape Crew'
@@ -504,11 +505,15 @@ server <- function(input, output, session) {
 		}
         t <- ''
         if (nrow(data)) {
+			print('data')
+			print(head(data))
             p <- format(round(mean(head(data$price, 100)), 1), big.mark=',')
             f <- format(round(mean(head(data$vs_floor, 100)), 1), big.mark=',')
+			data[, pct_vs_floor := (vs_floor + price) / price ]
+            pct <- format(round(mean(head(data$pct_vs_floor, 100)), 1), big.mark=',')
 			chain <- getChain()
-			currency <- ifelse( chain == 'Solana', 'SOL', 'LUNA' )
-            t <- paste0(p, ' $',currency,' (+',f,' vs the floor)')
+			currency <- ifelse( chain == 'Solana', 'SOL', ifelse(chain == 'Ethereum', 'ETH', 'LUNA') )
+            t <- paste0(p, ' $',currency,' (+',f,' / ',pct,'x vs the floor)')
         }
 		paste0(t)
 	})
@@ -532,7 +537,7 @@ server <- function(input, output, session) {
 						selected %in% c('Levana Dragon Eggs')
 						, 'Collection'
 						, ifelse(
-							selected %in% c('Galactic Angels')
+							selected %in% c('Galactic Angels') | chain == 'Ethereum'
 							, 'Rarity'
 							, 'NotFoundTerra'
 						)
@@ -603,7 +608,9 @@ server <- function(input, output, session) {
 			tuple <- getConvertedPrice()
 			p_1 <- adjust_price(p_0, tuple)
 			chain <- getChain()
-			currency <- ifelse( chain == 'Solana', 'SOL', 'LUNA' )
+			currency <- ifelse( chain == 'Solana', 'SOL', 
+				ifelse( chain == 'Ethereum', 'ETH', 'LUNA' )
+			)
 			if (nrow(cur)) {
 				t <- paste0("Fair Market Price: ", (format(p_1, digits=3, decimal.mark=".",big.mark=",")), " ", currency)
 			}

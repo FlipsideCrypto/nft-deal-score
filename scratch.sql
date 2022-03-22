@@ -55,6 +55,11 @@ FROM ethereum.nft_metadata
 WHERE contract_name IN ('MutantApeYachtClub','bayc')
 GROUP BY 1
 
+SELECT *
+FROM ethereum.nft_metadata
+WHERE contract_name IN ('MutantApeYachtClub','bayc')
+LIMIT 10000
+
 SELECT contract_name
 , token_id
 , token_metadata:Background AS background
