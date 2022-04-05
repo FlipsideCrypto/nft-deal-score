@@ -53,6 +53,7 @@ ld.add_eth_sales()
 
 # update listings
 # ssn.scrape_listings(browser, ['smb'])
+# ssn.scrape_listings(browser, ['cets-on-creck'])
 ssn.scrape_listings(browser)
 ssn.scrape_randomearth(browser)
 ssn.scrape_opensea_listings(browser)

@@ -7,6 +7,72 @@ os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 from solana_model import get_sales
 from scrape_sol_nfts import clean_name
 
+def add_sf_metadata():
+	old = pd.read_csv('./data/metadata.csv')
+	l0 = len(old)
+	sf_metadata = pd.read_csv('./data/sf_metadata.csv')
+	old.head()
+	sf_metadata.head()
+	sf_metadata['collection'] = sf_metadata.collection.apply(lambda x: clean_name(x) )
+	sorted(sf_metadata.collection.unique())
+	sf_metadata['chain'] = 'Solana'
+	a = sf_metadata[sf_metadata.collection.isin(['DeFi Pirates','Cets On Creck','Astrals'])][list(old.columns)]
+	a = sf_metadata[sf_metadata.collection.isin(['Cets on Creck'])][list(old.columns)]
+	a['tmp'] = a.feature_value.apply(lambda x: len(x) if type(x) == str else 0 )
+	a = a[a.tmp < 35]
+	a['feature_value'] = a.feature_value.fillna('None')
+	a[a.feature_value.isnull()].feature_name.unique()
+	a[a.feature_value.isnull()].groupby('feature_name').head(1)
+	a[a.feature_value.isnull()].groupby('feature_name').count()
+	del a['tmp']
+	# old = old[-(old.collection.isin(a.collection.unique()))]
+	old = old.append(a)
+	old['collection'] = old.collection.apply(lambda x: clean_name(x))
+	old = old.drop_duplicates(subset=['collection','token_id','feature_name'], keep='last')
+	l1 = len(old)
+	print('Added {} rows'.format(l1 - l0))
+	print(sorted(old.collection.unique()))
+	old[old.collection == 'Cets on Creck'].sort_values('token_id').head(20)
+	old[(old.collection == 'Cets on Creck') & (old.token_id == 2059)]
+	old.to_csv('./data/metadata.csv', index=False)
+	a.collection.unique()
+
+def add_sf_tokens():
+	old = pd.read_csv('./data/tokens.csv')
+	old.loc[ old.collection == 'Cets on Creck', 'chain' ] = 'Solana'
+	l0 = len(old)
+	r = pd.read_csv('./data/solana_rarities.csv')
+	old.head()
+	r.head()
+	r['collection'] = r.collection.apply(lambda x: clean_name(x) )
+	sorted(r.collection.unique())
+	r['chain'] = 'Solana'
+	r['clean_token_id'] = r.token_id
+	r['market_url'] = None
+	a = r[r.collection.isin(['DeFi Pirates','Cets On Creck','Astrals'])][list(old.columns)]
+	a = r[r.collection.isin(['Cets on Creck'])][list(old.columns)]
+	sorted(r.collection.unique())
+	a.collection.unique()
+	old = old[-(old.collection.isin(a.collection.unique()))]
+	old = old.append(a)
+	l1 = len(old)
+	print('Added {} rows'.format(l1 - l0))
+	old[old.collection == 'Cets on Creck']
+	# old['clean_token_id'] = old.clean_token_id.astype(int)
+	old.to_csv('./data/tokens.csv', index=False)
+
+def add_rarity_from_metadata_to_token():
+	metadata = pd.read_csv('./data/metadata.csv')
+	metadata = metadata[ (metadata.collection.isin(['Cets on Creck'])) & (metadata.feature_name == 'nft_rank' ) ][[ 'collection','token_id','feature_value' ]].rename(columns={'feature_value':'nft_rank'})
+	old = pd.read_csv('./data/tokens.csv')
+	old = old.merge( metadata, how='left', on=['collection','token_id'] )
+	old['nft_rank'] = old.nft_rank_y.fillna(old.nft_rank_x)
+	del old['nft_rank_x']
+	del old['nft_rank_y']
+	old['clean_token_id'] = old.clean_token_id.fillna(old.token_id).astype(int)
+	old.to_csv('./data/tokens.csv', index=False)
+	old[old.collection == 'Cets on Creck']
+
 def add_matching():
 	old = pd.read_csv('./data/metadata.csv')
 	cur = old[old.collection == 'Solana Monkey Business']
@@ -50,8 +116,9 @@ def add_tokens():
 
 def add_att_count():
 	m_df = pd.read_csv('./data/metadata.csv')
+	l0 = len(m_df)
 	print(len(m_df))
-	collection = 'MAYC'
+	collection = 'Cets on Creck'
 	cur = m_df[m_df.collection == collection]
 	cur['feature_name'] = cur.feature_name.apply(lambda x: 'Clothes' if x == 'Clother' else x )
 	cur['feature_value'] = cur.feature_value.fillna('None')
@@ -61,23 +128,38 @@ def add_att_count():
 	g.columns = [ 'collection', 'token_id','feature_value' ]
 	g.groupby('feature_value').token_id.count()
 	g['feature_name'] = 'Attribute Count'
-	g['chain'] = 'Ethereum'
+	g['chain'] = 'Solana'
+	print(g.groupby('feature_value').token_id.count())
+	g[g.feature_value == 3356]
+	cur[cur.token_id == 3356]
 	# g['chain'] = 'Terra' if False else 'Solana'
 	# cur = cur[cur.feature_name != 'Attribute Count']
 	m_df = m_df[ -((m_df.collection == collection) & (m_df.feature_name.isin(['attribute_count', 'Attribute Count']))) ]
-	print(len(m_df))
+	# print(len(m_df))
 	m_df = m_df.append(g)
-	print(len(m_df))
+	l1 = len(m_df)
+	print('Adding {} rows'.format(l1 - l0))
 	m_df.to_csv('./data/metadata.csv', index=False)
 
 def add_rarities():
 	m_df = pd.read_csv('./data/metadata.csv')
 	l0 = len(m_df)
+	m_df['tmp'] = m_df.apply(lambda x: x['collection'] in ['Cets on Creck'] and type(x['feature_value']) == str and len(x['feature_value']) > 35, 1 )
+	m_df[m_df.tmp == 1]
+	m_df = m_df[m_df.tmp == 0]
+	del m_df['tmp']
+	m_df[ (m_df.collection == 'Cets on Creck') & (m_df.feature_name == 'nft_rank') ]
+	a = len(m_df[ (m_df.collection == 'Cets on Creck') & (m_df.feature_name == 'nft_rank') ].token_id.unique())
+	b = len(m_df[ (m_df.collection == 'Cets on Creck') ].token_id.unique())
+	print('a = {}. b = {}'.format(a, b))
+	# l0 = len(m_df)
 	m_df[m_df.collection == 'BAYC'].feature_name.unique()
 
-	solana_rarities = pd.read_csv('./data/solana_rarities.csv')
 	tokens = pd.read_csv('./data/tokens.csv')[['collection','token_id','nft_rank']]
 	solana_rarities = pd.read_csv('./data/solana_rarities.csv')
+	sorted(solana_rarities.collection.unique())
+	solana_rarities[solana_rarities.collection == 'cets-on-creck']
+	solana_rarities = solana_rarities[solana_rarities.collection != 'cets-on-creck']
 	ga_ranks = pd.read_csv('./data/metadata/Galactic Angels.csv')[['nft_rank','token_id']]
 	ga_ranks['collection'] = 'Galactic Angels'
 	ga_ranks[ (ga_ranks.collection == 'Galactic Angels') & (ga_ranks.token_id == 1) ]
@@ -86,6 +168,7 @@ def add_rarities():
 
 	lev_egg_ranks = m_df[m_df.feature_name == 'collection_rank'][['collection','token_id','feature_value']].rename(columns={'feature_value':'nft_rank'})
 	lev_egg_ranks['nft_rank'] = lev_egg_ranks.nft_rank.astype(int)
+	m = m_df[m_df.feature_name == 'nft_rank'][['collection','token_id','feature_value']].rename(columns={'feature_value':'nft_rank'})
 	# ga_ranks = m_df[ (m_df.collection == 'Galactic Angels') & (m_df.feature_name == 'nft_rank')][['collection','token_id','feature_value']].rename(columns={'feature_value':'nft_rank'})
 	# ga_ranks['nft_rank'] = ga_ranks.nft_rank.astype(float).astype(int)
 	if False:
@@ -103,13 +186,15 @@ def add_rarities():
 		metadata['chain'] = metadata.collection.apply(lambda x: 'Terra' if x in ['LunaBulls','Galactic Punks','Levana Dragon Eggs'] else 'Solana' )
 		metadata.to_csv('./data/metadata.csv', index=False)
 
-	rarities = solana_rarities.append(lp_ranks).append(gp_ranks).append(lev_egg_ranks).append(ga_ranks).append(tokens)[[ 'collection','token_id','nft_rank' ]].dropna()
+	rarities = solana_rarities.append(lp_ranks).append(gp_ranks).append(lev_egg_ranks).append(ga_ranks).append(tokens).append(m)[[ 'collection','token_id','nft_rank' ]].dropna()
 	rarities['collection'] = rarities.collection.apply(lambda x: clean_name(x) )
 	rarities['token_id'] = rarities.token_id.astype(str)
 	rarities = rarities.drop_duplicates(subset=['collection','token_id'], keep='first')
 	rarities['nft_rank'] = rarities.nft_rank.astype(int)
 	rarities.loc[ (rarities.collection == 'Solana Monkey Business') & (rarities.token_id == 903) , 'nft_rank' ] = 18
 	rarities[ (rarities.collection == 'Galactic Angels') & (rarities.token_id == '1') ]
+	rarities[ (rarities.collection == 'Cets on Creck') & (rarities.token_id == '1554') ]
+	rarities[ (rarities.collection == 'Cets on Creck') & (rarities.token_id == '1877') ]
 
 	rarities['adj_nft_rank_0'] = rarities.nft_rank.apply(lambda x: (x+1) ** -0.2 )
 	rarities['adj_nft_rank_1'] = rarities.nft_rank.apply(lambda x: (x+1) ** -0.9 )
@@ -136,10 +221,11 @@ def add_rarities():
 	len(g)
 	len(g.feature_name.unique())
 
-	fill_missing_metadata = False
+	fill_missing_metadata = True
 	if fill_missing_metadata:
 		c = 'Solana Monkey Business'
 		for c in m_df.collection.unique():
+			l1 = len(m_df)
 			cur = m_df[m_df.collection == c]
 			base = cur[[ 'collection','token_id','chain' ]].drop_duplicates()
 			for f in cur.feature_name.unique():
@@ -149,6 +235,7 @@ def add_rarities():
 				a['feature_name'] = f
 				a['feature_value'] = 'None'
 				m_df = m_df.append(a)
+			print('{}: Adding {} rows'.format(c, len(m_df) - l1))
 
 	print(m_df[(m_df.token_id=='1') & (m_df.collection == 'Solana Monkey Business')])
 	print(m_df[(m_df.token_id=='10') & (m_df.collection == 'Aurory')])
@@ -174,10 +261,14 @@ def add_rarities():
 	g['rat'] = g.atts / g.token_id
 	print(g)
 
+	m_df[m_df.collection == 'Stoned Ape Crew'].feature_name.unique()
+	# m_df[m_df.collection == 'Levana Dragon Eggs'].feature_name.unique()
+	m_df = m_df[-((m_df.collection == 'Cets on Creck') & (m_df.token_id == '0'))]
+	m_df[((m_df.collection == 'Cets on Creck') & (m_df.token_id == '1'))]
+
 	l1 = len(m_df)
-	m_df[m_df.collection == 'Levana Dragon Eggs'].feature_name.unique()
 	print('Adding {} rows'.format(l1 - l0))
 	# m_df[m_df.collection == 'Galactic Angels']
-	m_df[ (m_df.collection == 'Galactic Angels') & (m_df.token_id == '1') ]
+	# m_df[ (m_df.collection == 'Galactic Angels') & (m_df.token_id == '1') ]
 	m_df.to_csv('./data/metadata.csv', index=False)
 
