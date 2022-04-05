@@ -408,7 +408,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'BAYC'
+			, selected = 'Cets on Creck'
 			, choices = choices
 			, width = "100%"
 		)
@@ -465,12 +465,16 @@ server <- function(input, output, session) {
 				selected == 'Thugbirdz'
 				, 'THUG'
 				, ifelse(
-					selected == 'Solana Monkey Business' | chain == 'Ethereum'
+					selected %in% c('Solana Monkey Business') | chain == 'Ethereum'
 					, selected
 					, ifelse(
-						selected == 'Stoned Ape Crew'
-						, 'Stoned Ape'
-						, substr(selected, 1, nchar(selected) - 1)
+						selected %in% c('Cets on Creck')
+						, str_split(selected, ' |s ')[[1]][1]
+						, ifelse(
+							selected == 'Stoned Ape Crew'
+							, 'Stoned Ape'
+							, substr(selected, 1, nchar(selected) - 1)
+						)
 					)
 				)
 			)

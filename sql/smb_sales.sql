@@ -1,21 +1,38 @@
 WITH base AS (
 	SELECT *
     , CASE 
-		WHEN program_id = 'J7RagMKwSD5zJSbRQZU56ypHUtux8LRDkUpAPSKH4WPp' THEN inner_instruction:instructions[1]:parsed:info:amount / POWER(10, 9)
-		ELSE inner_instruction:instructions[0]:parsed:info:lamports / POWER(10, 9) 
+		WHEN program_id = 'J7RagMKwSD5zJSbRQZU56ypHUtux8LRDkUpAPSKH4WPp' THEN ROUND((COALESCE(inner_instruction:instructions[2]:parsed:info:amount, 0) + COALESCE(inner_instruction:instructions[1]:parsed:info:amount, 0)) / POWER(10, 9), 2)
+		WHEN program_id = 'MEisE1HzehtrDpAAT8PnLHjpSSkRYakotTuJRPjTpo8' THEN inner_instruction:instructions[2]:parsed:info:lamports * 1.075268817 / POWER(10, 9)
+		ELSE inner_instruction:instructions[0]:parsed:info:lamports / POWER(10, 9)
 	END AS amount
 	, pretokenbalances[0]:mint AS pre_mint_0
 	, pretokenbalances[1]:mint AS pre_mint_1
+	, pretokenbalances[2]:mint AS pre_mint_2
+	, pretokenbalances[3]:mint AS pre_mint_3
+	, pretokenbalances[4]:mint AS pre_mint_4
+	, pretokenbalances[5]:mint AS pre_mint_5
 	, posttokenbalances[0]:mint AS pos_mint_0
 	, posttokenbalances[1]:mint AS pos_mint_1
+	, posttokenbalances[2]:mint AS pos_mint_2
+	, posttokenbalances[3]:mint AS pos_mint_3
+	, posttokenbalances[4]:mint AS pos_mint_4
+	, posttokenbalances[5]:mint AS pos_mint_5
 	, CASE WHEN NOT COALESCE(pre_mint_0, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pre_mint_0
 		WHEN NOT COALESCE(pre_mint_1, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pre_mint_1
+		WHEN NOT COALESCE(pre_mint_2, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pre_mint_2
+		WHEN NOT COALESCE(pre_mint_3, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pre_mint_3
+		WHEN NOT COALESCE(pre_mint_4, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pre_mint_4
+		WHEN NOT COALESCE(pre_mint_5, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pre_mint_5
 		WHEN NOT COALESCE(pos_mint_0, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pos_mint_0
-		ELSE pos_mint_1 END
+		WHEN NOT COALESCE(pos_mint_1, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pos_mint_1
+		WHEN NOT COALESCE(pos_mint_2, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pos_mint_2
+		WHEN NOT COALESCE(pos_mint_3, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pos_mint_3
+		WHEN NOT COALESCE(pos_mint_4, '') IN ('', 'So11111111111111111111111111111111111111112') THEN pos_mint_4
+		ELSE pos_mint_5 END
 		AS clean_mint
 	FROM solana.nfts
-	WHERE block_timestamp >= '2022-03-19'
-	AND amount IS NOT NULL
+	WHERE block_timestamp >= '2022-01-01'
+	AND COALESCE(amount, 0) > 0
 	AND (
 		program_id = 'J7RagMKwSD5zJSbRQZU56ypHUtux8LRDkUpAPSKH4WPp'
 		OR (
@@ -5025,15 +5042,27 @@ WITH base AS (
 		)
 	)
 ), base2 AS (
-	SELECT clean_mint
+	SELECT REPLACE(clean_mint, '"', '') AS mint
 	, tx_id
 	, block_timestamp
-	, MAX(amount) AS amount
+	, program_id
+	, MAX(COALESCE(amount, 0)) AS amount
 	FROM base
-	GROUP BY 1, 2, 3
+	GROUP BY 1, 2, 3, 4
+), base3 AS (
+	SELECT b.mint
+	, b.tx_id
+	, b.program_id
+	, b.block_timestamp
+	, CASE 
+		WHEN b.amount > COALESCE(t.amount, 0) 
+		THEN b.amount 
+		ELSE COALESCE(t.amount, 0) 
+	END AS price
+	FROM base2 b
+	LEFT JOIN solana.transfers t ON t.tx_id = b.tx_id
 )
-SELECT b.*
-, t.amount AS price
-FROM base2 b
-LEFT JOIN solana.transfers t ON t.tx_id = b.tx_id
+SELECT *
+FROM base3
+WHERE price >= 75
 ORDER BY price DESC

@@ -40,7 +40,10 @@ def clean_name(name):
 	x = re.sub('-', '', name).lower()
 	if x in clean_names.keys():
 		return(clean_names[x])
-	name = re.sub('-', ' ', name.title())
+	name = name.title()
+	name = re.sub('-', ' ', name)
+	name = re.sub(' On ', ' on ', name)
+	name = re.sub('Defi ', 'DeFi ', name)
 	return(name)
 
 

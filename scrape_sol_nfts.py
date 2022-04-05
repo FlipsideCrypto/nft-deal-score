@@ -1,12 +1,14 @@
+from curses import meta
+from lib2to3.pgen2.tokenize import tokenize
 from operator import index
 import os
 import re
 import json
+import time
 from secrets import token_bytes
 import time
 import requests
 import functools
-import collections
 import pandas as pd
 import urllib.request
 from time import sleep
@@ -23,11 +25,33 @@ from utils import clean_token_id, merge, clean_name
 
 # howrare.is api
 # https://api.howrare.is/v0.1/collections/smb/only_rarity
+# https://api.howrare.is/v0.1/collections/smb
 
 # browser = webdriver.Chrome()
 
 # old = pd.read_csv('./data/tokens.csv')
 # metadata[(metadata.collection == 'Galactic Punks') & (metadata.feature_name=='attribute_count')].drop_duplicates(subset=['feature_value']).merge(old)
+
+
+def how_rare_is_api():
+	collection = 'Cets on Creck'
+	url = 'https://api.howrare.is/v0.1/collections/cetsoncreck'
+	r = requests.get(url)
+	j = r.json()
+	t_data = []
+	for i in j['result']['data']['items']:
+		token_id = int(i['id'])
+		nft_rank = int(i['rank'])
+		t_data += [[ collection, token_id, nft_rank ]]
+	old = pd.read_csv('./data/tokens.csv')
+	l0 = len(old)
+	tokens = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank'])
+	old = old.merge(tokens, how='left', on=['collection','token_id'])
+	old['nft_rank'] = old.nft_rank_y.fillna(old.nft_rank_y)
+	del old['nft_rank_x']
+	del old['nft_rank_y']
+	print('Adding {} rows'.format(len(old) - l0))
+	old.to_csv('./data/tokens.csv', index=False)
 
 
 def convert_collection_names():
@@ -453,14 +477,14 @@ def scrape_solanafloor():
 	df = pd.DataFrame(data, columns=['project','is_lite'])
 	df.to_csv('./data/sf_projects.csv', index=False)
 
-def scrape_opensea_listings(browser):
+def scrape_opensea_listings(browser, collections=['BAYC','MAYC']):
 	data = []
 	opensea_d = {
 		'BAYC': 'boredapeyachtclub'
 		, 'MAYC': 'mutant-ape-yacht-club'
 	}
-	collection = 'BAYC'
-	for collection in [ 'BAYC','MAYC' ]:
+	collection = 'MAYC'
+	for collection in collections:
 		c = opensea_d[collection]
 		url = 'https://opensea.io/collection/{}'.format(c)
 		browser.get(url)
@@ -485,12 +509,13 @@ def scrape_opensea_listings(browser):
 				except:
 					sleep(2)
 				token_id = int(a.find_all('div', class_='AssetCardFooter--name')[0].text)
-				price = float(a.find_all('div', class_='Price--amount')[0].text)
+				price = float(a.find_all('div', class_='AssetCardFooter--price')[0].find_all('div', class_='AssetCardFooter--price-amount')[0].text)
 				if not token_id in seen:
 					data += [[ collection, token_id, price ]]
 					seen.append(token_id)
 
-			browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+			# browser.execute_script("window.scrollTo(0, document.body.scrollHeight - 600);")
+			browser.execute_script("window.scrollTo(0, {});".format(300+(it * 300)))
 			# scroll = browser.find_elements_by_class_name('AssetSearchList--asset')
 			# scroll = browser.find_elements_by_class_name('Asset--loaded')
 			# j = len(scroll) - 1
@@ -506,12 +531,12 @@ def scrape_opensea_listings(browser):
 			# 		browser.execute_script("arguments[0].scrollIntoView();", scroll[j] )
 			if len(seen) == prv:
 				counter += 1
-				if counter >= 3:
+				if counter >= 5:
 					break
 			else:
 				counter = 0
 			prv = len(seen)
-			sleep(8)
+			sleep(1)
 	df = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
 	df['chain'] = 'Ethereum'
 	old = pd.read_csv('./data/listings.csv')
@@ -521,10 +546,11 @@ def scrape_opensea_listings(browser):
 	old.groupby('collection').token_id.count()
 	old.to_csv('./data/listings.csv', index=False)
 
-def scrape_listings(browser, collections = [ 'stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
+def scrape_listings(browser, collections = [ 'cets-on-creck','stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
 	data = []
 	m_data = []
+	m_data_2 = []
 	# collections = [ 'aurory','thugbirdz','meerkatmillionaires','aurory','degenapes' ]
 	# collections = [ 'aurory','thugbirdz','smb','degenapes' ]
 	# collections = [ 'smb' ]
@@ -539,6 +565,13 @@ def scrape_listings(browser, collections = [ 'stoned-ape-crew','degods','aurory'
 	# collections = sf_projects[(sf_projects.to_scrape==1) & (sf_projects.is_lite==0) & (-sf_projects.collection.isin(old.collection.unique()))].collection.unique()
 	collection = 'portals'
 	collection = 'degods'
+	collection = 'defi-pirates'
+	collection = 'cets-on-creck'
+	# collections = ['astrals']
+	# collections = ['defi-pirates']
+	# collections = ['cets-on-creck','astrals']
+	# collections = ['cets-on-creck']
+	# collections = ['defi-pirates', 'astrals']
 	for collection in collections:
 		if collection == 'boryokudragonz':
 			continue
@@ -587,19 +620,40 @@ def scrape_listings(browser, collections = [ 'stoned-ape-crew','degods','aurory'
 							mint_address = re.split('/', cell0[0].find_all('a')[0].attrs['href'])[-1] if len(cell0[0].find_all('a')) else None
 							price = cell1[2 if is_listings else 0].text
 							if len(token_id) and len(price):
+								try:
+									img = cell0[1].find_all('a')[0].find_all('img')[0].attrs['src']
+								except:
+									sleep(3)
+									try:
+										img = cell0[1].find_all('a')[0].find_all('img')[0].attrs['src']
+									except:
+										img = ''
 								# token_id = int(token_id[0].text)
 								# price = float(price[0].text)
 								if not token_id.strip():
 									continue
-								token_id = int(token_id)
+								token_id = 0 if token_id.strip() =='' else int(token_id)
 								price = float(price) if price.strip() else 0
 								if not price and is_listings:
 									continue
 								if not token_id in seen:
 									if not is_listings:
-										data += [[ collection, token_id, mint_address, price ]]
+										data += [[ collection, token_id, img, mint_address, price ]]
+										# for i in range(len(cell1)):
+										# 	print(i, hs1[i], cell1[i].text.strip())
+										m = {
+											'collection': collection
+											, 'token_id': token_id
+											, 'mint_address': mint_address
+										}
+										has_listing = len(cell1) > 11 and '$' in cell1[10].text and cell1[11].text.strip() == 'Buy'
+										m_data_2 += [ [collection, token_id, mint_address] + [ x.text.strip() for x in cell1 ]]
 										for l in range(len(hs1)):
-											m_data += [[ collection, token_id, mint_address, hs1[l], cell1[l].text.strip() ]]
+											# print(hs1[l], cell1[l].text.strip())
+											m = l if has_listing or l == 0 else l - 5 if l > 5 else l + 5
+											# print(hs1[l], cell1[m].text.strip())
+											v = cell1[l].text.strip() if has_listing else cell1[l].text.strip()
+											m_data += [[ collection, token_id, mint_address, hs1[l], cell1[l].text.strip(), len(cell1) ]]
 									else:
 										data += [[ collection, token_id, price ]]
 									seen.append(token_id)
@@ -627,22 +681,61 @@ def scrape_listings(browser, collections = [ 'stoned-ape-crew','degods','aurory'
 				has_more = False
 				break
 		if not is_listings:
+			rem = []
+			# data = [['defi-pirates', 0, '2qnp1qNd7bLcFdCn82GdrcNy61jV45vFWu9yxk4psq8o', 9863.0]]
 			old = pd.read_csv('./data/solana_rarities.csv')
-			rarities = pd.DataFrame(data, columns=['collection','token_id','mint_address','nft_rank']).drop_duplicates()
-			rarities = rarities.append(old).drop_duplicates()
+			# tmp = list(old[old.collection == 'defi-pirates'].token_id.unique())
+			# [x for x in range(0, 10001) if not x in tmp]
+			rarities = pd.DataFrame(data, columns=['collection','token_id','image_url','mint_address','nft_rank'])
+			rarities = rarities.append(old).drop_duplicates(subset=['collection','token_id'], keep = 'first')
+			rarities[rarities.collection == 'cets-on-creck']
 			rarities = rarities[-rarities.collection.isin(rem)]
-			print(rarities.groupby('collection').token_id.count().reset_index().sort_values('token_id'))
+			print(rarities.groupby('collection').token_id.count().reset_index().sort_values('collection'))
+			print(rarities.groupby('collection').head(1))
 			rarities.to_csv('./data/solana_rarities.csv', index=False)
 
 			old = pd.read_csv('./data/sf_metadata.csv')
-			metadata = pd.DataFrame(m_data, columns=['collection','token_id','mint_address','feature_name','feature_value']).drop_duplicates()
-			metadata = metadata[ -metadata.feature_name.isin(['Rank *','Owner','Listed On','Price','USD','Buy Link']) ]
-			metadata = metadata.append(old).drop_duplicates()
-			metadata.feature_name.unique()
+			# metadata = pd.DataFrame(m_data, columns=['collection','token_id','mint_address','feature_name','feature_value']).drop_duplicates()
+			metadata = pd.DataFrame(m_data_2, columns=['collection','token_id','mint_address'] + [ 'col_{}'.format(i) for i in range(len(m_data_2[-1]) - 3) ] ).drop_duplicates()
+			metadata = metadata.sort_values(['collection','token_id'])
+			hs = [ 'nft_rank', 'Background', 'Skin', 'Clothing', 'Mouth', 'Eye', 'Headgear' ]
+			hs = [ 'nft_rank', 'Background', 'Skin', 'Clothing', 'Mouth', 'Eye', 'Headgear', 'Hands' ]
+			mdf = pd.DataFrame()
+			for i in range(len(hs)):
+				cur = metadata[[ 'collection','token_id','mint_address','col_{}'.format(i) ]].rename(columns={'col_{}'.format(i):'feature_value'})
+				cur['feature_name'] = hs[i]
+				mdf = mdf.append( cur )
+			rem = mdf[mdf.feature_value == ''].token_id.unique()
+			mdf = mdf[-mdf.token_id.isin(rem)]
+			mdf[mdf.token_id == 6362].head(20)
+			mdf['tmp'] = mdf.feature_value.apply(lambda x: len(x))
+			mdf.sort_values('tmp', ascending=0).head()
+			mdf = mdf[mdf.tmp < 40]
+			del mdf['tmp']
+
+			# g = mdf.groupby(['feature_name','feature_value']).token_id.count().reset_index()
+			# g.to_csv('~/Downloads/tmp.csv', index=False)
+			# metadata.head()
+			# metadata.col_1.unique()
+			# metadata[metadata.col_1 == '']
+			# metadata = pd.DataFrame(m_data, columns=['collection','token_id','mint_address','feature_name','feature_value','n']).drop_duplicates()
+			# metadata[metadata.feature_name == 'Eye'].feature_value.unique()
+			# del metadata['n']
+			# mdf[mdf.token_id == 2988]
+			# metadata[metadata.token_id == 5641].head(10)
+			# metadata[metadata.token_id == 1]
+			# metadata['feature_name'] = metadata.feature_name.apply(lambda x: 'nft_rank' if x == 'Rank *' else x )
+			# metadata = metadata[ -metadata.feature_name.isin(['Rank *','Owner','Listed On','Price','USD','Buy Link']) ]
+			# metadata = metadata.drop_duplicates(subset=['collection','token_id','feature_name'], keep='first')
+			# metadata = metadata.append(old).drop_duplicates(subset=['collection','token_id','feature_name'])
+			metadata = mdf.append(old).drop_duplicates(subset=['collection','token_id','feature_name'], keep='first')
+			metadata[metadata.token_id == 5641].head(10)
+
 			g = metadata[[ 'collection','token_id' ]].drop_duplicates().groupby('collection').token_id.count().reset_index().sort_values('token_id')
 			rem = g[g.token_id<99].collection.unique()
 			metadata = metadata[-metadata.collection.isin(rem)]
 			print(g)
+			print('Adding {} rows'.format(len(metadata) - len(old)))
 			# g.to_csv('~/Downloads')
 			metadata.to_csv('./data/sf_metadata.csv', index=False)
 
@@ -1228,6 +1321,128 @@ def add_solscan_metadata():
 	metadata[metadata.collection == 'DeGods'][['collection','feature_name']].drop_duplicates()
 	metadata.to_csv('./data/metadata.csv', index=False)
 
+def get_metadata_from_metaboss():
+	# mints = pd.read_csv('./data/solana_mints_3.csv')
+	# os.system('metaboss -r {} -t 300 decode mint -a FYsPWQx1mr6X8McfuZ4oV3ZJaAf1NKWKU7NnYofx2MxQ  --output ~/git/nft-deal-score/data/mints/LightningOG/metadata/'.format(rpc))
+
+	d = {
+		# 'Astrals': '9ZtfJY5YggxyxNKncYFLPPFuS3fy8bx49n7Ly3M3QRJY'
+		# , 'DeFi Pirates': '8oUB51HmCjwnquwQyptz2Ys9hSnqATeMQnv2jqeLPJhZ'
+		# , 
+		'Cets on Creck': 'FCUKDLYtjFs257BTNVjTJwrwrR14PHEKHu1Ff7HU6U4e'
+	}
+	collection = 'Cets on Creck'
+	update_authority = 'FCUKDLYtjFs257BTNVjTJwrwrR14PHEKHu1Ff7HU6U4e'
+
+	rpc = 'https://red-cool-wildflower.solana-mainnet.quiknode.pro/a1674d4ab875dd3f89b34863a86c0f1931f57090/'
+	# update_authority = 'FCUKDLYtjFs257BTNVjTJwrwrR14PHEKHu1Ff7HU6U4e'
+	# collection = 'Cets on Creck'
+	for collection, update_authority in d.items():
+		print('Working on {}...'.format(collection))
+		collection_dir = re.sub(' ', '_', collection)
+
+		dir = './data/mints/{}/'.format(collection_dir)
+		if not os.path.exists(dir):
+			os.makedirs(dir)
+
+		os.system('metaboss -r {} -t 300 snapshot mints --update-authority {} --output {}'.format(rpc, update_authority, dir))
+		# os.system('metaboss -r {} -t 300 derive metadata mints --update-authority {} --output {}'.format(rpc, update_authority, dir))
+
+		fname = os.listdir(dir)
+		if len(fname) == 1:
+			fname = dir+fname[0]
+
+			dir_mints = '{}mints/'.format(dir)
+			if not os.path.exists(dir_mints):
+				os.makedirs(dir_mints)
+			os.system('metaboss -r {} -t 300 decode mint --list-file {} --output {}'.format(rpc, fname, dir_mints))
+			# os.system('metaboss -r {} -t 300 derive metadata --list-file {} --output {}'.format(rpc, fname, dir_mints))
+			# os.system('metaboss -r {} -t 300 derive metadata 5svxneN9H6xyFB1TueaEqBPDjDvPHYgV6yqyFXVR2KVK'.format(rpc))
+
+	dir = './data/mints/{}/mints/'.format(collection_dir)
+	errs = []
+	m_data = []
+	t_data = []
+	seen = [ x[1] for x in m_data ]
+	it = 0
+	prv = it
+	start = time.time()
+	include = [
+		'4eenV26jZCtRbbRRRLJ3ZnUzPQkGiJb7sncLVMQnFx3o'
+		, 'J2UhB1F7YyGNXdMDvNPyVwNYMzEw9xLznBTdrwbx52Z9'
+		, 'HRSJYvtv5YUBTjFe7WX87sN3cqVow2jjoPvpMr95YQQj'
+		, 'AccFHHRZXmqzWVvYrQXVS1scg17mAAKuC2ZTGg9zdvrz'
+		, '4t7DofyqHYdjfwqLKkHQ798MQWfce26RSnuLccuyTHvw'
+		, '7VctQnWtMAEPSgfrkYDFhzPdw7ATKCuBnhKryHAi32wk'
+		, '77GR2QhBAADxjjeSngqMxziAuxvSD3N1uMPhbBHht9Ar'
+	]
+	include = [
+		'8Xo9BUSxqG4Gi2oLzeNYEJLKDV176e6Zy8HXUb9mDsFQ'
+	]
+	include = []
+	# for fname in os.listdir(dir):
+	for fname in os.listdir(dir)[it-1:]:
+		if it % 10 == 0 and it:
+			now = time.time()
+			avg = round((now - start) / (it - prv), 1)
+			print('Averaging {} seconds per NFT'.format(avg))
+		# sleep(1)
+		it += 1
+		print(it, len(t_data), len(m_data))
+		mint_address = fname[:-5]
+		if len(include) and not mint_address in include:
+			continue
+		path = dir+fname
+		with open(path) as f:
+			s = f.read()
+			d = json.loads(s)
+			# try:
+			if '#' in d['name'] and not 'Incubator' in d['name'] and not 'Infant' in d['name']:
+				token_id = int(re.split('#', d['name'])[1])
+				if token_id in seen:
+					continue
+				r = requests.get(d['uri'])
+				# r = requests.get('https://api-mainnet.magiceden.dev/v2/tokens/{}'.format(mint_address))
+				j = r.json()
+				try:
+					for a in j['attributes']:
+						m_data += [[ collection, token_id, a['trait_type'], a['value'] ]]
+					t_data += [[ collection, token_id, mint_address, j['image'] ]]
+				except:
+					print('Error with {}'.format(token_id))
+					errs.append(token_id)
+				# except:
+				# 	pass
+	m = pd.DataFrame(m_data, columns=['collection','token_id','feature_name','feature_value']).drop_duplicates()
+	t = pd.DataFrame(t_data, columns=['collection','token_id','mint_address','image_url']).drop_duplicates()
+	print('{} m. {} t.'.format(len(m), len(t)))
+	m['chain'] = 'Solana'
+	tokens = pd.read_csv('./data/tokens.csv')
+	metadata = pd.read_csv('./data/metadata.csv')
+	metadata[metadata.collection == collection]
+	tokens[tokens.collection == collection]
+	l0 = len(metadata)
+	metadata = metadata.append(m)
+	# metadata = metadata.merge(m, how=['outer'], on=['collection','token_id','feature_name'])
+	metadata = metadata.drop_duplicates(subset=['collection','token_id','feature_name'], keep='last')
+	l1 = len(metadata)
+	print('Adding {} rows to metadata'.format(l1 - l0))
+
+	l0 = len(tokens)
+	# tokens = tokens.append(t)
+	tokens = tokens.merge(t, how='outer', on=['collection','token_id'])
+	for c in [ 'mint_address', 'image_url' ]:
+		tokens[c] = tokens[c+'_y'].fillna(tokens[c+'_x'])
+		del tokens[c+'_x']
+		del tokens[c+'_y']
+	tokens = tokens.drop_duplicates(subset=['collection','token_id'], keep='last')
+	tokens = tokens[-((tokens.token_id == 0) & (tokens.collection == 'Cets on Creck'))]
+	tokens['chain'] = tokens.chain.fillna('Solana')
+	l1 = len(tokens)
+	print('Adding {} rows to tokens'.format(l1 - l0))
+	metadata.to_csv('./data/metadata.csv', index=False)
+	tokens.to_csv('./data/tokens.csv', index=False)
+
 def scrape_mints():
 
 	nft_mint_addresses = pd.read_csv('./data/nft_mint_addresses.csv')
@@ -1264,7 +1479,10 @@ def scrape_mints():
 
 	remaining = sorted(solana_nfts[-solana_nfts.collection.isin(mints.collection.unique())].collection.unique())
 	print('{}'.format(len(remaining)))
-	collection = 'Balloonsville'
+	collection = 'Lightning OG'
+	d = {
+		'Lightning OG':'2dtWbt8X3uQNRNLdwwybDuFLzPrZribVXDdSVaRE5JzR'
+	}
 	for collection in remaining:
 		update_authority = d[collection]
 		if update_authority in seen or collection in [ 'Solana Monkey Business','Thugbirdz','Degenerate Ape Academy','Pesky Penguins','Aurory' ]:
@@ -1273,7 +1491,7 @@ def scrape_mints():
 		else:
 			print('Working on '+collection)
 			sleep(.10 * 60)
-			os.system('metaboss -r {} -t 300 snapshot mints --update-authority {} --output ~/git/nft-deal-score/data/mints '.format(rpc, update_authority))
+			os.system('metaboss -r {} -t 300 snapshot mints --update-authority {} --output ~/git/nft-deal-score/data/mints/LightningOG/'.format(rpc, update_authority, collection))
 
 	mints = pd.DataFrame()
 	auth_to_mint = {}
@@ -1282,6 +1500,7 @@ def scrape_mints():
 	# metaboss decode mint --list-file <LIST_FILE> -o <OUPUT_DIRECTORY>
 
 
+	fname = './data/mints/LightningOG/2dtWbt8X3uQNRNLdwwybDuFLzPrZribVXDdSVaRE5JzR_mint_accounts.json'
 	for collection, update_authority in d.items():
 		auth_to_mint[update_authority] = collection
 	for fname in [ './data/mints/'+f for f in os.listdir('./data/mints') ]:
@@ -1292,7 +1511,7 @@ def scrape_mints():
 			cur = pd.DataFrame(j)
 			if len(cur):
 				cur.columns = ['mint_address']
-				cur['update_authority'] = re.split('/|_', fname)[3]
+				cur['update_authority'] = re.split('/|_', fname)[4]
 				cur['collection'] = cur.update_authority.apply(lambda x: auth_to_mint[x] )
 				mints = mints.append(cur)
 	g = mints.groupby('collection').update_authority.count().reset_index()
@@ -1300,6 +1519,7 @@ def scrape_mints():
 	g.to_csv('~/Downloads/tmp.csv', index=False)
 	mints.to_csv('./data/solana_mints.csv', index=False)
 	mints[mints.collection == 'Balloonsville'].to_csv('./data/solana_mints_2.csv', index=False)
+	cur.to_csv('./data/solana_mints_3.csv', index=False)
 
 	url = 'https://solscan.io/token/GxERCTcBDmB6pfEoYYNWvioAhACifEGdn3dXNqVh5rXz'
 	url = 'https://explorer.solana.com/address/6CCprsgJT4nxBMSitGathXcLshDTL3BE4LcJXvSFwoe2'

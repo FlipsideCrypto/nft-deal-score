@@ -3,10 +3,12 @@ import re
 import os
 import math
 import json
+from typing import Collection
 import pandas as pd
 import snowflake.connector
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
+from utils import merge
 from scrape_sol_nfts import clean_name
 
 
@@ -31,6 +33,65 @@ def clean_colnames(df):
 	names = [ x.lower() for x in df.columns ]
 	df.columns = names
 	return(df)
+
+def solana_2():
+	mints = pd.read_csv('./data/solana_mints_3.csv')
+
+	collection = mints.collection.values[0]
+	collection_dir = re.sub(' ', '', collection)
+	mints['image_url'] = 'https://wblrifk3oz3qpmqbxsunfvtmzi3c6vafn3un4f57ysesotlale.arweave.net/sFcUFVt2dweyAbyo0tZsyj-YvVAVu6N4Xv8SJJ01gWQ?ext=gif'
+	mints['token_metadata_uri'] = 'https://arweave.net/8pJZCyLAY9TTAyuOB__2P_OwsmLzQEeKhLo5Ojiwflk'
+	results = []
+	token_id = 0
+	for row in mints.iterrows():
+		row = row[1]
+		token_metadata = {}
+		mint_address = row['mint_address']
+
+		d = {
+			'commission_rate': None
+			, 'mint_address': mint_address
+			, 'token_id': token_id
+			, 'contract_address': mint_address
+			, 'contract_name': row['collection']
+			, 'created_at_block_id': 0
+			, 'created_at_timestamp': str('2021-01-01')
+			, 'created_at_tx_id': ''
+			, 'creator_address': mint_address
+			, 'creator_name': row['collection']
+			, 'image_url': row['image_url']
+			, 'project_name': row['collection']
+			, 'token_id': int(token_id)
+			, 'token_metadata': token_metadata
+			, 'token_metadata_uri': row['token_metadata_uri']
+			, 'token_name': row['collection']
+		}
+		results.append(d)
+		token_id += 1
+	print('Uploading {} results'.format(len(results)))
+
+	dir = './data/metadata/{}/'.format(collection)
+	if not os.path.exists(dir):
+		os.makedirs(dir)
+
+	n = 50
+	r = math.ceil(len(results) / n)
+	for i in range(r):
+		newd = {
+			"model": {
+				"blockchain": "solana",
+				"sinks": [
+					{
+						"destination": "{database_name}.silver.nft_metadata",
+						"type": "snowflake",
+						"unique_key": "blockchain || contract_address || token_id"
+					}
+				],
+			},
+			"results": results[(i * n):((i * n)+r)]
+		}
+		with open('./data/metadata/{}/{}.txt'.format(collection, i), 'w') as outfile:
+			outfile.write(json.dumps(newd))
 
 def levana():
 	query = '''
@@ -237,6 +298,29 @@ def levana():
 		with open('./data/metadata/Levana Dragon Eggs/{}.txt'.format(i), 'w') as outfile:
 			outfile.write(json.dumps(newd))
 
+
+def mint_to_token_id():
+	data = []
+	collection = 'DeGods'
+	dir = './data/mints/DeGods/'
+	for fname in os.listdir(dir):
+		mint_address = fname[:-5]
+		path = dir+fname
+		with open(path) as f:
+			s = f.read()
+			d = json.loads(s)
+			try:
+				token_id = int(re.split('#', d['name'])[1])
+				data += [[ collection, token_id, mint_address ]]
+			except:
+				pass
+	data += [[ collection, 2508, 'CcWedWffikLoj3aYtgSK46LqF8LkLCgpu4RCo8RMxF3e' ]]
+	df = pd.DataFrame(data, columns=['collection','token_id','mint_address']).drop_duplicates(subset=['token_id'], keep='last')
+	[ x for x in range(1, 10001) if not x in df.token_id.unique() ]
+	g = df.groupby('token_id').collection.count().reset_index()
+	g[g.collection > 1]
+	df.to_csv('./data/mint_to_token_id_map.csv', index=False)
+
 def solana():
 	mints = pd.read_csv('./data/solana_rarities.csv')
 	sorted(mints.collection.unique())
@@ -275,7 +359,31 @@ def solana():
 	metadata['collection'] = metadata.collection.apply(lambda x: re.sub(' Cc', ' CC', x) )
 	metadata['collection'] = metadata.collection.apply(lambda x: re.sub('Og ', 'OG ', x) )
 
-	print(metadata.collection.unique())
+	collection = 'Cets On Creck'
+	collection = 'Astrals'
+	metadata = pd.read_csv('./data/metadata.csv')
+	print(sorted(metadata.collection.unique()))
+	metadata = metadata[metadata.collection == collection]
+	print(sorted(metadata.collection.unique()))
+	metadata = metadata[-(metadata.feature_name.isin(['adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2','nft_rank']))]
+	len(metadata.token_id.unique())
+	id_map = pd.read_csv('./data/mint_to_token_id_map.csv')
+	id_map = pd.read_csv('./data/tokens.csv')
+	id_map = id_map[id_map.collection == collection]
+
+	id_map['token_id'] = id_map.token_id.astype(int)
+	metadata['token_id'] = metadata.token_id.astype(int)
+
+	metadata = merge(metadata, id_map[['collection','token_id','mint_address','image_url']], ensure = True)
+
+	metadata['feature_name'] = metadata.feature_name.apply(lambda x: x.title() )
+	# metadata['image_url'] = metadata.token_id.apply(lambda x: 'https://metadata.degods.com/g/{}.png'.format(x - 1) )
+	metadata.head()
+
+	metadata = metadata[metadata.feature_name != 'L3G3Nd4Ry']
+
+	print(sorted(metadata.collection.unique()))
+	sorted(metadata[metadata.collection == collection].feature_name.unique())
 
 	# metadata[['collection']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
 
@@ -294,7 +402,8 @@ def solana():
 			if not len(m):
 				print(token_id)
 				continue
-			mint_address = m.mint_address.values[0] if 'mint_address' in m.columns else ''
+			# mint_address = m.mint_address.values[0] if 'mint_address' in m.columns else ''
+			mint_address = m.mint_address.values[0]
 			for row in cur.iterrows():
 				row = row[1]
 				token_metadata[row['feature_name']] = row['feature_value']
@@ -342,6 +451,7 @@ def solana():
 			}
 			with open('./data/metadata/{}/{}.txt'.format(collection, i), 'w') as outfile:
 				outfile.write(json.dumps(newd))
+
 def bayc():
 	with open('./data/bayc.json') as f:
 		j = json.load(f)

@@ -3,8 +3,6 @@ import re
 import os
 import json
 import math
-from tokenize import Imagnumber
-from pandas.io.pytables import Selection
 import requests
 import pandas as pd
 import urllib.request
@@ -31,6 +29,44 @@ ctx = snowflake.connector.connect(
 	password=pwd,
 	account='vna27887.us-east-1'
 )
+
+
+
+# query = '''
+# 	SHOW TABLES
+# '''
+# sales = ctx.cursor().execute(query)
+# sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
+# sales = clean_colnames(sales)
+
+# sorted(sales.name.unique())
+# sorted(sales.schema_name.unique())
+# sorted(sales.database_name.unique())
+
+# sales[sales.name == 'ACTIVE_VAULT_EVENTS'][['name','schema_name']]
+
+# tables = pd.DataFrame()
+# df = sales[sales.schema_name.isin(['BRONZE_MIDGARD_2_6_9','BRONZE_MIDGARD_20211108_MIDGARD']) ]
+# for row in df.iterrows():
+# 	row = row[1]
+# 	query = 'DESCRIBE TABLE {}.{}'.format(row['schema_name'], row['name'])
+# 	table = ctx.cursor().execute(query)
+# 	table = pd.DataFrame.from_records(iter(table), columns=[x[0] for x in table.description])
+# 	table = clean_colnames(table)
+# 	table['schema_name'] = row['schema_name']
+# 	table['table_name'] = row['name']
+# 	table.head()
+# 	tables = tables.append(table)
+# tables['clean_table_name'] = tables.table_name.apply(lambda x: re.sub('MIDGARD_', '', x) )
+# a = tables[tables.schema_name == 'BRONZE_MIDGARD_20211108_MIDGARD'][['name','clean_table_name','type']]
+# b = tables[tables.schema_name == 'BRONZE_MIDGARD_2_6_9'][['name','clean_table_name','type']]
+
+# c = a.merge(b, on=['clean_table_name','name'], how='outer')
+# c['is_hevo_fivetran'] = c.name.apply(lambda x: int(x[:7] == '__HEVO_' or x[:10] == '_FIVETRAN_') )
+# c['in_old'] = (c.type_x.notnull()).astype(int)
+# c['in_new'] = (c.type_y.notnull()).astype(int)
+# c['in_both'] = ((c.in_old + c.in_new) == 2).astype(int)
+# c.to_csv('~/Downloads/tmp.csv', index=False)
 
 d_market = {
 	'Galactic Punks': 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
@@ -119,27 +155,31 @@ def add_solana_sales():
 
 	query = '''
 		SELECT tx_id
-		, n.mint
-		, l.project_name
-		, n.block_timestamp AS sale_date
-		, (inner_instruction:instructions[0]:parsed:info:lamports 
-		+ inner_instruction:instructions[1]:parsed:info:lamports 
-		+ inner_instruction:instructions[2]:parsed:info:lamports 
-		+ inner_instruction:instructions[3]:parsed:info:lamports) / POWER(10, 9) AS price
-		FROM solana.nfts n
-		LEFT JOIN crosschain.address_labels l ON LOWER(n.mint) = LOWER(l.address)
+		, s.mint
+		, COALESCE(l.project_name, m.project_name) AS project_name
+		, s.block_timestamp AS sale_date
+		, m.token_id
+		, sales_amount AS price
+		FROM solana.fact_nft_sales s
+		LEFT JOIN crosschain.address_labels l ON LOWER(s.mint) = LOWER(l.address)
+		LEFT JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
 		WHERE block_timestamp >= CURRENT_DATE - 200
-		AND instruction:data like '3UjLyJvuY4%'
-		AND l.project_name IN ('degods','stoned ape crew')
+		AND COALESCE(l.project_name, m.project_name) IN ('degods','stoned ape crew','DeGods','Stoned Ape Crew','Astrals','Cets On Creck','DeFi Pirates')
 	'''
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
-	print('Queried {} sales'.format(format_num(len(sales))))
+	# print('Queried {} sales'.format(format_num(len(sales))))
 	sales['chain'] = 'Solana'
 	sales['collection'] = sales.project_name.apply(lambda x: clean_name(x) )
+	# print(sorted(sales.collection.unique()))
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
-	m = sales.merge(id_map, how='inner', on=['mint','collection'])
+	m = sales.merge(id_map, how='left', on=['mint','collection'])
+	m['token_id'] = m.token_id_x.fillna(m.token_id_y)
+	del m['token_id_x']
+	del m['token_id_y']
+	m = m[m.token_id.notnull()]
+	# print(sorted(m.collection.unique()))
 	m.sort_values('collection')
 	m = m[[ 'collection','token_id','sale_date','price','chain' ]]
 	s_df = pd.read_csv('./data/sales.csv')
@@ -150,7 +190,7 @@ def add_solana_sales():
 	l0 = len(s_df)
 	s_df = s_df[-s_df.collection.isin(sales.collection.unique())]
 	s_df = s_df.append(m)
-	print(s_df.groupby('collection').token_id.count())
+	# print(s_df.groupby('collection').token_id.count())
 	l1 = len(s_df)
 	print('Added {} sales'.format(format_num(l1 - l0)))
 	for c in [ 'mint','tmp' ]:
@@ -179,10 +219,10 @@ def add_eth_sales():
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
-	print('Queried {} sales'.format(len(sales)))
+	# print('Queried {} sales'.format(len(sales)))
 	sales['chain'] = 'Ethereum'
 	sales['collection'] = sales.project_name.apply(lambda x: clean_name(x) )
-	print(sales.groupby('collection').sale_date.max())
+	# print(sales.groupby('collection').sale_date.max())
 	sorted(sales.collection.unique())
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
 	# m = sales.merge(id_map, how='inner', on=['mint','collection'])
@@ -193,7 +233,7 @@ def add_eth_sales():
 	old = old[old.collection != 'Bakc']
 	old = old[-old.collection.isin(sales.collection.unique())]
 	old = old.append(m)
-	print(old.groupby('collection').token_id.count())
+	# print(old.groupby('collection').token_id.count())
 	l1 = len(old)
 	print('Added {} sales'.format(l1 - l0))
 	old.to_csv('./data/sales.csv', index=False)

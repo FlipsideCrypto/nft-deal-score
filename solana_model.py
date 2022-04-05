@@ -76,6 +76,7 @@ def get_sales(check_exclude = True, exclude=[]):
 
 	s_df = pd.read_csv('./data/sales.csv').rename(columns={'sale_date':'block_timestamp'})
 	s_df['token_id'] = s_df.token_id.astype(str)
+	s_df['collection'] = s_df.collection.apply(lambda x: clean_name(x))
 	# s_df['collection'] = s_df.collection_x.fillna(s_df.collection_y).fillna(s_df.collection).apply(lambda x: clean_name(x))
 	s_df = s_df.drop_duplicates(subset=['token_id','collection','price'])
 	s_df = s_df[-s_df.collection.isin(['Levana Meteors','Levana Dust'])]
@@ -227,7 +228,8 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	m_df['token_id'] = m_df.clean_token_id.fillna(m_df.token_id).astype(float).astype(int).astype(str)
 	s_df = merge(s_df, tokens[['collection','token_id','clean_token_id']], how='left', ensure=True, on=['collection','token_id'], message='s_df x tokens')
 	s_df[s_df.token_id.isnull()]
-	s_df['token_id'] = (s_df.clean_token_id.replace('nan', None).fillna(s_df.token_id.replace('nan', None))).astype(float).astype(int).astype(str)
+	s_df.collection.unique()
+	s_df['token_id'] = (s_df.clean_token_id.replace('nan', None).fillna(s_df.token_id.replace('nan', None))).apply(lambda x: re.sub('"', '', str(x))).astype(float).astype(int).astype(str)
 	lunabullsrem = tokens[tokens.clean_token_id>=10000].token_id.unique()
 	m_df = m_df[ -((m_df.collection == 'LunaBulls') & (m_df.token_id.isin(lunabullsrem))) ]
 	s_df = s_df[ -((s_df.collection == 'LunaBulls') & (s_df.token_id.isin(lunabullsrem))) ]
@@ -361,6 +363,8 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collections = ['MAYC']
 	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	collections = [ x for x in collections if not x in ['Bakc','BAKC','MAYC'] ]
+	collections = [ x for x in collections if not x in ['Astrals','Cets on Cleck','DeFi Pirates'] ]
+	collections = ['Cets on Creck']
 	print(sorted(collections))
 	s_df.groupby('collection').block_timestamp.max()
 	for collection in collections:
@@ -560,7 +564,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		X = df[std_pred_cols].values
 		y_0 = df.rel_price_0.values
 		y_1 = df.rel_price_1.values
-		df.sort_values('price', ascending=0).head(15)[['price','token_id','block_timestamp']]
+		df.sort_values('price', ascending=0).head(15)[['price','token_id','nft_rank','block_timestamp']]
 		df[df.sim == 0].block_timestamp.max()
 
 		for target_col in [ 'rel_price_0', 'rel_price_1' ]:
@@ -746,10 +750,19 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 			test['pred_price'] = test.pred_price.apply(lambda x: (x*1.03) )
 		if collection == 'Galactic Angels':
 			test['pred_price'] = test.pred_price.apply(lambda x: (x** 1.05) * 1.2 ) 
+
+		tmp = listings[listings.collection == collection][['token_id','price']].merge(test[['token_id','pred_price']])
+		tmp['ratio'] = (tmp.pred_price / tmp.price)
+		tmp['is_deal'] = (tmp.ratio > 1).astype(int)
+		mx = tmp.ratio.max()
+		if mx < 1.15:
+			test['pred_price'] = test.pred_price * 1.15 / mx
+
+		# make sure the lowest pred price is the floor
 		dff = test.pred_price.min() - CUR_FLOOR
 		if dff > 0:
 			test['pred_price'] = test.pred_price - dff
-		len(test[test.pred_price <= CUR_FLOOR])
+
 		test['pred_sd'] = test.pred_price * pe_sd
 		test = test.sort_values(['collection','token_id'])
 		test['rk'] = test.pred_price.rank(ascending=0, method='first')
@@ -811,11 +824,11 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 
 	coefsdf.to_csv('./data/coefsdf.csv', index=False)
 	salesdf.to_csv('./data/model_sales.csv', index=False)
-	salesdf[salesdf.collection]
+	# salesdf[salesdf.collection]
+	salesdf['block_timestamp'] = salesdf.block_timestamp.apply(lambda x: str(x)[:19] )
 	salesdf[salesdf.collection == 'BAYC'].sort_values('block_timestamp', ascending=0).head()[['token_id','block_timestamp','price']]
 	salesdf[salesdf.block_timestamp.isnull()]
 	salesdf.block_timestamp.max()
-	# salesdf['block_timestamp'] = salesdf.block_timestamp.apply(lambda x: str(x)[:10] )
 	salesdf.groupby('collection').block_timestamp.max()
 	pred_price[pred_price.collection == 'DeGods'].to_csv('~/Downloads/tmp1.csv', index=False)
 	# old = pd.read_csv('./data/pred_price.csv')
