@@ -1,4 +1,352 @@
+WITH active_vault_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'active_vault_events' AS "table"
+   FROM thorchain.active_vault_events),
+     add_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'add_events' AS "table"
+   FROM thorchain.add_events),
+     asgard_fund_yggdrasil_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'asgard_fund_yggdrasil_events' AS "table"
+   FROM thorchain.asgard_fund_yggdrasil_events),
+     block_pool_depths_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'block_pool_depths' AS "table"
+   FROM thorchain.block_pool_depths),
+     block_rewards_cte AS
+  (SELECT max(day)::string AS recency, min(day)::string AS start_time,
+          'block_rewards' AS "table"
+   FROM thorchain.block_rewards),
+     bond_actions_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'bond_actions' AS "table"
+   FROM thorchain.bond_actions),
+     bond_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'bond_events' AS "table"
+   FROM thorchain.bond_events),
+     constants_cte AS
+  (SELECT 'NA for this table' AS recency, 'NA for this table' AS start_time,
+          'constants' AS "table"
+   FROM thorchain.constants),
+     daily_earnings_cte AS
+  (SELECT max(day)::string AS recency, min(day)::string AS start_time,
+          'daily_earnings' AS "table"
+   FROM thorchain.daily_earnings),
+     daily_pool_stats_cte AS
+  (SELECT max(day)::string AS recency, min(day)::string AS start_time,
+          'daily_pool_stats' AS "table"
+   FROM thorchain.daily_pool_stats),
+     daily_tvl_cte AS
+  (SELECT max(day)::string AS recency, min(day)::string AS start_time,
+          'daily_tvl' AS "table"
+   FROM thorchain.daily_tvl),
+     errata_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'errata_events' AS "table"
+   FROM thorchain.errata_events),
+     fee_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'fee_events' AS "table"
+   FROM thorchain.fee_events),
+     gas_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'gas_events' AS "table"
+   FROM thorchain.gas_events),
+     inactive_vault_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'inactive_vault_events' AS "table"
+   FROM thorchain.inactive_vault_events),
+     liquidity_actions_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'liquidity_actions' AS "table"
+   FROM thorchain.liquidity_actions),
+     message_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'message_events' AS "table"
+   FROM thorchain.message_events),
+     new_node_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'new_node_events' AS "table"
+   FROM thorchain.new_node_events),
+     outbound_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'outbound_events' AS "table"
+   FROM thorchain.outbound_events),
+     pending_liquidity_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'pending_liquidity_events' AS "table"
+   FROM thorchain.pending_liquidity_events),
+     pool_balance_change_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'pool_balance_change_events' AS "table"
+   FROM thorchain.pool_balance_change_events),
+     pool_block_balances_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'pool_block_balances' AS "table"
+   FROM thorchain.pool_block_balances),
+     pool_block_fees_cte AS
+  (SELECT max(day)::string AS recency, min(day)::string AS start_time,
+          'pool_block_fees' AS "table"
+   FROM thorchain.pool_block_fees),
+     pool_block_statistics_cte AS
+  (SELECT max(day)::string AS recency, min(day)::string AS start_time,
+          'pool_block_statistics' AS "table"
+   FROM thorchain.pool_block_statistics),
+     pool_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'pool_events' AS "table"
+   FROM thorchain.pool_events),
+     prices_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'prices' AS "table"
+   FROM thorchain.prices),
+     refund_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'refund_events' AS "table"
+   FROM thorchain.refund_events),
+     reserve_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'reserve_events' AS "table"
+   FROM thorchain.reserve_events),
+     rewards_event_entries_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'rewards_event_entries' AS "table"
+   FROM thorchain.rewards_event_entries),
+     rewards_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'rewards_events' AS "table"
+   FROM thorchain.rewards_events),
+     set_ip_address_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'set_ip_address_events' AS "table"
+   FROM thorchain.set_ip_address_events),
+     set_mimir_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'set_mimir_events' AS "table"
+   FROM thorchain.set_mimir_events),
+     set_node_keys_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'set_node_keys_events' AS "table"
+   FROM thorchain.set_node_keys_events),
+     set_version_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'set_version_events' AS "table"
+   FROM thorchain.set_version_events),
+     slash_amounts_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'slash_amounts' AS "table"
+   FROM thorchain.slash_amounts),
+     stake_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'stake_events' AS "table"
+   FROM thorchain.stake_events),
+     swap_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'swap_events' AS "table"
+   FROM thorchain.swap_events),
+     swaps_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'swaps' AS "table"
+   FROM thorchain.swaps),
+     switch_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'switch_events' AS "table"
+   FROM thorchain.switch_events),
+     thorname_change_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'thorname_change_events' AS "table"
+   FROM thorchain.thorname_change_events),
+     total_block_rewards_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'total_block_rewards' AS "table"
+   FROM thorchain.total_block_rewards),
+     total_value_locked_cte AS
+  (SELECT max(day)::string AS recency, min(day)::string AS start_time,
+          'total_value_locked' AS "table"
+   FROM thorchain.total_value_locked),
+     transfer_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'transfer_events' AS "table"
+   FROM thorchain.transfer_events),
+     transfers_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'transfers' AS "table"
+   FROM thorchain.transfers),
+     unstake_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'unstake_events' AS "table"
+   FROM thorchain.unstake_events),
+     update_node_account_status_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'update_node_account_status_events' AS "table"
+   FROM thorchain.update_node_account_status_events),
+     upgrades_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'upgrades' AS "table"
+   FROM thorchain.upgrades),
+     validator_request_leave_events_cte AS
+  (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
+          'validator_request_leave_events' AS "table"
+   FROM thorchain.validator_request_leave_events)
+  
+SELECT *
+FROM active_vault_events_cte
+UNION
+SELECT *
+FROM add_events_cte
+UNION
+SELECT *
+FROM asgard_fund_yggdrasil_events_cte
+UNION
+SELECT *
+FROM block_pool_depths_cte
+UNION
+SELECT *
+FROM block_rewards_cte
+UNION
+SELECT *
+FROM bond_actions_cte
+UNION
+SELECT *
+FROM bond_events_cte
+UNION
+SELECT *
+FROM constants_cte
+UNION
+SELECT *
+FROM daily_earnings_cte
+UNION
+SELECT *
+FROM daily_pool_stats_cte
+UNION
+SELECT *
+FROM daily_tvl_cte
+UNION
+SELECT *
+FROM errata_events_cte
+UNION
+SELECT *
+FROM fee_events_cte
+UNION
+SELECT *
+FROM gas_events_cte
+UNION
+SELECT *
+FROM inactive_vault_events_cte
+UNION
+SELECT *
+FROM liquidity_actions_cte
+UNION
+SELECT *
+FROM message_events_cte
+UNION
+SELECT *
+FROM new_node_events_cte
+UNION
+SELECT *
+FROM outbound_events_cte
+UNION
+SELECT *
+FROM pending_liquidity_events_cte
+UNION
+SELECT *
+FROM pool_balance_change_events_cte
+UNION
+SELECT *
+FROM pool_block_balances_cte
+UNION
+SELECT *
+FROM pool_block_fees_cte
+UNION
+SELECT *
+FROM pool_block_statistics_cte
+UNION
+SELECT *
+FROM pool_events_cte
+UNION
+SELECT *
+FROM prices_cte
+UNION
+SELECT *
+FROM refund_events_cte
+UNION
+SELECT *
+FROM reserve_events_cte
+UNION
+SELECT *
+FROM rewards_event_entries_cte
+UNION
+SELECT *
+FROM rewards_events_cte
+UNION
+SELECT *
+FROM set_ip_address_events_cte
+UNION
+SELECT *
+FROM set_mimir_events_cte
+UNION
+SELECT *
+FROM set_node_keys_events_cte
+UNION
+SELECT *
+FROM set_version_events_cte
+UNION
+SELECT *
+FROM slash_amounts_cte
+UNION
+SELECT *
+FROM stake_events_cte
+UNION
+SELECT *
+FROM swap_events_cte
+UNION
+SELECT *
+FROM swaps_cte
+UNION
+SELECT *
+FROM switch_events_cte
+UNION
+SELECT *
+FROM thorname_change_events_cte
+UNION
+SELECT *
+FROM total_block_rewards_cte
+UNION
+SELECT *
+FROM total_value_locked_cte
+UNION
+SELECT *
+FROM transfer_events_cte
+UNION
+SELECT *
+FROM transfers_cte
+UNION
+SELECT *
+FROM unstake_events_cte
+UNION
+SELECT *
+FROM update_node_account_status_events_cte
+UNION
+SELECT *
+FROM upgrades_cte
+UNION
+SELECT *
+FROM validator_request_leave_events_cte
 
+
+
+
+
+SELECT s.block_timestamp::date AS date
+, COUNT(1) AS num_sales
+, SUM(sales_amount) AS volume
+, volume / num_sales AS avg_sale_price
+FROM solana.dim_nft_metadata m
+JOIN solana.fact_nft_sales s ON s.mint_address = m.mint_address
+WHERE m.project_name = 'Cets On Creck'
+GROUP BY 1
 
 
 
@@ -34,11 +382,125 @@ thorchain__pool_balance_change_events: have incorrect test, which I removed
 thorchain__pool_block_statistics: implemented fix
 thorchain__refund_events: not sure what the issue is there. need to do more digging
 
+
+WITH base AS (
+	SELECT *
+	, synth_amount / asset_amount AS ratio
+	, ROW_NUMBER() OVER (PARTITION BY pool_name ORDER BY block_timestamp DESC) AS rn
+	FROM THORCHAIN.POOL_BLOCK_BALANCES 
+	WHERE block_timestamp >= '2022-04-04'
+	ORDER BY block_timestamp DESC, ratio DESC
+	LIMIT 100
+)
+SELECT *
+FROM base
+WHERE rn = 1
+
+SELECT pool_name
+, SUM(COALESCE(rune_amount_usd, 0) + COALESCE(asset_amount_usd, 0)) AS amount_usd
+, SUM(COALESCE(il_protection_usd, 0)) AS il_protection_usd
+FROM thorchain.liquidity_actions
+WHERE lp_action = 'remove_liquidity'
+GROUP BY 1
+
 goes as profile.yml in ~/.dbt/
 dbt deps to install dependencies
 dbt test 
 dbt run --full-refresh -s models/thorchain
 dbt test -s models/thorchain
+
+SELECT *
+SELECT MIN(block_timestamp) AS mn
+, MIN(block_timestamp) AS mn2
+FROM thorchain.swaps
+WHERE 1=1
+AND (
+	from_asset LIKE '%/%'
+	OR to_asset LIKE '%/%'
+)
+LIMIT 10
+
+SELECT tx_id
+, COUNT(1) AS n
+FROM FLIPSIDE_DEV_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_FEE_EVENTS
+GROUP BY 1
+HAVING COUNT(1) > 1
+ORDER BY 2 DESC
+
+SELECT pool_name
+, COUNT(1) AS n
+, MAX(block_timestamp) AS m
+, MAX(block_timestamp) AS mm
+FROM thorchain.pool_block_statistics
+GROUP BY 1
+
+SELECT POOL_NAME
+, COUNT(1) AS n
+, MAX(BLOCK_TIMESTAMP) AS m
+, MAX(BLOCK_TIMESTAMP) AS mm
+FROM thorchain.block_pool_depths
+GROUP BY 1
+ORDER BY 2 DESC
+
+
+SELECT COUNT(1) AS n
+, COUNT(1) AS nn
+FROM thorchain.pool_block_statistics
+
+SELECT pool_name
+, COUNT(1) AS n
+, MAX(block_timestamp) AS mx
+, MIN(block_timestamp) AS mn
+FROM thorchain.prices
+GROUP BY 1
+ORDER BY 2 DESC
+
+WITH base AS (
+	SELECT *
+	, ROW_NUMBER() OVER (PARTITION BY pool_name ORDER BY block_timestamp DESC) AS rn
+	FROM thorchain.pool_block_balances
+	WHERE block_timestamp >= '2022-04-01'
+)
+SELECT *
+FROM base 
+WHERE rn = 1
+
+SELECT DISTINCT pool_name
+FROM thorchain.pool_block_balances
+
+
+SELECT DISTINCT pool_name
+FROM thorchain.pool_block_depths
+
+
+
+SELECT DISTINCT pool_name
+FROM FLIPSIDE_DEV_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_POOL_DEPTHS
+
+
+SELECT COUNT(1) AS n FROM flipside_dev_db.bronze_midgard_2_6_9.midgard_block_pool_depths
+SELECT COUNT(1) AS n FROM flipside_dev_db.bronze_midgard_2_6_9_20220405.midgard_block_pool_depths
+
+SELECT COUNT(1) AS n
+, COUNT(1) AS nn
+FROM flipside_dev_db.bronze_midgard_2_6_9.midgard_block_pool_depths
+
+SELECT *
+FROM BRONZE_MIDGARD_2_6_9.MIDGARD_SWAP_EVENTS
+WHERE memo like '=:TERRA/LUNA:%:%'
+AND pool like 'TERRA/LUNA'
+ORDER BY block_timestamp DESC
+LIMIT 100
+
+WITH base AS (
+	SELECT *
+	, CASE WHEN memo like '=:TERRA/LUNA:%:%' THEN 1 ELSE 0 END AS is_synth
+	FROM BRONZE_MIDGARD_2_6_9.MIDGARD_SWAP_EVENTS
+	WHERE block_timestamp >= '2022-04-01'
+	AND pool like 'TERRA/LUNA%'
+	LIMIT 1000
+)
+SELECT is_synth, COUNT(1) AS 
 
 SELECT asset_e8 / POWER(10, 8) AS asset_amt
 , rune_e8 / POWER(10, 8) AS rune_amt

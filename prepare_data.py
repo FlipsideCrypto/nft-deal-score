@@ -143,19 +143,27 @@ def add_att_count():
 
 def add_rarities():
 	m_df = pd.read_csv('./data/metadata.csv')
+	m_df['feature_name'] = m_df.feature_name.fillna(m_df.name)
+	m_df['feature_value'] = m_df.feature_value.fillna(m_df.value)
+	for c in [ 'name','value','rarity' ]:
+		del m_df[c]
+	# m_df[m_df.rarity.notnull()]
+	# m_df[(m_df.rarity.notnull()) & (m_df.token_id == '6435')]
+	m_df[(m_df.collection == 'SOLGods') & (m_df.token_id == 6435)]
 	l0 = len(m_df)
-	m_df['tmp'] = m_df.apply(lambda x: x['collection'] in ['Cets on Creck'] and type(x['feature_value']) == str and len(x['feature_value']) > 35, 1 )
-	m_df[m_df.tmp == 1]
-	m_df = m_df[m_df.tmp == 0]
-	del m_df['tmp']
-	m_df[ (m_df.collection == 'Cets on Creck') & (m_df.feature_name == 'nft_rank') ]
-	a = len(m_df[ (m_df.collection == 'Cets on Creck') & (m_df.feature_name == 'nft_rank') ].token_id.unique())
-	b = len(m_df[ (m_df.collection == 'Cets on Creck') ].token_id.unique())
-	print('a = {}. b = {}'.format(a, b))
+	# m_df['tmp'] = m_df.apply(lambda x: x['collection'] in ['Cets on Creck'] and type(x['feature_value']) == str and len(x['feature_value']) > 35, 1 )
+	# m_df[m_df.tmp == 1]
+	# m_df = m_df[m_df.tmp == 0]
+	# del m_df['tmp']
+	# m_df[ (m_df.collection == 'Cets on Creck') & (m_df.feature_name == 'nft_rank') ]
+	# a = len(m_df[ (m_df.collection == 'Cets on Creck') & (m_df.feature_name == 'nft_rank') ].token_id.unique())
+	# b = len(m_df[ (m_df.collection == 'Cets on Creck') ].token_id.unique())
+	# print('a = {}. b = {}'.format(a, b))
 	# l0 = len(m_df)
-	m_df[m_df.collection == 'BAYC'].feature_name.unique()
+	# m_df[m_df.collection == 'BAYC'].feature_name.unique()
 
 	tokens = pd.read_csv('./data/tokens.csv')[['collection','token_id','nft_rank']]
+	tokens[tokens.collection == 'SOLGods']
 	solana_rarities = pd.read_csv('./data/solana_rarities.csv')
 	sorted(solana_rarities.collection.unique())
 	solana_rarities[solana_rarities.collection == 'cets-on-creck']
@@ -188,6 +196,7 @@ def add_rarities():
 
 	rarities = solana_rarities.append(lp_ranks).append(gp_ranks).append(lev_egg_ranks).append(ga_ranks).append(tokens).append(m)[[ 'collection','token_id','nft_rank' ]].dropna()
 	rarities['collection'] = rarities.collection.apply(lambda x: clean_name(x) )
+	sorted(rarities.collection.unique())
 	rarities['token_id'] = rarities.token_id.astype(str)
 	rarities = rarities.drop_duplicates(subset=['collection','token_id'], keep='first')
 	rarities['nft_rank'] = rarities.nft_rank.astype(int)
@@ -265,6 +274,9 @@ def add_rarities():
 	# m_df[m_df.collection == 'Levana Dragon Eggs'].feature_name.unique()
 	m_df = m_df[-((m_df.collection == 'Cets on Creck') & (m_df.token_id == '0'))]
 	m_df[((m_df.collection == 'Cets on Creck') & (m_df.token_id == '1'))]
+	m_df[((m_df.collection == 'SOLGods') & (m_df.token_id == '1'))]
+	m_df[((m_df.collection == 'SOLGods'))]
+	sorted(m_df.collection.unique())
 
 	l1 = len(m_df)
 	print('Adding {} rows'.format(l1 - l0))

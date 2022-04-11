@@ -34,24 +34,54 @@ from utils import clean_token_id, merge, clean_name
 
 
 def how_rare_is_api():
-	collection = 'Cets on Creck'
-	url = 'https://api.howrare.is/v0.1/collections/cetsoncreck'
+	url = 'https://api.howrare.is/v0.1/collections'
 	r = requests.get(url)
 	j = r.json()
+	j.keys()
 	t_data = []
-	for i in j['result']['data']['items']:
-		token_id = int(i['id'])
-		nft_rank = int(i['rank'])
-		t_data += [[ collection, token_id, nft_rank ]]
+	metadata = pd.DataFrame()
+	for d in j['result']['data'][8:]:
+		collection = 'Cets on Creck'
+		collection = 'SOLGods'
+		collection = d['url'][1:]
+		print('Working on collection {}, {}, {}'.format(collection, len(t_data), len(metadata)))
+		url = 'https://api.howrare.is/v0.1/collections'+d['url']
+		url = 'https://api.howrare.is/v0.1/collections/solgods'
+		r = requests.get(url)
+		j = r.json()
+		for i in j['result']['data']['items']:
+			token_id = int(i['id'])
+			nft_rank = int(i['rank'])
+			mint = i['mint']
+			image = i['image']
+			t_data += [[ collection, token_id, nft_rank, mint, image ]]
+			# m_data += [[ collection, token_id, nft_rank ]]
+			m = pd.DataFrame(i['attributes'])
+			m['token_id'] = token_id
+			m['collection'] = collection
+			metadata = metadata.append(m)
 	old = pd.read_csv('./data/tokens.csv')
 	l0 = len(old)
-	tokens = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank'])
-	old = old.merge(tokens, how='left', on=['collection','token_id'])
-	old['nft_rank'] = old.nft_rank_y.fillna(old.nft_rank_y)
-	del old['nft_rank_x']
-	del old['nft_rank_y']
+	tokens = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
+	# old = old.merge(tokens, how='left', on=['collection','token_id'])
+	old = old.append(tokens)
+	# old['nft_rank'] = old.nft_rank_y.fillna(old.nft_rank_y)
+	# del old['nft_rank_x']
+	# del old['nft_rank_y']
 	print('Adding {} rows'.format(len(old) - l0))
 	old.to_csv('./data/tokens.csv', index=False)
+
+	old = pd.read_csv('./data/metadata.csv')
+	l0 = len(old)
+	metadata.collection.unique()
+	# metadata = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
+	# old = old.merge(tokens, how='left', on=['collection','token_id'])
+	old = old.append(metadata)
+	# old['nft_rank'] = old.nft_rank_y.fillna(old.nft_rank_y)
+	# del old['nft_rank_x']
+	# del old['nft_rank_y']
+	print('Adding {} rows'.format(len(old) - l0))
+	old.to_csv('./data/metadata.csv', index=False)
 
 
 def convert_collection_names():
@@ -546,7 +576,7 @@ def scrape_opensea_listings(browser, collections=['BAYC','MAYC']):
 	old.groupby('collection').token_id.count()
 	old.to_csv('./data/listings.csv', index=False)
 
-def scrape_listings(browser, collections = [ 'cets-on-creck','stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
+def scrape_listings(browser, collections = [ 'solgods','cets-on-creck','stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
 	data = []
 	m_data = []
@@ -743,19 +773,19 @@ def scrape_listings(browser, collections = [ 'cets-on-creck','stoned-ape-crew','
 	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
 	# others = scrape_magic_eden()
 	# listings = listings.append(others).drop_duplicates()
-	d = {
-		'aurory': 'Aurory'
-		,'thugbirdz': 'Thugbirdz'
-		,'smb': 'Solana Monkey Business'
-		,'degenapes': 'Degen Apes'
-		,'peskypenguinclub': 'Pesky Penguins'
-		,'meerkatmillionaires': 'Meerkat Millionaires'
-		,'boryokudragonz': 'Boryoku Dragonz'
-		,'degods': 'DeGods'
-	}
+	# d = {
+	# 	'aurory': 'Aurory'
+	# 	,'thugbirdz': 'Thugbirdz'
+	# 	,'smb': 'Solana Monkey Business'
+	# 	,'degenapes': 'Degen Apes'
+	# 	,'peskypenguinclub': 'Pesky Penguins'
+	# 	,'meerkatmillionaires': 'Meerkat Millionaires'
+	# 	,'boryokudragonz': 'Boryoku Dragonz'
+	# 	,'degods': 'DeGods'
+	# }
 	listings['collection'] = listings.collection.apply(lambda x: clean_name(x))
 	listings[listings.token_id=='1656']
-	listings[listings.token_id==1656]
+	listings[listings.token_id==484]
 
 	old = old[ -(old.collection.isin(listings.collection.unique())) ]
 	pred_price = pd.read_csv('./data/pred_price.csv')
