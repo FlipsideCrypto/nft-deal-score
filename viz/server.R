@@ -509,8 +509,6 @@ server <- function(input, output, session) {
 		}
         t <- ''
         if (nrow(data)) {
-			print('data')
-			print(head(data))
             p <- format(round(mean(head(data$price, 100)), 1), big.mark=',')
             f <- format(round(mean(head(data$vs_floor, 100)), 1), big.mark=',')
 			data[, pct_vs_floor := (vs_floor + price) / price ]
@@ -640,7 +638,7 @@ server <- function(input, output, session) {
 			return(head(attributes, 0))
 		}
 		cur <- attributes[ token_id == eval(as.numeric(id)) & collection == eval(selected) ]
-		cur <- merge( cur, feature_values[collection == eval(selected), list(feature_name, feature_value, pct_vs_baseline) ], all.x=TRUE )
+		cur <- merge( cur, feature_values[collection == eval(selected), list(feature_name, feature_value, pct_vs_baseline) ], all.x=TRUE, by=c('feature_name','feature_value') )
 		cur <- cur[order(rarity)]
 		# floor <- getFloors()[2]
 		# log_coef <- coefsdf[ collection == eval(selected) ]$log_coef[1]
@@ -809,7 +807,7 @@ server <- function(input, output, session) {
 		# data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred, mn_20 )]
 		data <- sales[ collection == eval(selected)]
 		m <- pred_price[collection == eval(selected), list(token_id, rk)]
-		data <- merge(data, m, all.x=TRUE)
+		data <- merge(data, m, all.x=TRUE, by=c('token_id'))
 		if(nrow(data) == 0) {
 			return(data.table())
 		}
@@ -849,7 +847,7 @@ server <- function(input, output, session) {
         data <- getFilteredSalesData(data, selected, input$filter19, 19)
         data <- getFilteredSalesData(data, selected, input$filter20, 20)
 
-		data <- merge(data, tokens[collection == eval(selected), list(collection, token_id, image_url)], all.x=T )
+		data <- merge(data, tokens[collection == eval(selected), list(collection, token_id, image_url)], all.x=T, by=c('collection','token_id') )
 		data <- data[, list( token_id, image_url, block_timestamp, price, pred, mn_20, rk, nft_rank )]
 
         data <- data[order(-block_timestamp)]
@@ -1156,8 +1154,8 @@ server <- function(input, output, session) {
 			return(data.table())
 		}
 
-		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd, rk, nft_rank) ])
-		df <- merge(df, tokens[collection == eval(selected), list(collection, token_id, image_url)] )
+		df <- merge(listings[ collection == eval(selected), list(token_id, price) ], pred_price[ collection == eval(selected), list(token_id, pred_price, pred_sd, rk, nft_rank) ], by = c('token_id'))
+		df <- merge(df, tokens[collection == eval(selected), list(collection, token_id, image_url)], by = c('token_id') )
 		tuple <- getConvertedPrice()
 		floors <- getFloors()
 

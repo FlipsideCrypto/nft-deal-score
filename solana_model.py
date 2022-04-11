@@ -226,7 +226,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	tokens['token_id'] = tokens.token_id.astype(str)
 	m_df = merge(m_df, tokens[['collection','token_id','clean_token_id']].dropna().drop_duplicates() , how='left', ensure=True, on=['collection','token_id'], message='m_df x tokens')
 	m_df['token_id'] = m_df.clean_token_id.fillna(m_df.token_id).astype(float).astype(int).astype(str)
-	s_df = merge(s_df, tokens[['collection','token_id','clean_token_id']], how='left', ensure=True, on=['collection','token_id'], message='s_df x tokens')
+	s_df = merge(s_df, tokens[['collection','token_id','clean_token_id']].drop_duplicates(), how='left', ensure=True, on=['collection','token_id'], message='s_df x tokens')
 	s_df[s_df.token_id.isnull()]
 	s_df.collection.unique()
 	s_df['token_id'] = (s_df.clean_token_id.replace('nan', None).fillna(s_df.token_id.replace('nan', None))).apply(lambda x: re.sub('"', '', str(x))).astype(float).astype(int).astype(str)
@@ -281,7 +281,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		# tmp.block_timestamp = s_df.timestamp.max()
 		tmp['timestamp'] = tmp.block_timestamp.astype(int)
 		tmp['days_ago'] = tmp.block_timestamp.apply(lambda x: (datetime.today() - x).days ).astype(int)
-		tmp = merge(tmp, floor)
+		tmp = merge(tmp, floor, ensure=False)
 
 		n = round(len(s_df) / 5000)
 		n = max(1, min(3, n))
@@ -361,15 +361,16 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collection = 'MAYC'
 	collections = ['BAYC']
 	collections = ['MAYC']
-	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	collections = [ x for x in collections if not x in ['Bakc','BAKC','MAYC'] ]
 	collections = [ x for x in collections if not x in ['Astrals','Cets on Cleck','DeFi Pirates'] ]
 	collections = ['Cets on Creck']
-	print(sorted(collections))
+	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	s_df.groupby('collection').block_timestamp.max()
+	collections = ['SOLGods']
+	print(sorted(collections))
 	for collection in collections:
-		# if collection == 'Stoned Ape Crew':
-		# 	continue
+		if collection in ['Astrals','BAYC','MAYC']:
+			continue
 		if not collection in saved_params.keys():
 			saved_params[collection] = {}
 		coefsdf = coefsdf[coefsdf.collection != collection]
@@ -904,6 +905,13 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		exclude = exclude.append(salesdf[salesdf.exclude == 1][[ 'collection','token_id','price','exclude' ]])
 		# salesdf[salesdf.exclude == 1][[ 'collection','token_id','price','exclude' ]].to_csv('./data/exclude.csv', index=False)
 		exclude.to_csv('./data/exclude.csv', index=False)
+	# tokens[tokens.collection == 'SOLGods']
+	# tokens[tokens.collection == 'Cets on Creck'].sort_values('nft_rank', ascending=0)
+	# tokens[tokens.collection == 'Cets on Creck']
+	# tokens = tokens.drop_duplicates(subset=['collection','token_id'], keep='last')
+	# tokens['chain'] = tokens.chain.fillna('Solana')
+	# tokens['clean_token_id'] = tokens.clean_token_id.fillna(tokens.token_id)
+	# tokens.to_csv('./data/tokens.csv', index=False)
 
 # train_model(True, False)
 # train_model(False, False)

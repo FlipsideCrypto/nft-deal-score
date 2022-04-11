@@ -3,6 +3,7 @@ import re
 import os
 import json
 import math
+from tkinter import SEL
 import requests
 import pandas as pd
 import urllib.request
@@ -146,6 +147,16 @@ def mint_address_token_id_map():
 	df['collection'] = 'DeGods'
 	df.to_csv('./data/mint_address_token_id_map.csv', index=False)
 
+def mint_address_token_id_map():
+	old = pd.read_csv('./data/mint_address_token_id_map.csv')
+	l0 = len(old)
+	tokens = pd.read_csv('./data/tokens.csv')[['collection','token_id','mint_address']].rename(columns={'mint_address':'mint'}).dropna()
+	tokens['uri'] = None
+	tokens = tokens[-tokens.collection.isin(old.collection.unique())]
+	old = old.append(tokens)
+	print('Adding {} rows'.format(len(old) - l0))
+	old.to_csv('./data/mint_address_token_id_map.csv', index=False)
+
 def add_solana_sales():
 	print('Adding Solana sales...')
 	# read id map
@@ -164,7 +175,7 @@ def add_solana_sales():
 		LEFT JOIN crosschain.address_labels l ON LOWER(s.mint) = LOWER(l.address)
 		LEFT JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
 		WHERE block_timestamp >= CURRENT_DATE - 200
-		AND COALESCE(l.project_name, m.project_name) IN ('degods','stoned ape crew','DeGods','Stoned Ape Crew','Astrals','Cets On Creck','DeFi Pirates')
+		AND LOWER(COALESCE(l.project_name, m.project_name)) IN ('degods','stoned ape crew','sstrals','cets on creck','defi pirates','solgods')
 	'''
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
@@ -176,6 +187,7 @@ def add_solana_sales():
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
 	m = sales.merge(id_map, how='left', on=['mint','collection'])
 	m['token_id'] = m.token_id_x.fillna(m.token_id_y)
+	m[m.collection == 'SOLGods']
 	del m['token_id_x']
 	del m['token_id_y']
 	m = m[m.token_id.notnull()]

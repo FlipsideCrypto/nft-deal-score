@@ -17,6 +17,7 @@ clean_names = {
 	,'mutantapeyachtclub': 'MAYC'
 	,'bayc': 'BAYC'
 	,'mayc': 'MAYC'
+	,'solgods': 'SOLGods'
 	# ,'stonedapecrew': 'Stoned Ape Crew'
 }
 
