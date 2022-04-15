@@ -18,6 +18,7 @@ clean_names = {
 	,'bayc': 'BAYC'
 	,'mayc': 'MAYC'
 	,'solgods': 'SOLGods'
+	,'meerkatmillionairescc': 'Meerkat Millionaires'
 	# ,'stonedapecrew': 'Stoned Ape Crew'
 }
 
@@ -39,6 +40,7 @@ def clean_token_id(df):
 
 def clean_name(name):
 	x = re.sub('-', '', name).lower()
+	x = re.sub(' ', '', name).lower()
 	if x in clean_names.keys():
 		return(clean_names[x])
 	name = name.title()

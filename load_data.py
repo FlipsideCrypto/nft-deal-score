@@ -108,6 +108,180 @@ def manual_clean():
 			df['clean_token_id'] = df.token_id
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
+def mints_from_me():
+	data = []
+	has_more = 1
+	offset = 0
+	while has_more:
+		sleep(1)
+		print(offset)
+		url = 'https://api-mainnet.magiceden.dev/v2/collections?offset={}&limit=500'.format(offset)
+		r = requests.get(url)
+		j = r.json()
+		data = data + j
+		has_more = len(j)
+		offset += 500
+	df = pd.DataFrame(data)
+	df.to_csv('./data/me_collections.csv', index=False)
+
+	lp_data = []
+	has_more = 1
+	offset = 0
+	while has_more:
+		sleep(1)
+		print(offset)
+		url = 'https://api-mainnet.magiceden.dev/v2/launchpad/collections?offset={}&limit=500'.format(offset)
+		r = requests.get(url)
+		j = r.json()
+		lp_data = lp_data + j
+		has_more = len(j)
+		offset += 500
+	lp_df = pd.DataFrame(lp_data)
+	lp_df.to_csv('./data/me_lp_collections.csv', index=False)
+
+	it = 0
+	l_data = []
+	old_l_df = pd.read_csv('./data/me_mints.csv')
+	seen = list(old_l_df.symbol.unique())
+	for row in lp_df.iterrows():
+		it += 1
+		row = row[1]
+		print('Listings on {}...'.format(row['symbol']))
+		url = 'https://api-mainnet.magiceden.dev/v2/collections/{}/listings?offset=0&limit=1'.format(row['symbol'])
+		if row['symbol'] in seen:
+			print('Seen')
+			continue
+		try:
+			r = requests.get(url)
+			j = r.json()
+		except:
+			print('Re-trying in 10s')
+			sleep(10)
+			try:
+				r = requests.get(url)
+				j = r.json()
+			except:
+				print('Re-trying in 60s')
+				sleep(60)
+				r = requests.get(url)
+				j = r.json()
+		if len(j):
+			l_data += [[ row['symbol'], row['name'], j[0]['tokenMint'] ]]
+		if it % 10 == 0:
+			print('it#{}: {}'.format(it, len(l_data)))
+			l_df = pd.DataFrame(l_data, columns=['symbol','name','mint_address'])
+			l_df.to_csv('./data/me_mints.csv', index=False)
+	l_df = pd.DataFrame(l_data, columns=['symbol','name','mint_address'])
+	l_df.to_csv('./data/me_mints.csv', index=False)
+
+	it = 0
+	l_data = []
+	seen = [ x[0] for x in l_data ]
+	print(len(seen))
+	for row in df.iterrows():
+		it += 1
+		row = row[1]
+		print('Listings on {}...'.format(row['symbol']))
+		url = 'https://api-mainnet.magiceden.dev/v2/collections/{}/listings?offset=0&limit=1'.format(row['symbol'])
+		if row['symbol'] in seen:
+			print('Seen')
+			continue
+		try:
+			r = requests.get(url)
+			j = r.json()
+		except:
+			print('Re-trying in 10s')
+			sleep(10)
+			try:
+				r = requests.get(url)
+				j = r.json()
+			except:
+				print('Re-trying in 60s')
+				sleep(60)
+				r = requests.get(url)
+				j = r.json()
+		if len(j):
+			l_data += [[ row['symbol'], row['name'], j[0]['tokenMint'] ]]
+		if it % 10 == 0:
+			print('it#{}: {}'.format(it, len(l_data)))
+			l_df = pd.DataFrame(l_data, columns=['symbol','name','mint_address'])
+			l_df.to_csv('./data/me_mints.csv', index=False)
+	l_df = pd.DataFrame(l_data, columns=['symbol','name','mint_address'])
+	l_df.to_csv('./data/me_mints.csv', index=False)
+
+	l_df = pd.read_csv('./data/me_mints.csv')
+	m_old = pd.read_csv('./data/me_update_authorities.csv')
+	m_data = list(m_old.values)
+	seen = [ x[0] for x in m_data ]
+	print('Seen {} m_data'.format(len(seen)))
+	it = 0
+	for row in l_df.iterrows():
+		it += 1
+		row = row[1]
+		symbol = row['symbol']
+		print('Working on {}...'.format(symbol))
+		if symbol in seen:
+			print('Seen')
+			continue
+		url = 'https://api-mainnet.magiceden.dev/v2/tokens/{}'.format(row['mint_address'])
+		try:
+			r = requests.get(url)
+			j = r.json()
+		except:
+			print('Re-trying in 10s')
+			sleep(10)
+			try:
+				r = requests.get(url)
+				j = r.json()
+			except:
+				print('Re-trying in 60s')
+				sleep(60)
+				r = requests.get(url)
+				j = r.json()
+		if 'updateAuthority' in j.keys():
+			m_data += [[ row['symbol'], row['name'], j['updateAuthority'] ]]
+		if it % 10 == 0:
+			print('it#{}: {}'.format(it, len(m_data)))
+			m_df = pd.DataFrame(m_data, columns=['symbol','name','update_authority'])
+			m_df.to_csv('./data/me_update_authorities.csv', index=False)
+	m_df = pd.DataFrame(m_data, columns=['symbol','name','update_authority'])
+	m_df
+	m_df.to_csv('./data/me_update_authorities.csv', index=False)
+
+	m_df = pd.read_csv('./data/me_update_authorities.csv')
+	rpc = 'https://red-cool-wildflower.solana-mainnet.quiknode.pro/a1674d4ab875dd3f89b34863a86c0f1931f57090/'
+	for row in m_df.iterrows():
+		row = row[1]
+		collection = row['name']
+		update_authority = row['update_authority']
+		print('Working on {}...'.format(collection))
+		collection_dir = re.sub(' ', '_', collection)
+
+		dir = './data/mints/{}/'.format(collection_dir)
+		if not os.path.exists(dir):
+			os.makedirs(dir)
+		else:
+			# print('Already have {}.'.format(collection))
+			print('Seen')
+			continue
+
+		os.system('metaboss -r {} -t 300 snapshot mints --update-authority {} --output {}'.format(rpc, update_authority, dir))
+		# os.system('metaboss -r {} -t 300 derive metadata mints --update-authority {} --output {}'.format(rpc, update_authority, dir))
+
+		fname = os.listdir(dir)
+		if len(fname) == 1:
+			fname = dir+fname[0]
+
+			dir_mints = '{}mints/'.format(dir)
+			if not os.path.exists(dir_mints):
+				os.makedirs(dir_mints)
+			os.system('metaboss -r {} -t 300 decode mint --list-file {} --output {}'.format(rpc, fname, dir_mints))
+
+
+	len(df)
+	len(df[df.twitter.notnull()])
+	len(df[ (df.twitter.notnull()) & (df.website.notnull())])
+
 def mint_address_token_id_map_2():
 	old = pd.read_csv('./data/mint_address_token_id_map.csv')
 	old = pd.DataFrame()
@@ -175,32 +349,40 @@ def add_solana_sales():
 		LEFT JOIN crosschain.address_labels l ON LOWER(s.mint) = LOWER(l.address)
 		LEFT JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
 		WHERE block_timestamp >= CURRENT_DATE - 200
-		AND LOWER(COALESCE(l.project_name, m.project_name)) IN ('degods','stoned ape crew','sstrals','cets on creck','defi pirates','solgods')
 	'''
+	# AND LOWER(COALESCE(l.project_name, m.project_name)) IN ('degods','stoned ape crew','sstrals','cets on creck','defi pirates','solgods')
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
 	# print('Queried {} sales'.format(format_num(len(sales))))
 	sales['chain'] = 'Solana'
-	sales['collection'] = sales.project_name.apply(lambda x: clean_name(x) )
+	sales['collection'] = sales.project_name.fillna('').apply(lambda x: clean_name(x) )
 	# print(sorted(sales.collection.unique()))
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
-	m = sales.merge(id_map, how='left', on=['mint','collection'])
+	# m = sales.merge(id_map, how='left', on=['mint','collection'])
+	m = sales.merge(id_map, how='left', on=['mint'])
+	m = m[ (m.collection_x.notnull()) | (m.collection_y == 'Meerkat Millionaires') ]
+	m[m.collection_y == 'Meerkat Millionaires']
+	m['collection'] = m.collection_y.fillna(m.collection_x)
+	del m['collection_x']
+	del m['collection_y']
 	m['token_id'] = m.token_id_x.fillna(m.token_id_y)
-	m[m.collection == 'SOLGods']
+	m[m.collection == 'Meerkat Millionaires']
 	del m['token_id_x']
 	del m['token_id_y']
 	m = m[m.token_id.notnull()]
+	m = m[m.collection == 'Meerkat Millionaires']
 	# print(sorted(m.collection.unique()))
 	m.sort_values('collection')
 	m = m[[ 'collection','token_id','sale_date','price','chain' ]]
 	s_df = pd.read_csv('./data/sales.csv')
+	sorted(s_df.collection.unique())
 	if 'collection_x' in s_df.columns and 'collection_y' in s_df.columns:
 		s_df['collection'] = s_df.collection.fillna(s_df.collection_x).fillna(s_df.collection_y)
 		del s_df['collection_x']
 		del s_df['collection_y']
 	l0 = len(s_df)
-	s_df = s_df[-s_df.collection.isin(sales.collection.unique())]
+	s_df = s_df[-s_df.collection.isin(m.collection.unique())]
 	s_df = s_df.append(m)
 	# print(s_df.groupby('collection').token_id.count())
 	l1 = len(s_df)
