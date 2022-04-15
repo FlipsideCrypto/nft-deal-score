@@ -230,9 +230,10 @@ def add_rarities():
 	len(g)
 	len(g.feature_name.unique())
 
-	fill_missing_metadata = True
+	fill_missing_metadata = False
 	if fill_missing_metadata:
 		c = 'Solana Monkey Business'
+		c = 'Meerkat Millionaires'
 		for c in m_df.collection.unique():
 			l1 = len(m_df)
 			cur = m_df[m_df.collection == c]
@@ -275,7 +276,8 @@ def add_rarities():
 	m_df = m_df[-((m_df.collection == 'Cets on Creck') & (m_df.token_id == '0'))]
 	m_df[((m_df.collection == 'Cets on Creck') & (m_df.token_id == '1'))]
 	m_df[((m_df.collection == 'SOLGods') & (m_df.token_id == '1'))]
-	m_df[((m_df.collection == 'SOLGods'))]
+	m_df[((m_df.collection == 'Meerkat Millionaires'))]
+	m_df[((m_df.collection == 'Meerkat Millionaires')) & (m_df.token_id=='1')]
 	sorted(m_df.collection.unique())
 
 	l1 = len(m_df)

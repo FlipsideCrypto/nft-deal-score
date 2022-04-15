@@ -366,7 +366,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collections = ['Cets on Creck']
 	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	s_df.groupby('collection').block_timestamp.max()
-	collections = ['SOLGods']
+	collections = ['Meerkat Millionaires']
 	print(sorted(collections))
 	for collection in collections:
 		if collection in ['Astrals','BAYC','MAYC']:
@@ -509,6 +509,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 
 		std_pred_cols_0 = [ 'std_{}'.format(c) for c in pred_cols ]
 		std_pred_cols = [ 'std_{}'.format(c) for c in pred_cols ]
+		df.sort_values('rel_price_0', ascending=0).head()[['token_id','nft_rank','price','rel_price_0']]
 
 		#########################
 		#     Run the Model     #
@@ -905,7 +906,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		exclude = exclude.append(salesdf[salesdf.exclude == 1][[ 'collection','token_id','price','exclude' ]])
 		# salesdf[salesdf.exclude == 1][[ 'collection','token_id','price','exclude' ]].to_csv('./data/exclude.csv', index=False)
 		exclude.to_csv('./data/exclude.csv', index=False)
-	# tokens[tokens.collection == 'SOLGods']
+	# tokens[tokens.collection == 'Meerkat Millionaires']
 	# tokens[tokens.collection == 'Cets on Creck'].sort_values('nft_rank', ascending=0)
 	# tokens[tokens.collection == 'Cets on Creck']
 	# tokens = tokens.drop_duplicates(subset=['collection','token_id'], keep='last')

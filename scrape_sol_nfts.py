@@ -43,10 +43,11 @@ def how_rare_is_api():
 	for d in j['result']['data'][8:]:
 		collection = 'Cets on Creck'
 		collection = 'SOLGods'
+		collection = 'Meerkat Millionaires'
 		collection = d['url'][1:]
 		print('Working on collection {}, {}, {}'.format(collection, len(t_data), len(metadata)))
 		url = 'https://api.howrare.is/v0.1/collections'+d['url']
-		url = 'https://api.howrare.is/v0.1/collections/solgods'
+		url = 'https://api.howrare.is/v0.1/collections/meerkatmillionaires'
 		r = requests.get(url)
 		j = r.json()
 		for i in j['result']['data']['items']:
@@ -61,6 +62,7 @@ def how_rare_is_api():
 			m['collection'] = collection
 			metadata = metadata.append(m)
 	old = pd.read_csv('./data/tokens.csv')
+	sorted(old.collection.unique())
 	l0 = len(old)
 	tokens = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
 	# old = old.merge(tokens, how='left', on=['collection','token_id'])
@@ -72,6 +74,8 @@ def how_rare_is_api():
 	old.to_csv('./data/tokens.csv', index=False)
 
 	old = pd.read_csv('./data/metadata.csv')
+	old = old[-(old.collection == 'Meerkat Millionaires Cc')]
+	print(sorted(old.collection.unique()))
 	l0 = len(old)
 	metadata.collection.unique()
 	# metadata = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
@@ -601,7 +605,7 @@ def scrape_listings(browser, collections = [ 'solgods','cets-on-creck','stoned-a
 	# collections = ['defi-pirates']
 	# collections = ['cets-on-creck','astrals']
 	# collections = ['cets-on-creck']
-	# collections = ['defi-pirates', 'astrals']
+	# collections = ['meerkat-millionaires-cc']
 	for collection in collections:
 		if collection == 'boryokudragonz':
 			continue
