@@ -361,32 +361,46 @@ def solana():
 
 	collection = 'Cets On Creck'
 	collection = 'Astrals'
+
+
+
 	metadata = pd.read_csv('./data/metadata.csv')
-	print(sorted(metadata.collection.unique()))
-	metadata = metadata[metadata.collection == collection]
-	print(sorted(metadata.collection.unique()))
+	# print(sorted(metadata.collection.unique()))
+	# metadata = metadata[metadata.collection == collection]
+	# print(sorted(metadata.collection.unique()))
 	metadata = metadata[-(metadata.feature_name.isin(['adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2','nft_rank']))]
 	len(metadata.token_id.unique())
 	id_map = pd.read_csv('./data/mint_to_token_id_map.csv')
 	id_map = pd.read_csv('./data/tokens.csv')
-	id_map = id_map[id_map.collection == collection]
+	cs = ['SOLGods']
+	id_map = id_map[id_map.collection.isin(cs)]
+	metadata = metadata[metadata.collection.isin(cs)]
+	sorted(id_map.collection.unique())
+	sorted(metadata.collection.unique())
 
-	id_map['token_id'] = id_map.token_id.astype(int)
-	metadata['token_id'] = metadata.token_id.astype(int)
+	# id_map['token_id'] = id_map.token_id.astype(int)
+	# metadata['token_id'] = metadata.token_id.astype(int)
+	id_map['token_id'] = id_map.token_id.astype(str)
+	metadata['token_id'] = metadata.token_id.astype(str)
 
-	metadata = merge(metadata, id_map[['collection','token_id','mint_address','image_url']], ensure = True)
+	metadata = merge(metadata, id_map[['collection','token_id','mint_address','image_url']], ensure = False)
+	metadata = metadata[metadata.collection.isin(cs)]
 
 	metadata['feature_name'] = metadata.feature_name.apply(lambda x: x.title() )
 	# metadata['image_url'] = metadata.token_id.apply(lambda x: 'https://metadata.degods.com/g/{}.png'.format(x - 1) )
 	metadata.head()
+	metadata = metadata[-(metadata.feature_name.isin(['Nft_Rank','Adj_Nft_Rank_0','Adj_Nft_Rank_1','Adj_Nft_Rank_2']))]
+	# print(metadata.groupby('feature_name').token_id.count().reset_index().sort_values('token_id', ascending=0).head(10))
 
 	metadata = metadata[metadata.feature_name != 'L3G3Nd4Ry']
 
-	print(sorted(metadata.collection.unique()))
-	sorted(metadata[metadata.collection == collection].feature_name.unique())
+	# print(sorted(metadata.collection.unique()))
+	# sorted(metadata[metadata.collection == collection].feature_name.unique())
+	# sorted(metadata.feature_name.unique())
 
 	# metadata[['collection']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
 
+	metadata['token_id'] = metadata.token_id.astype(int)
 	for collection in metadata.collection.unique():
 		print(collection)
 		mdf = metadata[metadata.collection == collection]

@@ -146,33 +146,47 @@ fluidPage(
 		, bsTooltip(id = "historical-sales-tooltip", title = "This app is still in beta - sales data may be incomplete or delayed", placement = "bottom", trigger = "hover")
 		, fluidRow(
             class = 'filters'
-			, column(3
+			, column(2
 				, div(
 					class = "inputtitle"
 					, "Min Deal Score Rank"
 				)
 				, fluidRow(uiOutput("minnftrankinput2"))
 			)
-			, column(3
+			, column(2
 				, div(
 					class = "inputtitle"
 					, "Max Deal Score Rank"
 				)
 				, fluidRow(uiOutput("maxnftrankinput2"))
 			)
-			, column(3
+			, column(2
 				, div(
 					class = "inputtitle"
 					, "Min Rarity Rank"
 				)
 				, fluidRow(uiOutput("minrarityrankinput2"))
 			)
-			, column(3
+			, column(2
 				, div(
 					class = "inputtitle"
 					, "Max Rarity Rank"
 				)
 				, fluidRow(uiOutput("maxrarityrankinput2"))
+			)
+			, column(2
+				, div(
+					class = "inputtitle"
+					, "Min Floor"
+				)
+				, fluidRow(uiOutput("minfloorinput"))
+			)
+			, column(2
+				, div(
+					class = "inputtitle"
+					, "Max Floor"
+				)
+				, fluidRow(uiOutput("maxfloorinput"))
 			)
 			, column(3
 				, div(

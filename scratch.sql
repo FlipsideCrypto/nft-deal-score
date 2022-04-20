@@ -1,3 +1,380 @@
+
+
+WITH base AS (
+	SELECT native_to_address, COUNT(1) AS n
+	FROM thorchain.swaps
+	WHERE block_timestamp >= '2022-04-01'
+	GROUP BY 1
+)
+select b.n, s.* from thorchain.swaps s 
+JOIN base b ON b.native_to_address = s.native_to_address
+where block_timestamp >= '2022-04-10'
+ORDER BY block_timestamp, n, tx_id
+LIMIT 100
+
+
+
+SELECT MIN(block_timestamp) AS mn
+, MAX(block_timestamp) AS mx
+, COUNT(1) AS n
+FROM flipside_dev_db.thorchain.liquidity_actions
+
+
+SELECT MIN(block_timestamp) AS mn
+, MAX(block_timestamp) AS mx
+, COUNT(1) AS n
+FROM flipside_dev_db.thorchain.liquidity_actions
+
+
+SELECT MIN(block_timestamp) AS mn
+, MAX(block_timestamp) AS mx
+, COUNT(1) AS n
+FROM flipside_dev_db.thorchain.bond_actions
+
+SELECT 
+
+
+
+https://app.flipsidecrypto.com/dashboard/small-lp-actions-LD1XQ9
+
+
+https://app.flipsidecrypto.com/dashboard/pool-ranks-UbtLg9
+https://app.flipsidecrypto.com/dashboard/price-shift-_-JpTq
+https://app.flipsidecrypto.com/dashboard/tho-rchain-average-age-of-synth-holders-Z2AXIx
+https://app.flipsidecrypto.com/dashboard/thor-64-standardized-tvl-over-time-all-pools-Zf6w-L
+https://app.flipsidecrypto.com/dashboard/tho-rchain-pool-ranks-RNNzza
+https://app.flipsidecrypto.com/dashboard/thorchain-synth-mints-burns-aH0lCY
+
+https://discord.com/channels/889577356681945098/889577399308656662/951960381411192842
+
+solana-keygen recover 'prompt:?key=3/0' --outfile ~/.config/solana/tmp.json
+
+
+SELECT *
+, instructions[0]:parsed:info:lamports / POWER(10, 9) AS sol_amount
+FROM solana.fact_transactions
+WHERE block_timestamp >= '2022-01-02'
+AND tx_id = '5H6UQqbxa2wtryax6SAZgjXB9B6Za4ip6GsheqopAsbLCrLMPvYf35H551SaAKNy6bi6BceRGtkwwP9LRoN7RiVo'
+
+
+SELECT *
+FROM solana.fact_transfers
+WHERE block_timestamp >= '2022-01-02'
+AND tx_id = '393xRouisz4DuMxzARAqPy7FVYQZtkfpmAMuDXXj39uvASFYtMijHM9hyVzXSocsB4fk2woLNfnWTM4qXJxJsWBw'
+
+SELECT lp.tx_id
+, lp.signers[0] as signer
+, t.instructions[0]:parsed:info:lamports / POWER(10, 9) AS sol_amount
+FROM solana.fact_staking_lp_actions lp
+JOIN solana.fact_transactions t ON t.tx_id = lp.tx_id
+WHERE lp.block_timestamp >= '2022-01-01'
+AND lp.event_type = 'delegate' 
+AND tx_id = '393xRouisz4DuMxzARAqPy7FVYQZtkfpmAMuDXXj39uvASFYtMijHM9hyVzXSocsB4fk2woLNfnWTM4qXJxJsWBw'
+LIMIT 10
+
+sudo apt-get build-dep python E: You must put some 'deb-src' URIs in your sources.list
+
+
+SELECT project_name
+, COUNT(1) AS n
+, SUM( CASE WHEN address IS NULL THEN 1 ELSE 0 END) AS n_nulls
+FROM crosschain.address_labels
+WHERE blockchain = 'solana'
+AND label_subtype = 'nf_token_contract'
+GROUP BY 1
+
+-- MEv1 De-Listing
+WITH mints AS (
+	SELECT DISTINCT project_name
+	, mint
+	, token_id
+	FROM solana.dim_nft_metadata
+)
+SELECT pre_token_balances[0]:mint::string AS mint
+, t.*
+, m.project_name
+, m.token_id
+FROM solana.fact_transactions t
+JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+WHERE block_timestamp >= CURRENT_DATE - 30
+AND tx_id = '3CxhnTCXYX1zH6HbNESFsZLwdHfTe7RUYF8tAgB168hciVjUGggp2PwVEsnDvpd2kNqMha7kH2be7NtSTppAnXzn'
+AND instructions[0]:data = 'TE6axTojnpk'
+AND instructions[0]:programId = 'MEisE1HzehtrDpAAT8PnLHjpSSkRYakotTuJRPjTpo8'
+AND succeeded = TRUE
+LIMIT 100
+
+ENwHiaH9NA9veUqRzGozjWnTuR9xcNvHcPZVFMi3Ca9L
+
+
+WITH mints AS (
+	SELECT DISTINCT project_name
+	, mint
+	, token_id
+	FROM solana.dim_nft_metadata
+)
+SELECT instructions[0]:data AS data
+, COUNT(1) AS n
+, COUNT(1) AS nn
+FROM solana.fact_transactions t
+JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+WHERE block_timestamp >= '2022-04-17'
+AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+AND succeeded = TRUE
+GROUP BY 1
+ORDER BY 2 DESC
+
+
+-- MEv2 De-Listing
+WITH mints AS (
+	SELECT DISTINCT project_name
+	, mint
+	, token_id
+	FROM solana.dim_nft_metadata
+), rem AS (
+	SELECT pre_token_balances[0]:mint::string AS mint
+	, m.project_name
+	, m.token_id
+	, t.tx_id AS remove_tx
+	, block_timestamp AS remove_time
+	, ROW_NUMBER() OVER (PARTITION BY mint ORDER BY block_timestamp DESC) AS rn
+	FROM solana.fact_transactions t
+	JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+	WHERE block_timestamp >= CURRENT_DATE - 3
+	AND LEFT(instructions[0]:data::string, 4) IN ('ENwH','3GyW')
+	AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+), add AS (
+	SELECT pre_token_balances[0]:mint::string AS mint
+	, m.project_name
+	, m.token_id
+	, t.tx_id AS listing_tx
+	, block_timestamp AS listing_time
+	, ROW_NUMBER() OVER (PARTITION BY mint ORDER BY block_timestamp DESC) AS rn
+	FROM solana.fact_transactions t
+	JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+	WHERE block_timestamp >= CURRENT_DATE - 3
+	AND LEFT(instructions[0]:data::string, 4) IN ('2B3v')
+	AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+	AND succeeded = TRUE
+)
+SELECT a.*
+, r.remove_tx
+, r.remove_time
+, CASE WHEN r.remove_time IS NULL OR a.listing_time > r.remove_time THEN 1 ELSE 0 END AS is_listed
+FROM add a
+LEFT JOIN rem r ON r.mint = a.mint AND r.rn = 1
+WHERE a.rn = 1
+
+thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj
+
+WITH base AS (
+	SELECT from_address AS address 
+	, block_timestamp::date AS date
+	, -from_amount AS amount
+	, 'From Swap' AS tx_type
+	FROM thorchain.swaps
+	WHERE from_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+	AND from_asset = 'THOR.RUNE'
+
+	UNION ALL
+
+	SELECT native_to_address AS address 
+	, block_timestamp::date AS date
+	, to_amount AS amount
+	, 'To Swap' AS tx_type
+	FROM thorchain.swaps
+	WHERE native_to_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+	AND to_asset = 'THOR.RUNE'
+
+	UNION ALL
+
+	SELECT from_address AS address 
+	, block_timestamp::date AS date
+	, -rune_amount AS amount
+	, 'From Transfer' AS tx_type
+	FROM thorchain.transfers
+	WHERE from_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+
+	UNION ALL
+
+	SELECT to_address AS address 
+	, block_timestamp::date AS date
+	, rune_amount AS amount
+	, 'To Transfer' AS tx_type
+	FROM thorchain.transfers
+	WHERE to_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+)
+SELECT *
+FROM base
+ORDER BY date DESC
+
+68. [Hard] $RUNE Distribution
+Calculate the distribution of $RUNE holdings by address. Include RUNE that is in liquidity pools. (e.g. if I have 100 $RUNE in my wallet and LP 50, I should still be considered to be holding 100). In terms of charts, feel free to create a histogram or whichever visual you think works best!
+
+Hint: use thorchain.transfers and thorchain.liquidity_actions
+
+70. [Hard] Weighted-average LP duration
+What is the average duration of liquidity held in each pool, weighted by the size of the LP?
+
+Hint: use thorchain.liquidity_actions
+
+69. [Medium] LP Size Distribution
+What is the current distribution of LP size for each pool? You will have to use both 'add_liquidity' and 'remove_liquidity' to determine which LPs are stil current.
+
+Hint: use thorchain.liquidity_actions
+
+71. [Easy] Block Rewards vs Swap Fees
+Breakdown the yield from block rewards vs swap fees, both total and by pool. Show how the proportions have changed over time since the network started.
+
+Hint: use thorchain.block_rewards
+
+
+72. [Medium] Swap Volume vs LP Rewards
+Chart the weekly swap volume and LP rewards on the same chart. What is the relationship between the two?
+
+Hint: use thorchain.daily_pool_stats to get swap volume and earnings_to_pools from thorchain.daily_earnings to get LP rewards
+
+73. [Hard] Realized APY
+Visualize the realized APY of LP-ers that have removed liquidity from THORChain. What was their actual APY vs HODL (accounting for impermanent loss) when you pro-rate it for how long they were LP-ing for? Are certain pools out-performing others?
+
+Hint: use thorchain.liquidity_actions
+
+
+SELECT *
+FROM THORCHAIN.DAILY_POOL_STATS
+WHERE pool_name ilike '%luna%'
+ORDER BY day DESC
+
+
+WITH base AS (
+	SELECT from_address AS address 
+	, block_timestamp::date AS date
+	, rune_amount AS lp_amount
+	, 'Add LP' AS tx_type
+	FROM thorchain.liquidity_actions
+	WHERE from_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+	AND lp_action = 'add_liquidity'
+
+	UNION ALL
+
+	SELECT from_address AS address 
+	, block_timestamp::date AS date
+	, -rune_amount AS lp_amount
+	, 'Rem LP' AS tx_type
+	FROM thorchain.liquidity_actions
+	WHERE from_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+	AND lp_action = 'remove_liquidity'
+
+	UNION ALL
+
+	SELECT native_to_address AS address 
+	, block_timestamp::date AS date
+	, to_amount AS amount
+	, 'To Swap' AS tx_type
+	FROM thorchain.swaps
+	WHERE native_to_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+	AND to_asset = 'THOR.RUNE'
+
+	UNION ALL
+
+	SELECT from_address AS address 
+	, block_timestamp::date AS date
+	, -rune_amount AS amount
+	, 'From Transfer' AS tx_type
+	FROM thorchain.transfers
+	WHERE from_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+
+	UNION ALL
+
+	SELECT to_address AS address 
+	, block_timestamp::date AS date
+	, rune_amount AS amount
+	, 'To Transfer' AS tx_type
+	FROM thorchain.transfers
+	WHERE to_address = 'thor12209cxpf4mpm8qxdyzmm4k8mfuyjt4fysnwyjj'
+)
+SELECT *
+FROM base
+ORDER BY date DESC
+
+-- 2B3v: listing
+-- ENwH: de-listing
+-- 3GyW: sale
+
+WITH mints AS (
+	SELECT DISTINCT project_name
+	, mint
+	, token_id
+	FROM solana.dim_nft_metadata
+)
+SELECT pre_token_balances[0]:mint::string AS mint
+, t.*
+, m.project_name
+, m.token_id
+FROM solana.fact_transactions t
+JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+WHERE block_timestamp >= CURRENT_DATE - 2
+AND tx_id = '3CxhnTCXYX1zH6HbNESFsZLwdHfTe7RUYF8tAgB168hciVjUGggp2PwVEsnDvpd2kNqMha7kH2be7NtSTppAnXzn'
+AND LEFT(instructions[0]:data::string, 4) IN ('2B3v')
+AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+AND succeeded = TRUE
+LIMIT 100
+
+
+
+
+
+
+SELECT MIN(block_timestamp) AS mn
+, MAX(block_timestamp) AS mx
+, COUNT(1) AS n
+FROM flipside_prod_db.thorchain.liquidity_actions
+
+
+SELECT MIN(block_timestamp) AS mn
+, MAX(block_timestamp) AS mx
+, COUNT(1) AS n
+FROM flipside_prod_db.thorchain.prices
+
+liquidity_actions
+bond_actions
+
+
+SELECT MIN(block_timestamp) AS mn
+, MAX(block_timestamp) AS mx
+, COUNT(1) AS n
+FROM flipside_prod_db.thorchain.bond_actions
+
+
+SELECT MIN(block_timestamp) AS mn
+, MAX(block_timestamp) AS mx
+, COUNT(1) AS n
+FROM flipside_prod_db.thorchain.pool_block_balances
+WHERE rune_amount > 0 and COALESCE(rune_amount_usd, 0) = 0
+
+SELECT MIN(block_timestamp) AS mn
+, MAX(block_timestamp) AS mx
+, COUNT(1) AS n
+FROM flipside_prod_db.thorchain.pool_block_balances
+WHERE asset_amount > 0 and COALESCE(asset_amount_usd, 0) = 0
+
+SELECT *
+FROM flipside_prod_db.thorchain.pool_block_balances
+WHERE (asset_amount > 0 and COALESCE(asset_amount_usd, 0) = 0)
+OR (rune_amount > 0 and COALESCE(rune_amount_usd, 0) = 0)
+ORDER BY block_timestamp DESC
+LIMIT 10000
+
+SELECT block_timestamp::date AS date
+, COUNT(1) AS n
+FROM flipside_prod_db.thorchain.pool_block_balances
+WHERE (asset_amount > 0 and COALESCE(asset_amount_usd, 0) = 0)
+OR (rune_amount > 0 and COALESCE(rune_amount_usd, 0) = 0)
+ORDER BY block_timestamp DESC
+GROUP BY 1
+ORDER BY 1
+
+
+
 WITH active_vault_events_cte AS
   (SELECT max(block_timestamp)::string AS recency, min(block_timestamp)::string AS start_time,
           'active_vault_events' AS "table"

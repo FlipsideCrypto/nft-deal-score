@@ -364,12 +364,12 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collections = [ x for x in collections if not x in ['Bakc','BAKC','MAYC'] ]
 	collections = [ x for x in collections if not x in ['Astrals','Cets on Cleck','DeFi Pirates'] ]
 	collections = ['Cets on Creck']
-	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	s_df.groupby('collection').block_timestamp.max()
 	collections = ['Meerkat Millionaires']
+	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	print(sorted(collections))
 	for collection in collections:
-		if collection in ['Astrals','BAYC','MAYC']:
+		if collection in ['Astrals','Bakc','BAYC','MAYC']:
 			continue
 		if not collection in saved_params.keys():
 			saved_params[collection] = {}
@@ -381,7 +381,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		print('\nWorking on collection {}'.format(collection))
 		sales = s_df[ s_df.collection == collection ]
 		sales[sales.sim==0].block_timestamp.max()
-		metadata = m_df[ m_df.collection == collection ].drop_duplicates()
+		metadata = m_df[ m_df.collection == collection ].drop_duplicates(subset=['token_id','feature_name'], keep='last')
 		metadata = metadata[metadata.feature_name != 'Genesis Role?']
 		metadata[metadata.token_id=='1']
 		metadata[metadata.feature_name=='Genesis Role?'].feature_value.unique()
@@ -629,7 +629,14 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 						mn = coefs.val.min()
 						if mn >= 0:
 							df, bst_p, bst_r = ku.get_bst_params( model, df, X_new, y, target_col, col, verbose = True, wt_col='wt', params = [bst_p] )
+					coefs['col'] = coefs.col.apply(lambda x: re.sub('std_', '', x) )
+					coefs['n'] = 0
+					n = pd.DataFrame()
+					for c in cat_metadata.columns:
+						if not c in [ 'collection','token_id' ]:
+							coefs.loc[ coefs.col == c, 'n' ] = len(cat_metadata[cat_metadata[c] == 1])
 					coefs.to_csv('./data/coefs/{}_{}_{}.csv'.format(collection, model, it), index=False)
+
 				test = ku.apply_model( model, bst_p, df, test, cur_std_pred_cols, target_col, col)
 				if model in ['rfr']:
 					df[col] = df[col] + df['rarity_value_'+it]
