@@ -40,14 +40,22 @@ def how_rare_is_api():
 	j.keys()
 	t_data = []
 	metadata = pd.DataFrame()
-	for d in j['result']['data'][8:]:
-		collection = 'Cets on Creck'
-		collection = 'SOLGods'
-		collection = 'Meerkat Millionaires'
-		collection = d['url'][1:]
+	d = {
+		'Degen Apes': 'degenapes'
+		, 'Pesky Penguins': 'peskypenguinclub'
+		, 'Aurory': 'aurory'
+		, 'Solana Monkey Business': 'smb'
+		, 'Thugbirdz': 'thugbirdz'
+	}
+	for collection, url in d.items():
+		# collection = 'Cets on Creck'
+		# collection = 'SOLGods'
+		# collection = 'Meerkat Millionaires'
+		# collection = d['url'][1:]
 		print('Working on collection {}, {}, {}'.format(collection, len(t_data), len(metadata)))
-		url = 'https://api.howrare.is/v0.1/collections'+d['url']
-		url = 'https://api.howrare.is/v0.1/collections/meerkatmillionaires'
+		# url = 'https://api.howrare.is/v0.1/collections'+d['url']
+		# url = 'https://api.howrare.is/v0.1/collections/meerkatmillionaires'
+		url = 'https://api.howrare.is/v0.1/collections/'+url
 		r = requests.get(url)
 		j = r.json()
 		for i in j['result']['data']['items']:
@@ -64,27 +72,50 @@ def how_rare_is_api():
 	old = pd.read_csv('./data/tokens.csv')
 	sorted(old.collection.unique())
 	l0 = len(old)
+	do_merge = True
 	tokens = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
-	# old = old.merge(tokens, how='left', on=['collection','token_id'])
-	old = old.append(tokens)
-	# old['nft_rank'] = old.nft_rank_y.fillna(old.nft_rank_y)
-	# del old['nft_rank_x']
-	# del old['nft_rank_y']
+	if do_merge:
+		old['token_id'] = old.token_id.astype(str)
+		tokens['token_id'] = tokens.token_id.astype(str)
+		old = old.merge(tokens, how='left', on=['collection','token_id'])
+		old[old.collection == 'Solana Monkey Business']
+		for c in [ 'nft_rank','mint_address','image_url' ]:
+			old[c] = old[c+'_x'].fillna(old[c+'_y'])
+			del old[c+'_x']
+			del old[c+'_y']
+		old['clean_token_id'] = old.clean_token_id.fillna(old.token_id)
+		old['chain'] = old.chain.fillna('Solana')
+	else:
+		old = old.append(tokens)
 	print('Adding {} rows'.format(len(old) - l0))
+	old[old.nft_rank.isnull()].groupby('collection').token_id.count()
 	old.to_csv('./data/tokens.csv', index=False)
 
 	old = pd.read_csv('./data/metadata.csv')
-	old = old[-(old.collection == 'Meerkat Millionaires Cc')]
+	a = old[['collection','token_id']].drop_duplicates()
+	a['exclude'] = 0
+	a['token_id'] = a.token_id.astype(str)
+	metadata['token_id'] = metadata.token_id.astype(str)
+	m = metadata.merge(a, how='left')
+	m = m[m.exclude.isnull()]
+	len(m[m.exclude.isnull()].token_id.unique())
+	del m['exclude']
+	# old = old[-(old.collection == 'Meerkat Millionaires Cc')]
 	print(sorted(old.collection.unique()))
 	l0 = len(old)
 	metadata.collection.unique()
 	# metadata = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
 	# old = old.merge(tokens, how='left', on=['collection','token_id'])
-	old = old.append(metadata)
+	old = old.append(m[['collection','token_id','name','value']].rename(columns={'name':'feature_name','value':'feature_value'}) )
+	old['token_id'] = old.token_id.astype(str)
+	old = old.drop_duplicates(subset=['collection','token_id','feature_name'])
 	# old['nft_rank'] = old.nft_rank_y.fillna(old.nft_rank_y)
 	# del old['nft_rank_x']
 	# del old['nft_rank_y']
 	print('Adding {} rows'.format(len(old) - l0))
+	print(old.groupby('collection').token_id.count())
+	old[old.collection.isin(metadata.collection)]
+	old[(old.collection == 'Thugbirdz') & (old.token_id == '1206')]
 	old.to_csv('./data/metadata.csv', index=False)
 
 
@@ -580,7 +611,7 @@ def scrape_opensea_listings(browser, collections=['BAYC','MAYC']):
 	old.groupby('collection').token_id.count()
 	old.to_csv('./data/listings.csv', index=False)
 
-def scrape_listings(browser, collections = [ 'solgods','cets-on-creck','stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
+def scrape_listings(browser, collections = [ 'meerkat-millionaires-cc','solgods','cets-on-creck','stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
 	data = []
 	m_data = []
@@ -775,6 +806,7 @@ def scrape_listings(browser, collections = [ 'solgods','cets-on-creck','stoned-a
 
 	old = pd.read_csv('./data/listings.csv')
 	listings = pd.DataFrame(data, columns=['collection','token_id','price']).drop_duplicates()
+	listings.groupby('collection').price.min()
 	# others = scrape_magic_eden()
 	# listings = listings.append(others).drop_duplicates()
 	# d = {
@@ -788,10 +820,13 @@ def scrape_listings(browser, collections = [ 'solgods','cets-on-creck','stoned-a
 	# 	,'degods': 'DeGods'
 	# }
 	listings['collection'] = listings.collection.apply(lambda x: clean_name(x))
+	listings.groupby('collection').price.min()
+	listings.groupby('collection').price.count()
 	listings[listings.token_id=='1656']
 	listings[listings.token_id==484]
 
 	old = old[ -(old.collection.isin(listings.collection.unique())) ]
+	old = old[old.collection != 'Meerkat Millionaires Cc']
 	pred_price = pd.read_csv('./data/pred_price.csv')
 	listings.token_id.values[:3]
 	pred_price.token_id.values[:3]

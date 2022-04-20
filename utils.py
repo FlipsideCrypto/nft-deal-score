@@ -40,7 +40,7 @@ def clean_token_id(df):
 
 def clean_name(name):
 	x = re.sub('-', '', name).lower()
-	x = re.sub(' ', '', name).lower()
+	x = re.sub(' ', '', x).lower()
 	if x in clean_names.keys():
 		return(clean_names[x])
 	name = name.title()

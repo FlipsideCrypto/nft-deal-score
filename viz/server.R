@@ -1,5 +1,14 @@
 server <- function(input, output, session) {
-	load('data.Rdata')
+	# load('data.Rdata')
+
+	file.location <- ifelse(
+		Sys.info()[["user"]] == "rstudio-connect"
+		, "/rstudio-data/"
+		, '~/git/nft-deal-score/viz/'
+	)
+	load(paste0(file.location, 'nft_deal_score_data.RData'))
+	load(paste0(file.location, 'nft_deal_score_listings_data.RData'))
+	# load(paste0(file.location, 'data.RData'))
 
     metadata <- unique(attributes[, list(collection, feature_name, feature_value)])
 
@@ -81,6 +90,20 @@ server <- function(input, output, session) {
 		)
 	})
 
+	output$minfloorinput <- renderUI({
+		textInput(
+			inputId = 'minfloorinput'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+	output$maxfloorinput <- renderUI({
+		textInput(
+			inputId = 'maxfloorinput'
+			, label = NULL
+			, width = "100%"
+		)
+	})
 	output$maxrarityrankinput2 <- renderUI({
 		textInput(
 			inputId = 'maxrarityrank2'
@@ -509,10 +532,12 @@ server <- function(input, output, session) {
 		}
         t <- ''
         if (nrow(data)) {
-            p <- format(round(mean(head(data$price, 100)), 1), big.mark=',')
-            f <- format(round(mean(head(data$vs_floor, 100)), 1), big.mark=',')
+			data <- head(data, 100)
+            p <- format(round(mean(data$price), 1), big.mark=',')
+            f <- format(round(mean(data$vs_floor), 1), big.mark=',')
 			data[, pct_vs_floor := (vs_floor + price) / price ]
-            pct <- format(round(mean(head(data$pct_vs_floor, 100)), 1), big.mark=',')
+			pct <- sum(data$price) / sum(data$mn_20)
+            pct <- format(round(pct, 1), big.mark=',')
 			chain <- getChain()
 			currency <- ifelse( chain == 'Solana', 'SOL', ifelse(chain == 'Ethereum', 'ETH', 'LUNA') )
             t <- paste0(p, ' $',currency,' (+',f,' / ',pct,'x vs the floor)')
@@ -818,6 +843,18 @@ server <- function(input, output, session) {
         }
         if(input$minnftrank2 != '') {
             data <- data[ rk >= eval(as.numeric(input$minnftrank2)) ]
+        }
+        if(input$maxrarityrank2 != '') {
+            r <- as.numeric(input$maxrarityrank2)
+            data <- data[ nft_rank <= eval(r) ]
+        }
+        if(input$minfloorinput != '') {
+            r <- as.numeric(input$minfloorinput)
+            data <- data[ minfloorinput >= eval(r) ]
+        }
+        if(input$maxfloorinput != '') {
+            r <- as.numeric(input$maxfloorinput)
+            data <- data[ maxfloorinput <= eval(r) ]
         }
         if(input$maxrarityrank2 != '') {
             r <- as.numeric(input$maxrarityrank2)

@@ -2,26 +2,77 @@ library(data.table)
 library(dplyr)
 library(plotly)
 
-pred_price <- read.csv('~/nft-deal-score/data/pred_price.csv') %>% as.data.table()
+isRstudio <- Sys.info()[["user"]] == 'rstudio-connect'
+
+file.location <- ifelse(
+	isRstudio
+	, "/rstudio-data/"
+	, '~/git/nft-deal-score/viz/'
+)
+
+read_csv <- function(fname) {
+	dir <- ifelse(isRstudio, '/rstudio-data/', '~/git/nft-deal-score/data/')
+	fname <- paste0(dir, fname)
+	dt <- read.csv(fname) %>% as.data.table()
+}
+
+# load all csvs
+pred_price <- read_csv('pred_price.csv')
 pred_price[, token_id := as.numeric(token_id) ]
 pred_price <- pred_price[ collection != 'meerkatmillionaires' ]
 pred_price <- pred_price[order(token_id)]
 
-attributes <- read.csv('~/nft-deal-score/data/attributes.csv') %>% as.data.table()
-feature_values <- read.csv('~/nft-deal-score/data/feature_values.csv') %>% as.data.table()
-sales <- read.csv('~/nft-deal-score/data/model_sales.csv') %>% as.data.table()
-listings <- read.csv('~/nft-deal-score/data/listings.csv') %>% as.data.table()
-coefsdf <- read.csv('~/nft-deal-score/data/coefsdf.csv') %>% as.data.table()
-tokens <- read.csv('~/nft-deal-score/data/tokens.csv') %>% as.data.table()
+attributes <- read_csv('attributes.csv')
+attributes[, feature_name := trimws(feature_name) ]
+attributes[, feature_value := trimws(as.character(feature_value)) ]
+feature_values <- read_csv('feature_values.csv')
+sales <- read_csv('model_sales.csv')
+listings <- read_csv('listings.csv')
+coefsdf <- read_csv('coefsdf.csv')
+tokens <- read_csv('tokens.csv')
+tokens[, token_id := clean_token_id]
+sales[, price := as.numeric(price)]
+sales[, token_id := as.numeric(token_id)]
+listings[, token_id := as.numeric(token_id)]
+listings <- listings[ !(collection == 'Stoned Ape Crew' & token_id == 764) ]
+listings <- listings[ !(collection == 'Solana Monkey Business' & token_id == 953) ]
+tokens[, token_id := as.numeric(token_id)]
 
+# manual adjustments to price
+ids_1 <- attributes[ (collection == 'Aurory') & (feature_value == 'Solana Blob') ]$token_id
+pred_price[  collection == 'Aurory' & token_id %in% eval(ids_1), pred_price := (pred_price * 0.8) ]
 
-# save(pred_price, attributes, feature_values, sales, listings, coefsdf, tokens, file='data.Rdata')
-save(pred_price, attributes, feature_values, sales, listings, coefsdf, tokens, file='~/nft-deal-score/viz/data.Rdata')
-load('~/git/nft-deal-score/viz/data.Rdata')
-write.csv(listings, '~/git/nft-deal-score/data/listings.csv', row.names=F)
-write.csv(attributes, '~/git/nft-deal-score/data/attributes.csv', row.names=F)
-write.csv(sales, '~/git/nft-deal-score/data/model_sales.csv', row.names=F)
-write.csv(sales, '~/git/nft-deal-score/data/model_sales.csv', row.names=F)
-write.csv(coefsdf, '~/git/nft-deal-score/data/coefsdf.csv', row.names=F)
-write.csv(tokens, '~/git/nft-deal-score/data/tokens.csv', row.names=F)
-write.csv(pred_price, '~/git/nft-deal-score/data/pred_price.csv', row.names=F)
+ids_2 <- attributes[ (collection == 'Aurory') & (feature_value == 'Long Blob Hair ') ]$token_id
+pred_price[  collection == 'Aurory' & token_id %in% eval(ids_2), pred_price := (pred_price * 0.90) ]
+
+ids_3 <- attributes[ (collection == 'Aurory') & (grepl( 'Mask', feature_value, fixed = TRUE)) ]$token_id
+pred_price[  collection == 'Aurory' & token_id %in% eval(ids_3), pred_price := (pred_price * 0.975) ]
+
+# filter for only collections that have all data
+a <- unique(pred_price[, list(collection)])
+b <- unique(sales[, list(collection)])
+c <- unique(listings[, list(collection)])
+d <- merge(merge(a, b), c)
+
+pred_price <- merge(pred_price, d, by=c('collection'))
+attributes <- merge(attributes, d, by=c('collection'))
+feature_values <- merge(feature_values, d, by=c('collection'))
+sales <- merge(sales, d, by=c('collection'))
+listings <- merge(listings, d, by=c('collection'))
+coefsdf <- merge(coefsdf, d, by=c('collection'))
+tokens <- merge(tokens, d, by=c('collection'))
+
+save(
+	pred_price
+	, attributes
+	, feature_values
+	, sales
+	, listings
+	, coefsdf
+	, tokens
+	, file = paste0(file.location,'nft_deal_score_data.Rdata')
+)
+save(
+	listings
+	, file = paste0(file.location,'nft_deal_score_listings_data.Rdata')
+)

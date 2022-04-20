@@ -52,12 +52,15 @@ ld.add_solana_sales()
 ld.add_eth_sales()
 
 # update listings
-# ssn.scrape_listings(browser, ['smb'])
-# ssn.scrape_listings(browser, ['cets-on-creck'])
+# ssn.scrape_listings(browser, ['meerkat-millionaires-cc'])
+# ssn.scrape_listings(browser, ['thugbirdz'])
 ssn.scrape_listings(browser)
 ssn.scrape_randomearth(browser)
 ssn.scrape_opensea_listings(browser)
 # ssn.scrape_listings(browser, ['smb','aurory'])
+
+listings = pd.read_csv('./data/listings.csv')
+listings[listings.collection == 'Solana Monkey Business'].sort_values('price').head(20)
 
 # update model
 # ssn.convert_collection_names()

@@ -138,6 +138,7 @@ def mints_from_me():
 		offset += 500
 	lp_df = pd.DataFrame(lp_data)
 	lp_df.to_csv('./data/me_lp_collections.csv', index=False)
+	lp_df = pd.read_csv('./data/me_lp_collections.csv')
 
 	it = 0
 	l_data = []
@@ -249,10 +250,30 @@ def mints_from_me():
 	m_df.to_csv('./data/me_update_authorities.csv', index=False)
 
 	m_df = pd.read_csv('./data/me_update_authorities.csv')
+	def f(x):
+		x = re.sub('\(|\)', '', x)
+		x = re.sub(' ', '_', x)
+		x = re.sub('\'', '', x)
+		return(x)
+	m_df['collection'] = m_df.name.apply(lambda x: f(x) )
+
+	x = 'asf (asf)'
+	f(x)
+
+	seen = [ x for x in m_df.collection.unique() if os.path.exists('./data/mints/{}/'.format(x)) and len(os.listdir('./data/mints/{}/'.format(x))) ]
+	print(len(seen))
+	# m_df = m_df.merge(lp_df)
+	len(m_df)
+	it = 0
 	rpc = 'https://red-cool-wildflower.solana-mainnet.quiknode.pro/a1674d4ab875dd3f89b34863a86c0f1931f57090/'
-	for row in m_df.iterrows():
+	for row in m_df.sort_values('collection').iterrows():
+		it += 1
+		if it % 100 == 0:
+			print('#{}/{}'.format(it, len(m_df)))
 		row = row[1]
-		collection = row['name']
+		collection = row['collection']
+		if collection in seen:
+			continue
 		update_authority = row['update_authority']
 		print('Working on {}...'.format(collection))
 		collection_dir = re.sub(' ', '_', collection)
@@ -260,7 +281,7 @@ def mints_from_me():
 		dir = './data/mints/{}/'.format(collection_dir)
 		if not os.path.exists(dir):
 			os.makedirs(dir)
-		else:
+		elif len(os.listdir(dir)):
 			# print('Already have {}.'.format(collection))
 			print('Seen')
 			continue
@@ -278,7 +299,48 @@ def mints_from_me():
 			os.system('metaboss -r {} -t 300 decode mint --list-file {} --output {}'.format(rpc, fname, dir_mints))
 
 
+	data = []
+	for path in os.listdir('./data/mints/'):
+		if os.path.isdir('./data/mints/'+path):
+			collection = re.sub('_', ' ', path).strip()
+			for fname in os.listdir('./data/mints/'+path):
+				f = './data/mints/'+path+'/'+fname
+				if os.path.isfile(f) and '.json' in f:
+					with open(f) as file:
+						j = json.load(file)
+						for m in j:
+							data += [[ collection, m ]]
+	df = pd.DataFrame(data, columns=['collection','mint_address'])
+	df = df[df.collection != 'etc']
+	df = df.drop_duplicates()
+	df['n'] = 1
+	g = df.groupby(['mint_address']).n.sum().reset_index()
+	g = g[g.n > 1]
+	tmp_0 = g[['mint_address']].merge(df).groupby('collection').n.count().reset_index().sort_values('n', ascending=0)
+	tmp_0.tail(20)
+	tmp = g.merge(df[[ 'collection','mint_address' ]])
+	tmp = tmp.sort_values(['mint_address','collection'])
+	tmp[tmp.collection == 'Fractals']
+	df[df.mint_address == '11gATLu654HjcVhkuarVy9YVm11CL74vjEmi1RhojRi']
+	# tmp.sort_values(['mint_address','collection']).head()
+	rem = tmp.collection.unique()
+	# len(rem)
+	# len(df.collection.unique())
+	# tmp.head()
+	# tmp = g[['mint_address']].merge(df).groupby('collection').n.count().reset_index().sort_values('n', ascending=0)
+	# tmp[tmp.collection == 'Fractals']
+	# tmp.head(20)
+	'Fractals' in rem
+	'Fractals' in df[-df.collection.isin(rem)].collection.unique()
+	print(sorted(df.collection.unique()))
+	len(df.collection.unique())
+	sorted(df.collection.unique)
+	df[['collection']].drop_duplicates().sort_values('collection').to_csv('~/Downloads/tmp.csv', index=False)
+	len(df[-df.collection.isin(rem)])
+	len(df[-df.collection.isin(rem)].drop_duplicates(subset=['mint_address']))
+	df[-df.collection.isin(rem)].to_csv('./data/collection_mints.csv', index=False)
 	len(df)
+	len(df.drop_duplicates(subset=['mint_address']))
 	len(df[df.twitter.notnull()])
 	len(df[ (df.twitter.notnull()) & (df.website.notnull())])
 

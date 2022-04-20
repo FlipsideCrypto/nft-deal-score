@@ -1,0 +1,32 @@
+
+sudo cp ~/nft-deal-score/viz/ui.R /srv/shiny-server/nft-deal-score/
+sudo cp ~/nft-deal-score/viz/server.R /srv/shiny-server/nft-deal-score/
+sudo cp ~/nft-deal-score/viz/www/styles.css /srv/shiny-server/nft-deal-score/www/
+sudo cp ~/nft-deal-score/viz/data.Rdata /srv/shiny-server/nft-deal-score
+
+sudo touch /srv/shiny-server/nft-deal-score/ui.R
+sudo touch /srv/shiny-server/nft-deal-score/server.R
+sudo touch /srv/shiny-server/nft-deal-score/www/styles.css
+sudo touch /srv/shiny-server/nft-deal-score/data.Rdata
+
+sudo cp ~/data_science/viz/thorchain-console/ui.R /srv/shiny-server/thorchain-console/
+sudo cp ~/data_science/viz/thorchain-console/server.R /srv/shiny-server/thorchain-console/
+sudo cp ~/data_science/viz/thorchain-console/www/styles.css /srv/shiny-server/thorchain-console/www/
+sudo cp ~/data_science/viz/thorchain-console/data.RData /srv/shiny-server/thorchain-console
+sudo cp ~/data_science/viz/native-token-recycling/data.RData /srv/shiny-server/native-token-recycling
+
+sudo cp ~/dfk_calculator_data.RData /rstudio-data/
+
+sudo cp ~/nft_deal_score_data.RData /rstudio-data/
+sudo cp ~/test.py /rstudio-data/
+python /rstudio-data/test.py
+sudo touch /rstudio-data/dfk_calculator_data.RData
+
+sudo touch /srv/shiny-server/thorchain-console/ui.R
+sudo touch /srv/shiny-server/thorchain-console/server.R
+sudo touch /srv/shiny-server/thorchain-console/www/styles.css
+sudo touch /srv/shiny-server/thorchain-console/data.RData
+sudo touch /srv/shiny-server/native-token-recycling/data.RData
+
+sudo cp ~/data_science/viz/thorchain-console/server.R /srv/shiny-server/thorchain-console
+sudo touch /srv/shiny-server/thorchain-console/server.R
