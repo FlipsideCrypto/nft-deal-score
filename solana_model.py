@@ -75,6 +75,7 @@ def calculate_percentages(df, cols=[]):
 def get_sales(check_exclude = True, exclude=[]):
 
 	s_df = pd.read_csv('./data/sales.csv').rename(columns={'sale_date':'block_timestamp'})
+	sorted(s_df.collection.unique())
 	s_df['token_id'] = s_df.token_id.astype(str)
 	s_df['collection'] = s_df.collection.apply(lambda x: clean_name(x))
 	# s_df['collection'] = s_df.collection_x.fillna(s_df.collection_y).fillna(s_df.collection).apply(lambda x: clean_name(x))
@@ -228,8 +229,16 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	m_df['token_id'] = m_df.clean_token_id.fillna(m_df.token_id).astype(float).astype(int).astype(str)
 	s_df = merge(s_df, tokens[['collection','token_id','clean_token_id']].drop_duplicates(), how='left', ensure=True, on=['collection','token_id'], message='s_df x tokens')
 	s_df[s_df.token_id.isnull()]
-	s_df.collection.unique()
-	s_df['token_id'] = (s_df.clean_token_id.replace('nan', None).fillna(s_df.token_id.replace('nan', None))).apply(lambda x: re.sub('"', '', str(x))).astype(float).astype(int).astype(str)
+	sorted(s_df.token_id.unique())
+	# np.isinf(s_df).values.sum()
+	# s_df['clean_token_id'] = s_df.clean_token_id.fillna(s_df.token_id)
+	# s_df['token_id'] = (s_df.clean_token_id).apply(lambda x: re.sub('"', '', str(x))).astype(float).astype(int).astype(str)
+	s_df['token_id'] = (s_df.clean_token_id.replace('nan', None).fillna(s_df.token_id.replace('nan', None))).apply(lambda x: re.sub('"', '', str(x)))
+	s_df = s_df[s_df.token_id != 'None']
+	s_df['token_id'] = s_df.token_id.astype(float).astype(int).astype(str)
+	# s_df[s_df.token_id == 'None'].groupby('collection').token_id.count()
+
+
 	lunabullsrem = tokens[tokens.clean_token_id>=10000].token_id.unique()
 	m_df = m_df[ -((m_df.collection == 'LunaBulls') & (m_df.token_id.isin(lunabullsrem))) ]
 	s_df = s_df[ -((s_df.collection == 'LunaBulls') & (s_df.token_id.isin(lunabullsrem))) ]
@@ -368,6 +377,9 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collections = ['Meerkat Millionaires']
 	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	print(sorted(collections))
+	m_df[m_df.collection.isin(['Okay Bears','Catalina Whale Mixer'])]
+	s_df[s_df.collection.isin(['Okay Bears','Catalina Whale Mixer'])]
+	collections = [ 'Catalina Whale Mixer', 'Okay Bears' ]
 	for collection in collections:
 		if collection in ['Astrals','Bakc','BAYC','MAYC']:
 			continue

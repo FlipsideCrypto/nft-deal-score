@@ -143,10 +143,11 @@ def add_att_count():
 
 def add_rarities():
 	m_df = pd.read_csv('./data/metadata.csv')
-	m_df['feature_name'] = m_df.feature_name.fillna(m_df.name)
-	m_df['feature_value'] = m_df.feature_value.fillna(m_df.value)
+	# m_df['feature_name'] = m_df.feature_name.fillna(m_df.name)
+	# m_df['feature_value'] = m_df.feature_value.fillna(m_df.value)
 	for c in [ 'name','value','rarity' ]:
-		del m_df[c]
+		if c in m_df.columns:
+			del m_df[c]
 	# m_df[m_df.rarity.notnull()]
 	# m_df[(m_df.rarity.notnull()) & (m_df.token_id == '6435')]
 	m_df[(m_df.collection == 'SOLGods') & (m_df.token_id == 6435)]
@@ -212,6 +213,7 @@ def add_rarities():
 
 	print(solana_rarities.groupby('collection').token_id.count())
 	print(rarities.groupby('collection').token_id.count())
+	print(rarities[rarities.collection.isin(['Catalina Whale Mixer','Okay Bears'])].groupby('collection').token_id.count())
 
 	# m_df[ m_df.feature_name.isin(['nft_rank','adj_nft_rank_0','adj_nft_rank_1']) ].groupby('collection').token_id.count()
 	m_df = m_df[ -m_df.feature_name.isin(['Nft Rank','nft_rank','adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2']) ]

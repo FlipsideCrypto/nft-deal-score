@@ -372,7 +372,7 @@ def solana():
 	len(metadata.token_id.unique())
 	id_map = pd.read_csv('./data/mint_to_token_id_map.csv')
 	id_map = pd.read_csv('./data/tokens.csv')
-	cs = ['SOLGods']
+	cs = ['Stoned Ape Crew']
 	id_map = id_map[id_map.collection.isin(cs)]
 	metadata = metadata[metadata.collection.isin(cs)]
 	sorted(id_map.collection.unique())
@@ -401,6 +401,7 @@ def solana():
 	# metadata[['collection']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
 
 	metadata['token_id'] = metadata.token_id.astype(int)
+	metadata.groupby(['collection','feature_name']).token_id.count()
 	for collection in metadata.collection.unique():
 		print(collection)
 		mdf = metadata[metadata.collection == collection]

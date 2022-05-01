@@ -1,5 +1,371 @@
 
 
+
+
+
+
+WITH base AS (
+	SELECT instructions[0]:data::string AS data
+	, instructions[0]:programId::string AS program_id
+	, *
+	FROM solana.fact_transactions
+	WHERE block_timestamp >= CURRENT_DATE - 2
+	AND tx_id = '25XwyS9jjZqs9xxqtVkRPRDRkydsrcCG9QMeqJMeY32ZQzMrSCpc9mdbUJFxMQDMfCNfB1E122krRKLTHW2JPoEx'
+	AND succeeded = TRUE
+	LIMIT 10
+), base2 AS (
+	SELECT b.tx_id
+	, b.block_timestamp
+	, t.value
+	, t.value:programId::string AS programId
+	, t.value:parsed:info:amount::int / POWER(10, 9) AS amount
+	, t.value:parsed:info:owner::string AS address
+	FROM base b
+	, LATERAL FLATTEN(
+		input => instructions
+	) t
+), base3 AS (
+	SELECT DISTINCT tx_id
+	FROM base2
+), base4 AS (
+	SELECT b2.tx_id
+	, b2.block_timestamp
+	, b2.address
+	, SUM(amount) AS amount
+	FROM base2 b2
+	JOIN base3 b3 ON b3.tx_id = b2.tx_id
+	WHERE amount IS NOT NULL
+	GROUP BY 1, 2, 3
+)
+SELECT *
+FROM base4
+
+
+SELECT date_trunc('month', block_timestamp) AS month
+AVERAGE( CASE WHEN COALESCE(rune_amount_usd, 0) + COALESCE(asset_amount_usd, 0) < 1000 THEN 1 ELSE 0 END ) AS pct_smal
+FROM thorchain.liquidity_actions
+WHERE COALESCE(rune_amount_usd, 0) > 0 OR COALESCE(asset_amount_usd, 0) > 0
+GROUP BY 1
+
+SELECT date_trunc('month', l.block_timestamp) AS month
+, AVG( CASE WHEN COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) < 1000 THEN 1 ELSE 0 END ) AS pct_under_1k_usd
+, AVG( CASE WHEN (COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0)) / (p.rune_amount_usd / p.rune_amount) < 100 THEN 1 ELSE 0 END ) AS pct_under_100_rune
+, SUM( COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) ) AS liquidity_added_usd
+FROM thorchain.liquidity_actions l
+JOIN thorchain.pool_block_balances p ON p.block_id = l.block_id AND p.pool_name = l.pool_name
+WHERE COALESCE(l.rune_amount_usd, 0) > 0 OR COALESCE(l.asset_amount_usd, 0) > 0
+GROUP BY 1
+
+SELECT l.pool_name
+, AVG( CASE WHEN COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) < 1000 THEN 1 ELSE 0 END ) AS pct_under_1k_usd
+, AVG( CASE WHEN (COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0)) / (p.rune_amount_usd / p.rune_amount) < 100 THEN 1 ELSE 0 END ) AS pct_under_100_rune
+, SUM( COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) ) AS liquidity_added_usd
+FROM thorchain.liquidity_actions l
+JOIN thorchain.pool_block_balances p ON p.block_id = l.block_id AND p.pool_name = l.pool_name
+WHERE COALESCE(l.rune_amount_usd, 0) > 0 OR COALESCE(l.asset_amount_usd, 0) > 0
+GROUP BY 1
+
+
+WITH base AS (
+	SELECT 
+)
+
+SELECT SPLIT_PART(l.pool_name, ',', 0) AS chain
+, AVG( CASE WHEN COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) < 1000 THEN 1 ELSE 0 END ) AS pct_under_1k_usd
+, AVG( CASE WHEN (COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0)) / (p.rune_amount_usd / p.rune_amount) < 100 THEN 1 ELSE 0 END ) AS pct_under_100_rune
+, SUM( COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) ) AS liquidity_added_usd
+FROM thorchain.liquidity_actions l
+JOIN thorchain.pool_block_balances p ON p.block_id = l.block_id AND p.pool_name = l.pool_name
+WHERE (COALESCE(l.rune_amount_usd, 0) > 0 OR COALESCE(l.asset_amount_usd, 0) > 0)
+AND l.block_timestamp >= '2021-10-01'
+GROUP BY 1
+
+[1]   accounts: {
+[1]     nonce: 255,
+[1]     feeNonce: 255,
+[1]     homeNonce: 254,
+[1]     gameId: 'test-0423-02',
+[1]     homeGameId: 'H.test-0423-02',
+[1]     numBonus: 2000000000000,
+[1]     poolBonus: 'B4zqS7Zmja3ZFEX9jVZjMwhUT8F6AteAyv8MJ6Uk5bZD',
+[1]     bonusMint: '4ZbziJ8WAg1aTG2sTAMwRqqZAxHLPGnG9y7A8c3x4eyP',
+[1]     userBonusTokenAccount: '7P6P5LbSDpq1VWUy3kAjsUzp6oZA6DyRmZkENaL86Z6z',
+[1]     poolAccount: '3LAJqoLxdHFZY79EwchTyGJA9XtvdtDnsqtaYehTJX48',
+[1]     poolSigner: 'CxspEvViMXrcDSM7APUwtK9DfV4WfJ6vbuBc6ncSMQDt',
+[1]     homePoolSigner: 'FTZHcPvrmBPwfD3iV1S4zHRohAU9McftTsYAU8gfrLgt',
+[1]     distributionAuthority: '6Ch8KyKpkZHKHNzEioLYg6b3w1WM8NMYg4pYnVsBU3pk',
+[1]     propsMint: '9UPZjRRqygSKqEvdpTdPqFg51wNjRk2SpuKiew9c75r3',
+[1]     poolProps: '9yYsVekDCXT4v2MPun3qbJ9j4fEpyuv7UHKCZzzYHB1g',
+[1]     homePoolProps: '9yYsVekDCXT4v2MPun3qbJ9j4fEpyuv7UHKCZzzYHB1g',
+[1]     homeTeamToken: '8f92E7LBgBnVvwmfQch1uG8kQyN91t6y9hLG44RZ2158',
+[1]     tokenProgram: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+[1]     rent: 'SysvarRent111111111111111111111111111111111',
+[1]     clock: 'SysvarC1ock11111111111111111111111111111111',
+[1]     systemProgram: '11111111111111111111111111111111'
+
+iblumberg55@gmail.com
+Hayley27!
+
+249927439.27
+249947307.61 - 249927439.27
+
+Catalina Whale Mixer
+Blocksmith Labs
+Okay Bears
+Degen Apes
+Aurory
+
+Easy: 78 + 83
+Medium: 79 + 80
+Hard: 73 + 76
+
+git checkout -b AN-1134/missing-amount-from-lp-actions
+
+
+
+WITH stakes AS (
+
+  SELECT
+    *
+  FROM
+    thorchain.stake_events
+  WHERE
+    TRUE
+),
+unstakes AS (
+  SELECT
+    *
+  FROM
+    thorchain.unstake_events
+  WHERE
+    TRUE
+), base AS (
+SELECT
+  se.block_timestamp,
+  se.block_id,
+  rune_tx_id AS tx_id,
+  'add_liquidity' AS lp_action,
+  se.pool_name,
+  rune_address AS from_address,
+  NULL AS to_address,
+  rune_e8 / pow(
+    10,
+    8
+  ) AS rune_amount,
+  rune_e8 / pow(
+    10,
+    8
+  ) * rune_usd AS rune_amount_usd,
+  asset_e8 / pow(
+    10,
+    8
+  ) AS asset_amount,
+  asset_e8 / pow(
+    10,
+    8
+  ) * asset_usd AS asset_amount_usd,
+  stake_units,
+  asset_tx_id,
+  asset_address,
+  asset_blockchain,
+  NULL AS il_protection,
+  NULL AS il_protection_usd,
+  NULL AS unstake_asymmetry,
+  NULL AS unstake_basis_points
+FROM
+  stakes se
+  LEFT JOIN thorchain.prices
+  p
+  ON se.block_id = p.block_id
+  AND se.pool_name = p.pool_name
+UNION
+SELECT
+  ue.block_timestamp,
+  ue.block_id,
+  tx_id,
+  'remove_liquidity' AS lp_action,
+  ue.pool_name,
+  from_address,
+  to_address,
+  emit_rune_e8,
+  COALESCE(emit_rune_e8 / pow(10, 8), 0) AS rune_amount,
+  COALESCE(emit_rune_e8 / pow(10, 8) * rune_usd, 0) AS rune_amount_usd,
+  COALESCE(asset_e8 / pow(10, 8), 0) AS asset_amount,
+  COALESCE(asset_e8 / pow(10, 8) * asset_usd, 0) AS asset_amount_usd,
+  stake_units,
+  NULL AS asset_tx_id,
+  NULL AS asset_address,
+  NULL AS asset_blockchain,
+  imp_loss_protection_e8 / pow(
+    10,
+    8
+  ) AS il_protection,
+  imp_loss_protection_e8 / pow(
+    10,
+    8
+  ) * rune_usd AS il_protection_usd,
+  asymmetry AS unstake_asymmetry,
+  basis_points AS unstake_basis_points
+FROM
+  unstakes ue
+  LEFT JOIN thorchain.prices
+  p
+  ON ue.block_id = p.block_id
+  AND ue.pool_name = p.pool_name
+)
+SELECT * FROM base WHERE rune_amount + asset_amount <= 0
+
+
+SELECT lp_action, COUNT(1) AS n
+FROM flipside_dev_db.thorchain.liquidity_actions
+WHERE RUNE_AMOUNT = 0 and asset_amount = 0
+GROUP BY 1
+
+stake: 
+unstake: emit_rune_e8, emit_asset_e8
+
+
+block_timestamp = 1648541784259230029
+
+SELECT *
+FROM FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_UNSTAKE_EVENTS
+WHERE tx = '3E439D4DCA401602116BE07E2FB8751D6F491EE908E04A779D48780DF3972201'
+
+
+SELECT MAX(timestamp)
+FROM FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG
+
+SELECT ABS(timestamp - 1648541784259230029) AS abs_dff
+, (timestamp - 1648541784259230029) AS dff
+, *
+FROM FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG
+ORDER BY abs_dff
+LIMIT 100
+WHERE timestamp = 1648541784259230029
+
+SELECT l1.height AS missing_block_id
+FROM FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG l1
+LEFT JOIN FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG l2 ON l2.height = l1.height + 1
+LEFT JOIN FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG l3 ON l3.height = l1.height - 1
+WHERE (l2.height IS NULL OR l3.height IS NULL)
+ORDER BY l1.height
+
+
+1648541784259230029
+1648541754719682517
+29539547512 / 29539547512
+29539547512 / 1000000000
+35261826303 / 1000000000
+
+not in 
+
+SELECT *
+FROM FLIPSIDE_PROD_DB.thorchain_midgard_public.unstake_events
+WHERE tx = '3E439D4DCA401602116BE07E2FB8751D6F491EE908E04A779D48780DF3972201'
+
+SELECT *
+FROM FLIPSIDE_PROD_DB.THORCHAIN_MIDGARD_PUBLIC.BLOCK_LOG
+WHERE timestamp >= 1648541784259230029
+ORDER BY timestamp DESC
+LIMIT 100
+
+SELECT MAX(timestamp)
+FROM FLIPSIDE_PROD_DB.THORCHAIN_MIDGARD_PUBLIC.BLOCK_LOG
+
+
+SELECT *
+FROM FLIPSIDE_PROD_DB.thorchain_midgard_public.block_log
+WHERE timestamp = 1648541784259230029
+ORDER BY 
+
+
+SELECT *
+FROM thorchain.unstake_events
+WHERE emit_rune_e8 + emit_asset_e8 = 0
+
+SELECT *
+FROM thorchain.unstake_events
+WHERE tx_id = '5815E4A96E9CBCD3CD24CADA4EB7765E0BFDC81D59ED945309BCD755FC969797'
+
+SELECT *
+FROM thorchain.liquidity_actions
+WHERE RUNE_AMOUNT = 0 and asset_amount = 0
+
+
+SELECT lp_action, COUNT(1) AS n
+FROM thorchain.liquidity_actions
+WHERE RUNE_AMOUNT = 0 and asset_amount = 0
+GROUP BY 1
+
+SELECT date_trunc('month', block_timestamp) AS month, COUNT(1) AS n
+FROM thorchain.liquidity_actions
+WHERE RUNE_AMOUNT = 0 and asset_amount = 0
+GROUP BY 1
+
+903 / 907 are remove_liquidity
+Months are spread out
+
+
+
+Research Question: How much value did each pool win/loose because of synths?
+@Orion (9R)#3332 just to clarify - what do you mean by a pool winning / losing value in this case?
+
+
+server {
+    listen 80;
+    server_name ec2-54-91-227-50.compute-1.amazonaws.com;
+    location / {
+        proxy_pass http://54.91.227.50;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+     }
+}
+
+
+WITH
+  burns as (
+  SELECT 
+SPLIT_PART(x.from_asset, ',', 0) AS chain
+count(distinct x.tx_id) as burns,
+  sum(x.from_amount_usd) as volume_burnt
+FROM thorchain.swaps x, thorchain.swap_events y
+WHERE x.tx_id=y.tx_id and memo like '%/%' and x.from_asset like '%/%' and x.to_asset not like '%/%'
+GROUP BY 1
+ORDER BY 1 DESC
+  ),
+  mints as (
+  SELECT 
+SPLIT_PART(x.to_asset, ',', 0) AS chain
+count(distinct x.tx_id) as mints,
+  sum(x.to_amount_usd) as volume_mint
+FROM thorchain.swaps x, thorchain.swap_events y
+WHERE x.tx_id=y.tx_id and memo like '%/%' and x.to_asset like '%/%' and x.from_asset not like '%/%'
+GROUP BY 1
+ORDER BY 1 DESC
+),
+  rune_price as(
+  SELECT
+  trunc(hour,'day') as date,
+  avg(price) as rune_price
+  from ethereum.token_prices_hourly
+  where symbol ='RUNE'
+  group by 1
+  )
+SELECT
+x.chain,
+mints,
+burns,
+volume_mint,
+volume_burnt,
+mints - burns AS net_mint_usd
+from mints x, burns y where x.chain=y.chain
+order by 1 asc
+
+
+
 WITH base AS (
 	SELECT native_to_address, COUNT(1) AS n
 	FROM thorchain.swaps
@@ -82,6 +448,62 @@ FROM crosschain.address_labels
 WHERE blockchain = 'solana'
 AND label_subtype = 'nf_token_contract'
 GROUP BY 1
+
+
+WITH base AS (
+	SELECT * 
+	FROM flipside_prod_db.bronze.prod_data_science_uploads_1748940988
+	WHERE record_content[0]:collection IS NOT NULL
+)
+SELECT t.value FROM base
+, LATERAL FLATTEN(
+input => record_content
+) t
+
+
+
+SELECT *
+FROM solana.fact_transactions
+
+WHERE block_timestamp >= CURRENT_DATE - 2
+AND instructions[0]:program_id::string = 'wormDTUJ6AWPNvk59vGQbDvGJmqbDTdgWgAqcLBCgUb'
+LIMIT 100
+
+
+SELECT instructions[0]:data::string AS data
+, COUNT(1) AS n
+FROM solana.fact_transactions
+WHERE block_timestamp >= CURRENT_DATE - 2
+AND instructions[0]:programId::string = 'wormDTUJ6AWPNvk59vGQbDvGJmqbDTdgWgAqcLBCgUb'
+AND tx_id = '4wfERHL5E5mDhDA4AB6bbhxtwjWh5kvPWyVVD8rWuZ6rWxzBctxhXRPHNxxU6Jpfx34dG8R3nWqvLZRGzSmHsErJ'
+GROUP BY 1
+
+SELECT instructions[0]:data::string AS data
+, *
+FROM solana.fact_transactions
+WHERE block_timestamp >= CURRENT_DATE - 2
+AND instructions[0]:programId::string = 'wormDTUJ6AWPNvk59vGQbDvGJmqbDTdgWgAqcLBCgUb'
+AND tx_id = '4wfERHL5E5mDhDA4AB6bbhxtwjWh5kvPWyVVD8rWuZ6rWxzBctxhXRPHNxxU6Jpfx34dG8R3nWqvLZRGzSmHsErJ'
+LIMIT 100
+
+WITH base AS (
+	SELECT instructions[0]:data::string AS data
+	, instructions[0]:programId::string AS program_id
+	, *
+	FROM solana.fact_transactions
+	WHERE block_timestamp >= CURRENT_DATE - 2
+	//AND instructions[0]:programId::string = 'wormDTUJ6AWPNvk59vGQbDvGJmqbDTdgWgAqcLBCgUb'
+	AND tx_id = '25XwyS9jjZqs9xxqtVkRPRDRkydsrcCG9QMeqJMeY32ZQzMrSCpc9mdbUJFxMQDMfCNfB1E122krRKLTHW2JPoEx'
+	LIMIT 10
+)
+SELECT t.value FROM base
+, LATERAL FLATTEN(
+input => instructions
+) t
+
+
+
+
 
 -- MEv1 De-Listing
 WITH mints AS (
@@ -206,38 +628,6 @@ WITH base AS (
 SELECT *
 FROM base
 ORDER BY date DESC
-
-68. [Hard] $RUNE Distribution
-Calculate the distribution of $RUNE holdings by address. Include RUNE that is in liquidity pools. (e.g. if I have 100 $RUNE in my wallet and LP 50, I should still be considered to be holding 100). In terms of charts, feel free to create a histogram or whichever visual you think works best!
-
-Hint: use thorchain.transfers and thorchain.liquidity_actions
-
-70. [Hard] Weighted-average LP duration
-What is the average duration of liquidity held in each pool, weighted by the size of the LP?
-
-Hint: use thorchain.liquidity_actions
-
-69. [Medium] LP Size Distribution
-What is the current distribution of LP size for each pool? You will have to use both 'add_liquidity' and 'remove_liquidity' to determine which LPs are stil current.
-
-Hint: use thorchain.liquidity_actions
-
-71. [Easy] Block Rewards vs Swap Fees
-Breakdown the yield from block rewards vs swap fees, both total and by pool. Show how the proportions have changed over time since the network started.
-
-Hint: use thorchain.block_rewards
-
-
-72. [Medium] Swap Volume vs LP Rewards
-Chart the weekly swap volume and LP rewards on the same chart. What is the relationship between the two?
-
-Hint: use thorchain.daily_pool_stats to get swap volume and earnings_to_pools from thorchain.daily_earnings to get LP rewards
-
-73. [Hard] Realized APY
-Visualize the realized APY of LP-ers that have removed liquidity from THORChain. What was their actual APY vs HODL (accounting for impermanent loss) when you pro-rate it for how long they were LP-ing for? Are certain pools out-performing others?
-
-Hint: use thorchain.liquidity_actions
-
 
 SELECT *
 FROM THORCHAIN.DAILY_POOL_STATS

@@ -1,14 +1,13 @@
 server <- function(input, output, session) {
-	# load('data.Rdata')
+	load('data.Rdata')
 
-	file.location <- ifelse(
-		Sys.info()[["user"]] == "rstudio-connect"
-		, "/rstudio-data/"
-		, '~/git/nft-deal-score/viz/'
-	)
-	load(paste0(file.location, 'nft_deal_score_data.RData'))
-	load(paste0(file.location, 'nft_deal_score_listings_data.RData'))
-	# load(paste0(file.location, 'data.RData'))
+	# file.location <- ifelse(
+	# 	Sys.info()[["user"]] == "rstudio-connect"
+	# 	, "/rstudio-data/"
+	# 	, '~/git/nft-deal-score/viz/'
+	# )
+	# load(paste0(file.location, 'nft_deal_score_data.RData'))
+	# load(paste0(file.location, 'nft_deal_score_listings_data.RData'))
 
     metadata <- unique(attributes[, list(collection, feature_name, feature_value)])
 
@@ -431,7 +430,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Meerkat Millionaires'
+			, selected = 'Catalina Whale Mixer'
 			, choices = choices
 			, width = "100%"
 		)
@@ -492,10 +491,10 @@ server <- function(input, output, session) {
 					, selected
 					, ifelse(
 						selected %in% c('Cets on Creck')
-						, str_split(selected, ' |s ')[[1]][1]
+						, strsplit(selected, ' |s ')[[1]][1]
 						, ifelse(
-							selected == 'Stoned Ape Crew'
-							, 'Stoned Ape'
+							selected %in% c('Stoned Ape Crew', 'Catalina Whale Mixer')
+							, paste(strsplit(selected, ' ')[[1]][1], strsplit(selected, ' ')[[1]][2], sep = ' ')
 							, substr(selected, 1, nchar(selected) - 1)
 						)
 					)
@@ -648,10 +647,12 @@ server <- function(input, output, session) {
 	output$tokenimg <- renderUI({
 		id <- getTokenId()
 		selected <- getCollection()
+		print(paste0('id = ', id, '. selected = ', selected))
 		if (length(id) == 0 | selected == '') {
 			return(NULL)
 		}
 		src <- tokens[ (collection == eval(selected)) & (token_id == eval(id)) ]$image_url[1]
+		print(paste0('src = ', src))
 		t <- tags$img(src = src)
 		t
 	})
@@ -893,7 +894,7 @@ server <- function(input, output, session) {
 
         m <- dcast(attributes[collection == eval(selected), list(token_id, feature_name, feature_value)], token_id ~ feature_name, value.var='feature_value')
         names <- colnames(m)
-        data <- merge(data, m, all.x=TRUE)
+        data <- merge(data, m, all.x=TRUE, by=c('token_id'))
 
 
         data <- data[order(-block_timestamp)]
@@ -1208,7 +1209,7 @@ server <- function(input, output, session) {
 
 		df <- df[, list(image_url, token_id, price, pred_price, deal_score, rk, nft_rank)]
 		m <- dcast(attributes[collection == eval(selected)], collection + token_id ~ feature_name, value.var='feature_value')
-		df <- merge(df, m, all.x=TRUE)
+		df <- merge(df, m, all.x=TRUE, by=c('token_id'))
 		df[, collection := NULL]
 		df <- df[order(-deal_score)]
 		return(df)

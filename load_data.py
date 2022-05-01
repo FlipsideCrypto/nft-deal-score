@@ -323,22 +323,21 @@ def mints_from_me():
 	tmp[tmp.collection == 'Fractals']
 	df[df.mint_address == '11gATLu654HjcVhkuarVy9YVm11CL74vjEmi1RhojRi']
 	# tmp.sort_values(['mint_address','collection']).head()
-	rem = tmp.collection.unique()
 	# len(rem)
 	# len(df.collection.unique())
 	# tmp.head()
 	# tmp = g[['mint_address']].merge(df).groupby('collection').n.count().reset_index().sort_values('n', ascending=0)
 	# tmp[tmp.collection == 'Fractals']
 	# tmp.head(20)
-	'Fractals' in rem
-	'Fractals' in df[-df.collection.isin(rem)].collection.unique()
-	print(sorted(df.collection.unique()))
+	old = pd.read_csv('./data/collection_mints.csv')
+	rem = list(tmp.collection.unique()) + list(old.collection.unique())
 	len(df.collection.unique())
-	sorted(df.collection.unique)
 	df[['collection']].drop_duplicates().sort_values('collection').to_csv('~/Downloads/tmp.csv', index=False)
+	df[-df.collection.isin(rem)][['collection']].drop_duplicates().sort_values('collection').to_csv('~/Downloads/tmp.csv', index=False)
 	len(df[-df.collection.isin(rem)])
 	len(df[-df.collection.isin(rem)].drop_duplicates(subset=['mint_address']))
-	df[-df.collection.isin(rem)].to_csv('./data/collection_mints.csv', index=False)
+	print(sorted(df.collection.unique()))
+	df[-df.collection.isin(rem)].to_csv('./data/collection_mints_2.csv', index=False)
 	len(df)
 	len(df.drop_duplicates(subset=['mint_address']))
 	len(df[df.twitter.notnull()])
@@ -412,6 +411,21 @@ def add_solana_sales():
 		LEFT JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
 		WHERE block_timestamp >= CURRENT_DATE - 200
 	'''
+	query = '''
+		SELECT tx_id
+		, s.mint
+		, m.project_name AS project_name
+		, s.block_timestamp AS sale_date
+		, m.token_id
+		, sales_amount AS price
+		FROM solana.fact_nft_sales s
+		JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
+		WHERE block_timestamp >= CURRENT_DATE - 200
+		AND m.project_name IN (
+			'Okay Bears'
+			, 'Catalina Whale Mixer'
+		)
+	'''
 	# AND LOWER(COALESCE(l.project_name, m.project_name)) IN ('degods','stoned ape crew','sstrals','cets on creck','defi pirates','solgods')
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
@@ -419,24 +433,48 @@ def add_solana_sales():
 	# print('Queried {} sales'.format(format_num(len(sales))))
 	sales['chain'] = 'Solana'
 	sales['collection'] = sales.project_name.fillna('').apply(lambda x: clean_name(x) )
+	sorted(sales.collection.unique())
+	cs = [
+		'Astrals',
+		'Aurory',
+		'Cets on Creck',
+		'Catalina Whale Mixer',
+		'DeFi Pirates',
+		'DeGods',
+		'Degen Apes',
+		'Meerkat Millionaires',
+		'Okay Bears',
+		'Pesky Penguins',
+		'SOLGods',
+		'Solana Monkey Business',
+		'Stoned Ape Crew',
+		'Thugbirdz'
+	]
+	sorted(sales[sales.collection.isin(cs)].collection.unique())
+	sales = sales[sales.collection.isin(cs)]
+	
+
 	# print(sorted(sales.collection.unique()))
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
-	m = sales.merge(id_map, how='left', on=['mint'])
-	m = m[ (m.collection_x.notnull()) | (m.collection_y == 'Meerkat Millionaires') ]
-	m[m.collection_y == 'Meerkat Millionaires']
-	m['collection'] = m.collection_y.fillna(m.collection_x)
-	del m['collection_x']
-	del m['collection_y']
-	m['token_id'] = m.token_id_x.fillna(m.token_id_y)
-	m[m.collection == 'Meerkat Millionaires']
-	del m['token_id_x']
-	del m['token_id_y']
-	m = m[m.token_id.notnull()]
-	m = m[m.collection == 'Meerkat Millionaires']
+	# m = sales.merge(id_map, how='left', on=['mint'])
+	# m = m[ (m.collection_x.notnull()) | (m.collection_y == 'Meerkat Millionaires') ]
+	# m[m.collection_y == 'Meerkat Millionaires']
+	# m['collection'] = m.collection_y.fillna(m.collection_x)
+	# del m['collection_x']
+	# del m['collection_y']
+	# m['token_id'] = m.token_id_x.fillna(m.token_id_y)
+	# m[m.collection == 'Meerkat Millionaires']
+	# del m['token_id_x']
+	# del m['token_id_y']
+	# m = m[m.token_id.notnull()]
+	# m = m[m.collection == 'Meerkat Millionaires']
 	# print(sorted(m.collection.unique()))
-	m.sort_values('collection')
-	m = m[[ 'collection','token_id','sale_date','price','chain' ]]
+	# m.sort_values('collection')
+	# m = m[[ 'collection','token_id','sale_date','price','chain' ]]
+	m = sales[[ 'collection','token_id','sale_date','price','chain' ]]
+	m['sale_date'] = m.sale_date.astype(str)
+	m.collection.unique()
 	s_df = pd.read_csv('./data/sales.csv')
 	sorted(s_df.collection.unique())
 	if 'collection_x' in s_df.columns and 'collection_y' in s_df.columns:
@@ -444,7 +482,10 @@ def add_solana_sales():
 		del s_df['collection_x']
 		del s_df['collection_y']
 	l0 = len(s_df)
-	s_df = s_df[-s_df.collection.isin(m.collection.unique())]
+	for c in sales.collection.unique():
+		mn = m[m.collection == c].sale_date.min()
+		s_df = s_df[-((s_df.collection == c ) & (s_df.sale_date >= mn))]
+	# s_df = s_df[-s_df.collection.isin(m.collection.unique())]
 	s_df = s_df.append(m)
 	# print(s_df.groupby('collection').token_id.count())
 	l1 = len(s_df)
@@ -454,6 +495,7 @@ def add_solana_sales():
 			del s_df[c]
 	if 'project_name' in s_df.columns:
 		del s_df['project_name']
+	s_df.groupby('collection').sale_date.min().reset_index().sort_values('sale_date')
 	s_df.to_csv('./data/sales.csv', index=False)
 	pass
 
@@ -1140,18 +1182,23 @@ def eth_metadata():
 #     Grab Data From OpenSea API     #
 ######################################
 def load_api_data():
+	headers = {
+		'Content-Type': 'application/json'
+		, 'X-API-KEY': '2b7cbb0ebecb468bba431aefb8dbbebe'
+	}
 	data = []
 	traits_data = []
-	contract_address = '0x60e4d786628fea6478f785a6d7e704777c86a7c6'
+	contract_address = '0x23581767a106ae21c074b2276d25e5c3e136a68b'
 	# url = 'https://api.opensea.io/api/v1/assets?asset_contract_address=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d&limit=20&token_ids=8179'
-	for o in [ 'asc', 'desc' ]:
+	# for o in [ 'asc', 'desc' ]:
+	for o in [ 'asc' ]:
 		l = 1
 		it = 0
 		offset = 0
 		while l and offset <= 10000:
 			if offset % 1000 == 0:
 				print("#{}/{}".format(offset, 20000))
-			r = requests.get('https://api.opensea.io/api/v1/assets?asset_contract_address={}&order_by=pk&order_direction={}&offset={}&limit=50'.format(contract_address, o, offset))
+			r = requests.get('https://api.opensea.io/api/v1/assets?asset_contract_address={}&order_by=pk&order_direction={}&offset={}&limit=50'.format(contract_address, o, offset), headers = headers)
 			# r = requests.get(url)
 			assets = r.json()['assets']
 			l = len(assets)
@@ -1171,8 +1218,8 @@ def load_api_data():
 	# sorted(traits.trait_type.unique())
 	traits = traits[(traits.trait_type != 'Token ID')]
 	traits['token_id'] = traits.token_id.astype(int)
-	traits.to_csv('./data/mayc_traits.csv', index=False)
-	opensea_data.to_csv('./data/mayc_data.csv', index=False)
+	traits.to_csv('./data/moonbird_traits.csv', index=False)
+	opensea_data.to_csv('./data/moonbird_data.csv', index=False)
 
 	traits = pd.read_csv('./data/mayc_traits.csv')
 	opensea_data = pd.read_csv('./data/mayc_data.csv')

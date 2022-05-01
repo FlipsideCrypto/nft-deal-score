@@ -56,11 +56,11 @@ ld.add_eth_sales()
 # ssn.scrape_listings(browser, ['thugbirdz'])
 ssn.scrape_listings(browser)
 ssn.scrape_randomearth(browser)
-ssn.scrape_opensea_listings(browser)
+# ssn.scrape_opensea_listings(browser)
 # ssn.scrape_listings(browser, ['smb','aurory'])
 
-listings = pd.read_csv('./data/listings.csv')
-listings[listings.collection == 'Solana Monkey Business'].sort_values('price').head(20)
+# listings = pd.read_csv('./data/listings.csv')
+# listings[listings.collection == 'Solana Monkey Business'].sort_values('price').head(20)
 
 # update model
 # ssn.convert_collection_names()
@@ -169,3 +169,12 @@ def update_token_ids():
 # add_model_sales()
 sm.train_model()
 
+if False:
+	listings = pd.read_csv('./data/listings.csv')
+	tokens = pd.read_csv('./data/tokens.csv')
+	tokens[tokens.collection == 'Okay Bears']
+	tokens[tokens.collection == 'Okay Bears'].image_url.values[0]
+	tokens['chain'] = tokens.chain.fillna('Solana')
+	tokens.to_csv('./data/tokens.csv', index=False)
+	listings[listings.chain.isnull()]
+	listings[listings.collection == 'Okay Bears']

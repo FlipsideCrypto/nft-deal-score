@@ -1,29 +1,56 @@
-library(reticulate)
+---
+title: "Update NFT Deal Score Data"
+author: "Kellen"
+date: "2022-04-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Run Updates
+
+Hello I am running this at `r Sys.time()`
+
+```{r update}
+#include all required libraries here
+#EVEN IF YOU SOURCE util_functions.R 
+#YOU HAVE TO PUT THE LIBRARIES HERE I KNOW SORRY
+#BUT HERE THEY ALL ARE TO SAVE YOU TIME
+library(fasttime)
+library(gridExtra)
+library(ggplot2)
+library(data.table)
+library(reshape2)
+library(dplyr)
+library(dbplyr)
+library(RJSONIO)
+library(magrittr)
+library(RJSONIO)
+library(xts)
+library(quantmod)
+library(fTrading)
+library(curl)
+library(stringr)
+library(aws.s3)
+library(RPostgres)
+library(odbc)
 library(httr)
 library(jsonlite)
-
-isRstudio <- Sys.info()[["user"]] == 'rstudio-connect'
-if(isRstudio) {
-	source("/home/data-science/data_science/util/util_functions.R")
-} else {
-	source("~/data_science/util/util_functions.R")
-	setwd('~/git/nft-deal-score')
-}
-
-py_install('pandas', pip = TRUE)
-py_install('cloudscraper', pip = TRUE)
-# r reticulate python ModuleNotFoundError
-
-cloudscraper <- import('cloudscraper')
-
-source_python('~/git/nft-deal-score/viz/scrape_terra_nfts.py')
-
-terra_listings <- scrape_randomearth('~/git/nft-deal-score/data/')
-head(terra_listings)
-
-py_run_file('~/git/nft-deal-score/viz/scrape_terra_nfts.py')
-
-
+switch(
+  Sys.info()[["user"]],
+  "rstudio-connect" = source("/home/data-science/data_science/util/util_functions.R"),
+  source("~/data_science/util/util_functions.R")
+)
+#NOW COPY EVERYTHING ELSE FROM YOUR CURRENT
+#update_data.R FILE HERE ---------->
+file.location <- ifelse(
+	Sys.info()[["user"]] == "rstudio-connect"
+	, "/rstudio-data/nft_deal_score_listings_data.RData"
+	, "~/git/nft-deal-score/viz/nft_deal_score_listings_data.RData"
+)
+load(file.location)
 
 query <- "
 	SELECT DISTINCT project_name AS collection
@@ -45,6 +72,21 @@ get_smb_url <- function(page) {
 	return(paste0('https://market.solanamonkey.business/api/items?limit=40&page=',page))
 }
 
+library(curl)
+h <- new_handle(verbose = TRUE)
+handle_setheaders(h,
+	'Content-Type' = 'application/json',
+	'X-API-KEY' = '2b7cbb0ebecb468bba431aefb8dbbebe'
+)
+con <- curl('https://api.opensea.io/api/v1/assets?collection=boredapeyachtclub&order_direction=desc&limit=5&include_orders=false', handle = h)
+r <- readLines(con)
+content <- rawToChar(r)
+content <- fromJSON(r)
+tmp <- rbindlist(content, fill=T) 
+jsonlite::prettify(readLines(con))
+
+url <- 'curl --header 'X-API-KEY: [YOUR_API_KEY]' --request GET -i --url 'https://api.opensea.io/api/v1/assets''
+
 new_listings <- data.table()
 collection <- collections[1]
 for(collection in collections) {
@@ -52,6 +94,7 @@ for(collection in collections) {
 	has_more <- TRUE
 	offset <- 0
 	while(has_more) {
+		Sys.sleep(2)
 		print(paste0('Offset #', offset))
 		url <- get_me_url(collection, offset)
 		response <- GET(url)
@@ -75,6 +118,7 @@ for(collection in c('Solana Monkey Business')) {
 	has_more <- TRUE
 	page <- 1
 	while(has_more) {
+		Sys.sleep(2)
 		print(paste0('Page #', page))
 		url <- get_smb_url(page)
 		response <- GET(url)
@@ -98,12 +142,32 @@ for(collection in c('Solana Monkey Business')) {
 }
 new_listings <- unique(new_listings)
 
-listings <- read.csv('./data/listings.csv') %>% as.data.table()
+# listings <- read.csv('./data/listings.csv') %>% as.data.table()
 rem <- unique(new_listings$collection)
 listings <- listings[ !(collection %in% eval(rem)), ]
 listings <- listings[, list(collection, token_id, price)]
 listings <- rbind(listings, new_listings)
 listings <- listings[order(collection, price)]
+rem <- c('DeFi Pirates')
+listings <- listings[ !(collection %in% eval(rem)), ]
+listings[, token_id := as.integer(token_id)]
+listings[, price := as.numeric(price)]
+listings <- listings[ !(is.na(price)), ]
 
-write.csv(listings, './data/listings.csv', row.names=F)
 
+#FINALLY
+#write your save to /rstudio-data/
+#WITH A DISCERNABLE NAME!!!
+# DO NOT. CALL IT. data.RData!!!!!!!!
+#DON'T DO IIIIIIIIT
+
+save(
+	listings
+	, file = file.location 
+)
+print(file.info(file.location))
+```
+
+Done updating at `r Sys.time()`
+
+The end. Byeeeee. 
