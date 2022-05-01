@@ -1,0 +1,14 @@
+name: nft-deal-score
+title: nft-deal-score
+username: kellen
+account: kellen
+server: rstudio-connect.flipsidecrypto.com
+hostUrl: https://rstudio-connect.flipsidecrypto.com/__api__
+appId: 70
+bundleId: 193
+url: https://rstudio-connect.flipsidecrypto.com/nft-deal-score/
+when: 1650495558.78872
+lastSyncTime: 1650495558.78873
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: data (2).Rdata|data copy 2.Rdata|data copy.Rdata|data.Rdata|exploration.R|nft_deal_score_data.RData|nft_deal_score_listings_data.RData|update_data.R

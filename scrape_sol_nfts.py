@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from datetime import datetime, timedelta
 from selenium.webdriver.common.keys import Keys
+import cloudscraper
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
@@ -47,6 +48,10 @@ def how_rare_is_api():
 		, 'Solana Monkey Business': 'smb'
 		, 'Thugbirdz': 'thugbirdz'
 	}
+	d = {
+		'Okay Bears': 'okay_bears'
+		, 'Catalina Whales': 'catalinawhalemixer'
+	}
 	for collection, url in d.items():
 		# collection = 'Cets on Creck'
 		# collection = 'SOLGods'
@@ -72,8 +77,10 @@ def how_rare_is_api():
 	old = pd.read_csv('./data/tokens.csv')
 	sorted(old.collection.unique())
 	l0 = len(old)
-	do_merge = True
+	do_merge = False
 	tokens = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
+	tokens['collection'] = tokens.collection.apply(lambda x: 'Catalina Whale Mixer' if x == 'Catalina Whales' else x )
+	metadata['collection'] = metadata.collection.apply(lambda x: 'Catalina Whale Mixer' if x == 'Catalina Whales' else x )
 	if do_merge:
 		old['token_id'] = old.token_id.astype(str)
 		tokens['token_id'] = tokens.token_id.astype(str)
@@ -86,7 +93,7 @@ def how_rare_is_api():
 		old['clean_token_id'] = old.clean_token_id.fillna(old.token_id)
 		old['chain'] = old.chain.fillna('Solana')
 	else:
-		old = old.append(tokens)
+		old = old.append(tokens).drop_duplicates(subset=['collection','token_id'])
 	print('Adding {} rows'.format(len(old) - l0))
 	old[old.nft_rank.isnull()].groupby('collection').token_id.count()
 	old.to_csv('./data/tokens.csv', index=False)
@@ -115,7 +122,7 @@ def how_rare_is_api():
 	print('Adding {} rows'.format(len(old) - l0))
 	print(old.groupby('collection').token_id.count())
 	old[old.collection.isin(metadata.collection)]
-	old[(old.collection == 'Thugbirdz') & (old.token_id == '1206')]
+	old[(old.collection == 'Catalina Whale Mixer') & (old.token_id == '1206')]
 	old.to_csv('./data/metadata.csv', index=False)
 
 
@@ -337,6 +344,7 @@ def scrape_randomearth(browser):
 	}
 	data = []
 	# for collection in [ 'Levana Dragon Eggs' ]:
+	scraper = cloudscraper.create_scraper()
 	for collection in d_address.keys():
 		print(collection)
 		page = 0
@@ -345,10 +353,12 @@ def scrape_randomearth(browser):
 			page += 1
 			print('Page #{} ({})'.format(page, len(data)))
 			url = 'https://randomearth.io/api/items?collection_addr={}&sort=price.asc&page={}&on_sale=1'.format( d_address[collection], page)
-			browser.get(url)
-			soup = BeautifulSoup(browser.page_source)
-			# txt = browser.page_source
-			j = json.loads(soup.text)
+			# r = requests.get(url)
+			# browser.get(url)
+			# soup = BeautifulSoup(browser.page_source)
+			# j = json.loads(soup.text)
+			t = scraper.get(url).text
+			j = json.loads(t)
 			has_more = 'items' in j.keys() and len(j['items'])
 			if has_more:
 				for i in j['items']:
@@ -611,7 +621,7 @@ def scrape_opensea_listings(browser, collections=['BAYC','MAYC']):
 	old.groupby('collection').token_id.count()
 	old.to_csv('./data/listings.csv', index=False)
 
-def scrape_listings(browser, collections = [ 'meerkat-millionaires-cc','solgods','cets-on-creck','stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
+def scrape_listings(browser, collections = [ 'okay-bears','catalina-whale-mixer','meerkat-millionaires-cc','solgods','cets-on-creck','stoned-ape-crew','degods','aurory','thugbirdz','smb','degenapes','peskypenguinclub' ], alerted = [], is_listings = True):
 	print('Scraping solanafloor listings...')
 	data = []
 	m_data = []
