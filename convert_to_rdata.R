@@ -72,15 +72,15 @@ save(
 	, tokens
 	, file = paste0(file.location,'data.Rdata')
 )
-# save(
-# 	pred_price
-# 	, attributes
-# 	, feature_values
-# 	, sales
-# 	, coefsdf
-# 	, tokens
-# 	, file = paste0(file.location,'nft_deal_score_data.Rdata')
-# )
+save(
+	pred_price
+	, attributes
+	, feature_values
+	, sales
+	, coefsdf
+	, tokens
+	, file = paste0(file.location,'nft_deal_score_data.Rdata')
+)
 # save(
 # 	listings
 # 	, file = paste0(file.location,'nft_deal_score_listings_data.Rdata')

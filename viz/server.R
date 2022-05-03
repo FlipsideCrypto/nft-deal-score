@@ -1,13 +1,17 @@
 server <- function(input, output, session) {
 	load('data.Rdata')
+	user <- Sys.info()[['user']]
 
-	# file.location <- ifelse(
-	# 	Sys.info()[["user"]] == "rstudio-connect"
-	# 	, "/rstudio-data/"
-	# 	, '~/git/nft-deal-score/viz/'
-	# )
-	# load(paste0(file.location, 'nft_deal_score_data.RData'))
-	# load(paste0(file.location, 'nft_deal_score_listings_data.RData'))
+	base_dir <- ifelse(
+		user == 'rstudio-connect'
+		, '/rstudio-data/'
+		, ifelse(user == 'fcaster'
+			, '/srv/shiny-server/nft-deal-score/'
+			, '~/git/nft-deal-score/viz/'
+		)
+	)
+	load(paste0(base_dir, 'nft_deal_score_data.RData'))
+	load(paste0(base_dir, 'nft_deal_score_listings_data.RData'))
 
     metadata <- unique(attributes[, list(collection, feature_name, feature_value)])
 

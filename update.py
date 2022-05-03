@@ -45,15 +45,15 @@ if False:
 # sales.to_csv('~/Downloads/tmp.csv', index=False)
 
 # update sales
-ssn.scrape_recent_smb_sales(browser)
-ssn.scrape_recent_sales()
+# ssn.scrape_recent_smb_sales(browser)
+# ssn.scrape_recent_sales()
 ld.add_terra_sales()
 ld.add_solana_sales()
 ld.add_eth_sales()
 
 # update listings
 # ssn.scrape_listings(browser, ['meerkat-millionaires-cc'])
-# ssn.scrape_listings(browser, ['thugbirdz'])
+# ssn.scrape_listings(browser, ['catalina-whale-mixer'])
 ssn.scrape_listings(browser)
 ssn.scrape_randomearth(browser)
 # ssn.scrape_opensea_listings(browser)
@@ -172,6 +172,7 @@ sm.train_model()
 if False:
 	listings = pd.read_csv('./data/listings.csv')
 	tokens = pd.read_csv('./data/tokens.csv')
+	tokens['clean_token_id'] = tokens.clean_token_id.fillna(tokens.token_id)
 	tokens[tokens.collection == 'Okay Bears']
 	tokens[tokens.collection == 'Okay Bears'].image_url.values[0]
 	tokens['chain'] = tokens.chain.fillna('Solana')
