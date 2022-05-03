@@ -3,11 +3,18 @@ sudo cp ~/nft-deal-score/viz/ui.R /srv/shiny-server/nft-deal-score/
 sudo cp ~/nft-deal-score/viz/server.R /srv/shiny-server/nft-deal-score/
 sudo cp ~/nft-deal-score/viz/www/styles.css /srv/shiny-server/nft-deal-score/www/
 sudo cp ~/nft-deal-score/viz/data.Rdata /srv/shiny-server/nft-deal-score
+sudo cp ~/nft-deal-score/viz/nft_deal_score_listings_data.RData /srv/shiny-server/nft-deal-score
+sudo cp ~/nft-deal-score/viz/nft_deal_score_data.RData /srv/shiny-server/nft-deal-score
 
 sudo touch /srv/shiny-server/nft-deal-score/ui.R
 sudo touch /srv/shiny-server/nft-deal-score/server.R
 sudo touch /srv/shiny-server/nft-deal-score/www/styles.css
 sudo touch /srv/shiny-server/nft-deal-score/data.Rdata
+sudo touch /srv/shiny-server/nft-deal-score/nft_deal_score_listings_data.RData
+sudo touch /srv/shiny-server/nft-deal-score/nft_deal_score_data.RData
+
+sudo rem /srv/shiny-server/nft-deal-score/nft_deal_score_listings_data.RData
+sudo rem /srv/shiny-server/nft-deal-score/nft_deal_score_data.RData
 
 sudo cp ~/data_science/viz/thorchain-console/ui.R /srv/shiny-server/thorchain-console/
 sudo cp ~/data_science/viz/thorchain-console/server.R /srv/shiny-server/thorchain-console/

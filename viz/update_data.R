@@ -20,6 +20,7 @@ base_dir <- ifelse(
 		, '~/git/nft-deal-score/viz/'
 	)
 )
+base_dir <- '/srv/shiny-server/nft-deal-score/'
 listings_file <- paste0(base_dir,'nft_deal_score_listings_data.RData')
 load(listings_file)
 
