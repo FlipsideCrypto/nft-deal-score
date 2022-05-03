@@ -422,8 +422,20 @@ def add_solana_sales():
 		JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
 		WHERE block_timestamp >= CURRENT_DATE - 200
 		AND m.project_name IN (
-			'Okay Bears'
-			, 'Catalina Whale Mixer'
+			'Astrals',
+			'Aurory',
+			'Cets on Creck',
+			'Catalina Whale Mixer',
+			'DeFi Pirates',
+			'DeGods',
+			'Degen Apes',
+			'Meerkat Millionaires',
+			'Okay Bears',
+			'Pesky Penguins',
+			'SOLGods',
+			'Solana Monkey Business',
+			'Stoned Ape Crew',
+			'Thugbirdz'
 		)
 	'''
 	# AND LOWER(COALESCE(l.project_name, m.project_name)) IN ('degods','stoned ape crew','sstrals','cets on creck','defi pirates','solgods')
@@ -765,6 +777,7 @@ def add_terra_metadata():
 		old.to_csv('./data/metadata.csv', index=False)
 
 def add_terra_sales():
+	print('Adding Terra sales')
 	query = '''
 		WITH 
 		RE_events AS (

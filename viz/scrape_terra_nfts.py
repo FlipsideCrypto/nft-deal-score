@@ -26,7 +26,7 @@ clean_names = {
 }
 
 def clean_token_id(df, data_folder):
-	tokens = pd.read_csv(data_folder+'tokens.csv')
+	tokens = pd.read_csv(data_folder+'nft_deal_score_tokens.csv')
 	df['collection'] = df.collection.apply(lambda x: clean_name(x))
 	df['token_id'] = df.token_id.apply(lambda x: re.sub('"', '', x) if type(x)==str else x )
 	df['tmp'] = df.token_id.apply(lambda x: x[:10] )
@@ -54,22 +54,25 @@ def scrape_randomearth(data_folder = '/rstudio-data/'):
 	d_address = {
 		'Galactic Angels': 'terra13nccm82km0ttah37hkygnvz67hnvkdass24yzv',
 		'Galactic Punks': 'terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k',
-		'LunaBulls': 'terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2',
+		'LunaBulls': 'lunabulls',
 		'Levana Dragon Eggs': 'terra1k0y373yxqne22pc9g7jvnr4qclpsxtafevtrpg',
 	}
 	data = []
 	scraper = cloudscraper.create_scraper()
 	# for collection in [ 'Levana Dragon Eggs' ]:
 	for collection in d_address.keys():
-		# print(collection)
+		print(collection)
 		page = 0
 		has_more = True
 		while has_more:
 			sleep(0.1)
 			page += 1
 			# print('Page #{} ({})'.format(page, len(data)))
-			url = 'https://randomearth.io/api/items?collection_addr={}&sort=price.asc&page={}&on_sale=1'.format( d_address[collection], page)
-			# url = 'https://randomearth.io/api/items?page=1&collection_addr=terra103z9cnqm8psy0nyxqtugg6m7xnwvlkqdzm4s4k'
+			tmp = d_address[collection]
+			t = 'collection_addr' if tmp[:5] == 'terra' else 'collection_slug'
+			url = 'https://randomearth.io/api/items?{}={}&sort=price.asc&page={}&on_sale=1'.format( t, tmp, page)
+			# url = 'https://randomearth.io/api/items?page=1&collection_addr=terra1trn7mhgc9e2wfkm5mhr65p3eu7a2lc526uwny2'
+			# url = 'https://randomearth.io/api/items?page=1&collection_addr=terra18d5cqlsqgxp8w7ysn48l4r8a5328592wfwjtyz'
 			t = scraper.get(url).text
 			# r = requests.get(url)
 			# browser.get(url)
@@ -80,6 +83,8 @@ def scrape_randomearth(data_folder = '/rstudio-data/'):
 			if has_more:
 				for i in j['items']:
 					data += [[ 'Terra', collection, str(i['token_id']), float(i['price']) / (10 ** 6) ]]
+			else:
+				print(t[:30])
 	df = pd.DataFrame(data, columns=['chain','collection','token_id','price'])
 	df = clean_token_id(df, data_folder)
 	# df.token_id.unique()
