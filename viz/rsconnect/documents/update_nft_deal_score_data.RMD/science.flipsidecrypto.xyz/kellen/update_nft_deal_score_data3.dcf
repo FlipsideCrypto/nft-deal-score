@@ -1,0 +1,14 @@
+name: update_nft_deal_score_data3
+title: update_nft_deal_score_data
+username: kellen
+account: kellen
+server: science.flipsidecrypto.xyz
+hostUrl: https://science.flipsidecrypto.xyz/__api__
+appId: 90
+bundleId: 234
+url: https://science.flipsidecrypto.xyz/content/2bdedbfb-5682-414f-923c-5caab6eddb53/
+when: 1651555470.95058
+lastSyncTime: 1651555470.95059
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: scrape_terra_nfts.py|nft_deal_score_listings_data.RData|nft_deal_score_data.RData

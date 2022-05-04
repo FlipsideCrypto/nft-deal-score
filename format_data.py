@@ -402,6 +402,8 @@ def solana():
 
 	metadata['token_id'] = metadata.token_id.astype(int)
 	metadata.groupby(['collection','feature_name']).token_id.count()
+	metadata.head()
+	assert(len(metadata[metadata.mint_address.isnull()]) == 0)
 	for collection in metadata.collection.unique():
 		print(collection)
 		mdf = metadata[metadata.collection == collection]

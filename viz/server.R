@@ -10,10 +10,11 @@ server <- function(input, output, session) {
 			, '~/git/nft-deal-score/viz/'
 		)
 	)
-	base_dir <- '/srv/shiny-server/nft-deal-score/'
+	# base_dir <- '/srv/shiny-server/nft-deal-score/'
 
 	load(paste0(base_dir, 'nft_deal_score_data.RData'))
 	load(paste0(base_dir, 'nft_deal_score_listings_data.RData'))
+	load(paste0(base_dir, 'nft_deal_score_sales_data.RData'))
 
     metadata <- unique(attributes[, list(collection, feature_name, feature_value)])
 

@@ -33,7 +33,13 @@ sudo cp ~/dfk_calculator_data.RData /rstudio-data/
 sudo cp ~/nft_deal_score_data.RData /rstudio-data/
 sudo cp ~/ntr_data.RData /rstudio-data/
 python /rstudio-data/test.py
-sudo touch /rstudio-data/ntr_data.RData
+sudo touch /rstudio-data/nft_deal_score_data.RData
+
+sudo cp ~/nft_deal_score_tokens.csv /rstudio-data/
+sudo touch /rstudio-data/nft_deal_score_tokens.csv
+
+sudo cp ~/dfk_calculator_daily_data.RData /rstudio-data/
+sudo touch /rstudio-data/dfk_calculator_daily_data.RData
 
 sudo touch /srv/shiny-server/thorchain-console/ui.R
 sudo touch /srv/shiny-server/thorchain-console/server.R

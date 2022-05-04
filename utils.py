@@ -45,7 +45,7 @@ def clean_name(name):
 		return(clean_names[x])
 	name = name.title()
 	name = re.sub('-', ' ', name)
-	name = re.sub(' On ', ' on ', name)
+	# name = re.sub(' On ', ' on ', name)
 	name = re.sub('Defi ', 'DeFi ', name)
 	return(name)
 
