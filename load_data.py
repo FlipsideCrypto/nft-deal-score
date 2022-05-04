@@ -394,27 +394,11 @@ def mint_address_token_id_map():
 
 def add_solana_sales():
 	print('Adding Solana sales...')
-	# read id map
-	id_map = pd.read_csv('./data/mint_address_token_id_map.csv')
-	id_map['collection'] = id_map.collection.apply(lambda x: clean_name(x) )
-	id_map.collection.unique()
 
 	query = '''
 		SELECT tx_id
 		, s.mint
-		, COALESCE(l.project_name, m.project_name) AS project_name
-		, s.block_timestamp AS sale_date
-		, m.token_id
-		, sales_amount AS price
-		FROM solana.fact_nft_sales s
-		LEFT JOIN crosschain.address_labels l ON LOWER(s.mint) = LOWER(l.address)
-		LEFT JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
-		WHERE block_timestamp >= CURRENT_DATE - 200
-	'''
-	query = '''
-		SELECT tx_id
-		, s.mint
-		, m.project_name AS project_name
+		, m.project_name AS collection
 		, s.block_timestamp AS sale_date
 		, m.token_id
 		, sales_amount AS price
@@ -438,78 +422,37 @@ def add_solana_sales():
 			'Thugbirdz'
 		)
 	'''
-	# AND LOWER(COALESCE(l.project_name, m.project_name)) IN ('degods','stoned ape crew','sstrals','cets on creck','defi pirates','solgods')
 	sales = ctx.cursor().execute(query)
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
-	# print('Queried {} sales'.format(format_num(len(sales))))
-	sales['chain'] = 'Solana'
-	sales['collection'] = sales.project_name.fillna('').apply(lambda x: clean_name(x) )
-	sorted(sales.collection.unique())
-	cs = [
-		'Astrals',
-		'Aurory',
-		'Cets on Creck',
-		'Catalina Whale Mixer',
-		'DeFi Pirates',
-		'DeGods',
-		'Degen Apes',
-		'Meerkat Millionaires',
-		'Okay Bears',
-		'Pesky Penguins',
-		'SOLGods',
-		'Solana Monkey Business',
-		'Stoned Ape Crew',
-		'Thugbirdz'
-	]
-	sorted(sales[sales.collection.isin(cs)].collection.unique())
-	sales = sales[sales.collection.isin(cs)]
-	
 
-	# print(sorted(sales.collection.unique()))
-	# m = sales.merge(id_map, how='left', on=['mint','collection'])
-	# m = sales.merge(id_map, how='left', on=['mint','collection'])
-	# m = sales.merge(id_map, how='left', on=['mint'])
-	# m = m[ (m.collection_x.notnull()) | (m.collection_y == 'Meerkat Millionaires') ]
-	# m[m.collection_y == 'Meerkat Millionaires']
-	# m['collection'] = m.collection_y.fillna(m.collection_x)
-	# del m['collection_x']
-	# del m['collection_y']
-	# m['token_id'] = m.token_id_x.fillna(m.token_id_y)
-	# m[m.collection == 'Meerkat Millionaires']
-	# del m['token_id_x']
-	# del m['token_id_y']
-	# m = m[m.token_id.notnull()]
-	# m = m[m.collection == 'Meerkat Millionaires']
-	# print(sorted(m.collection.unique()))
-	# m.sort_values('collection')
-	# m = m[[ 'collection','token_id','sale_date','price','chain' ]]
-	m = sales[[ 'collection','token_id','sale_date','price','chain' ]]
-	m['sale_date'] = m.sale_date.astype(str)
-	m.collection.unique()
-	s_df = pd.read_csv('./data/sales.csv')
-	sorted(s_df.collection.unique())
-	if 'collection_x' in s_df.columns and 'collection_y' in s_df.columns:
-		s_df['collection'] = s_df.collection.fillna(s_df.collection_x).fillna(s_df.collection_y)
-		del s_df['collection_x']
-		del s_df['collection_y']
-	l0 = len(s_df)
-	for c in sales.collection.unique():
-		mn = m[m.collection == c].sale_date.min()
-		s_df = s_df[-((s_df.collection == c ) & (s_df.sale_date >= mn))]
-	# s_df = s_df[-s_df.collection.isin(m.collection.unique())]
-	s_df = s_df.append(m)
-	# print(s_df.groupby('collection').token_id.count())
-	l1 = len(s_df)
-	print('Added {} sales'.format(format_num(l1 - l0)))
-	for c in [ 'mint','tmp' ]:
-		if c in s_df:
-			del s_df[c]
-	if 'project_name' in s_df.columns:
-		del s_df['project_name']
-	s_df.groupby('collection').sale_date.min().reset_index().sort_values('sale_date')
-	s_df.to_csv('./data/sales.csv', index=False)
-	pass
+	m = sales[[ 'tx_id','collection','token_id','sale_date','price' ]]
+	m['sale_date'] = m.sale_date.apply(lambda x: str(x)[:19] )
+	old = pd.read_csv('./data/sales.csv')
+	go = old.groupby('collection').token_id.count().reset_index().rename(columns={'token_id':'n_old'})
+	l0 = len(old)
+	app = old[old.collection.isin(m.collection.unique())].append(m)
+	app['tmp'] = app.apply(lambda x: x['collection']+str(int(float(x['token_id'])))+x['sale_date'][:10], 1 )
+	if len(app[app.tx_id.isnull()]):
+		app['null_tx'] = app.tx_id.isnull().astype(int)
+		app = app.sort_values('null_tx', ascending=1)
+		app = app.drop_duplicates(subset=['tmp'], keep='first')
+		app['tx_id'] = app.tx_id.fillna(app.tmp)
+	old = old[-old.collection.isin(m.collection.unique())]
+	old = old.append(app)
+
+	old = old[[ 'collection','token_id','sale_date','price','tx_id' ]]
+
+	# check changes
+	l1 = len(old)
+	gn = old.groupby('collection').token_id.count().reset_index().rename(columns={'token_id':'n_new'})
+	g = gn.merge(go, how='outer', on=['collection']).fillna(0)
+	g['dff'] = g.n_new - g.n_old
+	g = g[g.dff != 0].sort_values('dff', ascending=0)
+	print(g)
+	print('Added {} sales'.format(l1 - l0))
+	old.to_csv('./data/sales.csv', index=False)
+	return(old)
 
 def add_eth_sales():
 	print('Adding ETH sales...')
@@ -519,6 +462,7 @@ def add_eth_sales():
 		, token_id
 		, block_timestamp AS sale_date
 		, price
+		, tx_id
 		FROM ethereum.nft_events
 		WHERE project_name IN (
 			'BoredApeYachtClub'
@@ -530,14 +474,15 @@ def add_eth_sales():
 	sales = pd.DataFrame.from_records(iter(sales), columns=[x[0] for x in sales.description])
 	sales = clean_colnames(sales)
 	# print('Queried {} sales'.format(len(sales)))
-	sales['chain'] = 'Ethereum'
+	# sales['chain'] = 'Ethereum'
+	sorted(sales.project_name.unique())
 	sales['collection'] = sales.project_name.apply(lambda x: clean_name(x) )
 	# print(sales.groupby('collection').sale_date.max())
 	sorted(sales.collection.unique())
 	# m = sales.merge(id_map, how='left', on=['mint','collection'])
 	# m = sales.merge(id_map, how='inner', on=['mint','collection'])
 	# m.sort_values('collection')
-	m = sales[[ 'collection','token_id','sale_date','price','chain' ]]
+	m = sales[[ 'collection','token_id','sale_date','price','tx_id' ]]
 	old = pd.read_csv('./data/sales.csv')
 	l0 = len(old)
 	old = old[old.collection != 'Bakc']
@@ -788,9 +733,9 @@ def add_terra_sales():
 			FROM
 				terra.msg_events
 			WHERE event_attributes:action = 'execute_orders'
-			AND event_type = 'from_contract'
-			AND tx_status = 'SUCCEEDED'
-				
+				AND event_type = 'from_contract'
+				AND tx_status = 'SUCCEEDED'
+				AND block_timestamp >= CURRENT_DATE - 3
 		),
 
 		RE_takers AS (
@@ -801,6 +746,7 @@ def add_terra_sales():
 				terra.msgs
 			WHERE
 				tx_id IN (SELECT DISTINCT tx_id FROM RE_events)
+				AND block_timestamp >= CURRENT_DATE - 3
 		),
 		allSales AS 
 		(
@@ -891,6 +837,7 @@ def add_terra_sales():
 				terra.msg_events
 				WHERE 
 					tx_status = 'SUCCEEDED'
+					AND block_timestamp >= CURRENT_DATE - 3
 					AND tx_id IN ( 
 						SELECT DISTINCT 
 							tx_id 
@@ -899,6 +846,7 @@ def add_terra_sales():
 							msg_value:execute_msg:settle:auction_id is not null 
 							AND tx_status = 'SUCCEEDED' 
 							AND msg_value:contract = 'terra12v8vrgntasf37xpj282szqpdyad7dgmkgnq60j'
+							AND block_timestamp >= CURRENT_DATE - 3
 					)
 				GROUP BY
 					block_timestamp,
@@ -923,6 +871,7 @@ def add_terra_sales():
 				AND event_attributes:action = 'transfer_nft'
 				AND event_attributes:method = 'execute_order'
 				AND event_attributes:"0_contract_address" = 'terra1fj44gmt0rtphu623zxge7u3t85qy0jg6p5ucnk'
+				AND block_timestamp >= CURRENT_DATE - 3
 			)
 			WHERE nft_address IN (
 				'terra13nccm82km0ttah37hkygnvz67hnvkdass24yzv',
@@ -960,37 +909,29 @@ def add_terra_sales():
 		, 'tokenid': 'token_id'
 	})
 	sales = clean_token_id(sales)
-	# sales.token_id.values[:4]
-	# sales['token_id'] = sales.token_id.astype(int)
 
-	# tmp = sales.merge(tokens[['collection','token_id','clean_token_id']])
-	# sales[sales.tx_id.isin(['6CA1966B42D02F07D1FB6A839B8276D501FDF3EF048DECA5601C74D82EBB9D12',
-    #    'F5643C0C805F3236F67CFF1A6AC1FC50CF9DB61B846B3CE6F9D4CD3806284D4E',
-    #    'BFD1D2571B303CEC9BA6B2C67590242799000E3B8D4560792CD16E31BF5D5D1E'])]
-	# sales.head()
-	# sales.columns
-	sales['chain'] = 'Terra'
-	sales = sales[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
-	# print(sales.groupby(['chain','collection']).token_id.count())
-	# sales['token_id'] = sales.token_id.apply(lambda x: re.sub('"', '', x) )
-	# sales['collection'] = sales.collection.apply(lambda x: 'Levana Dragon Eggs' if x=='Levana Eggs' else x )
+	assert(len(sales[sales.price.isnull()]) == 0)
+
 	old = pd.read_csv('./data/sales.csv')
-	# print(old.groupby(['chain','collection']).token_id.count())
+	go = old.groupby('collection').token_id.count().reset_index().rename(columns={'token_id':'n_old'})
 	l0 = len(old)
-	if not 'chain' in old.columns:
-		old['chain'] = 'Solana'
+	app = old[ (old.collection.isin(sales.collection.unique())) ].append(sales)
+	assert(len(app[app.tx_id.isnull()]) == 0)
+	app = app.drop_duplicates('tx_id')
 	old = old[ -(old.collection.isin(sales.collection.unique())) ]
-	old = old.append(sales)
-	old = old[[ 'chain','collection','token_id','sale_date','price','tx_id' ]]
-	# old['collection'] = old.collection.apply(lambda x: 'Levana Dust' if x == 'Levana Meteor Dust' else x )
-	old = old.drop_duplicates(subset=['collection','token_id','price'])
-	# old = old[-(old.collection == 'Levana Dragons')]
-	# old = old[-(old.collection == 'Levana Dragon Eggs')]
+	old = old.append(app)
+	old = old[[ 'collection','token_id','sale_date','price','tx_id' ]]
+
+	# check changes
 	l1 = len(old)
+	gn = old.groupby('collection').token_id.count().reset_index().rename(columns={'token_id':'n_new'})
+	g = gn.merge(go, how='outer', on=['collection']).fillna(0)
+	g['dff'] = g.n_new - g.n_old
+	g = g[g.dff != 0].sort_values('dff', ascending=0)
+	print(g)
 	print('Added {} sales'.format(l1 - l0))
-	print(old.groupby(['chain','collection']).token_id.count())
 	old.to_csv('./data/sales.csv', index=False)
-	return
+	return(old)
 
 def rarity_tools(browser):
 	data = []

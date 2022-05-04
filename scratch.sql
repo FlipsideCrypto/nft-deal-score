@@ -221,8 +221,114 @@ FROM flipside_dev_db.thorchain.liquidity_actions
 WHERE RUNE_AMOUNT = 0 and asset_amount = 0
 GROUP BY 1
 
+https://rstudio-server.flipsidecrypto.com/auth-sign-in
+https://science.flipsidecrypto.xyz/auth-sign-in
+https://science.flipsidecrypto.xyz/connect/
+https://rstudio-connect.flipsidecrypto.com/
+
 stake: 
 unstake: emit_rune_e8, emit_asset_e8
+
+data-science
+DKiZEzE-CZ+o59}L
+boatpartydotbiz
+
+grep -r 'update_nft_deal_score_data.RMD' ./
+grep -R "touch" .
+find ./ -name 'update_nft_deal_score_data.RMD' -print
+
+
+Solana Monkey Business: https://api.flipsidecrypto.com/api/v2/queries/645b0dbc-f932-4389-a9b7-fcb1ae0c2c70/data/latest
+Okay Bears: https://api.flipsidecrypto.com/api/v2/queries/265c2f2e-58cd-456b-951c-2bc49866c6ea/data/latest
+Catalina Whale Mixer: https://api.flipsidecrypto.com/api/v2/queries/a66a796b-4e47-4acf-8195-69ea782c8f67/data/latest
+
+
+LunaBulls: https://api.flipsidecrypto.com/api/v2/queries/4ddc8d39-ef6b-4f19-a1a2-893e3f597a5d/data/latest
+Galactic Punks: https://api.flipsidecrypto.com/api/v2/queries/adeef975-6eeb-41f9-9952-cd82c5a4c668/data/latest
+Galactic Angels: https://api.flipsidecrypto.com/api/v2/queries/0c450359-c3e9-4dd6-a349-20841a0ce1e0/data/latest
+Levana Dragon Eggs: https://api.flipsidecrypto.com/api/v2/queries/f05e24fd-ad62-480b-905a-15ea334cbf48/data/latest
+
+MAYC: https://api.flipsidecrypto.com/api/v2/queries/881d8b52-f6f7-4333-b92a-35a075e5ec65/data/latest
+
+
+
+
+
+WITH base AS (
+	SELECT * 
+	FROM flipside_prod_db.bronze.prod_data_science_uploads_1748940988
+	WHERE record_content[0]:collection IS NOT NULL
+	AND record_metadata:key like '%nft-deal-score-rankings-%'
+	AND record_content[0]:collection = 'Solana Monkey Business'
+), base2 AS (
+	SELECT t.value:collection::string AS collection
+	, t.value:cur_floor AS old_floor
+	, t.value:cur_sd AS old_sd
+	, t.value:deal_score_rank AS deal_score_rank
+	, t.value:fair_market_price AS old_fair_market_price
+	, t.value:lin_coef AS lin_coef
+	, t.value:log_coef AS log_coef
+	, t.value:rarity_rank AS rarity_rank
+	, t.value:token_id AS token_id
+	, ROW_NUMBER() OVER (PARTITION BY collection, token_id ORDER BY record_metadata:CreateTime DESC) AS rn
+	FROM base
+	, LATERAL FLATTEN(
+	input => record_content
+	) t
+), base3 AS (
+	SELECT *
+	FROM flipside_prod_db.bronze.prod_data_science_uploads_1748940988
+	WHERE record_content[0]:collection IS NOT NULL
+	AND record_metadata:key like '%nft-deal-score-floors-%'
+), base4 AS (
+	SELECT t.value:collection::string AS collection
+	, t.value:cur_floor AS new_floor
+	, b.*
+	, ROW_NUMBER() OVER (PARTITION BY collection ORDER BY record_metadata:CreateTime DESC) AS rn
+	FROM base3 b
+	, LATERAL FLATTEN(
+	input => record_content
+	) t
+), base5 AS (
+	SELECT b2.*
+	, b4.new_floor
+	FROM base2 b2
+	JOIN base4 b4 ON b2.collection = b4.collection AND b4.rn = 1
+	WHERE b2.rn = 1
+), base6 AS (
+	SELECT *
+	, old_sd * new_floor / old_floor AS cur_sd
+	, old_fair_market_price + ((new_floor - old_floor) * lin_coef) + (( new_floor - old_floor) * log_coef * old_fair_market_price / old_floor) AS new_fair_market_price
+	FROM base5
+)
+SELECT collection
+, token_id
+, deal_score_rank
+, rarity_rank
+, new_floor AS floor_price
+, ROUND(CASE WHEN new_fair_market_price < floor_price THEN floor_price ELSE new_fair_market_price END, 2) AS fair_market_price
+, ROUND(CASE WHEN new_fair_market_price - cur_sd < floor_price * 0.975 THEN floor_price * 0.975 ELSE new_fair_market_price - cur_sd END, 2) AS price_low
+, ROUND(CASE WHEN new_fair_market_price + cur_sd < floor_price * 1.025 THEN floor_price * 1.025 ELSE new_fair_market_price + cur_sd END, 2) AS price_high
+FROM base6
+
+
+WITH base3 AS (
+	SELECT *
+	FROM flipside_prod_db.bronze.prod_data_science_uploads_1748940988
+	WHERE record_content[0]:collection IS NOT NULL
+	AND record_metadata:key like '%nft-deal-score-floors-%'
+), base4 AS (
+	SELECT t.value:collection::string AS collection
+	, t.value:cur_floor AS new_floor
+	, b.*
+	, ROW_NUMBER() OVER (PARTITION BY collection ORDER BY record_metadata:CreateTime DESC) AS rn
+	FROM base3 b
+	, LATERAL FLATTEN(
+	input => record_content
+	) t
+)
+SELECT * FROM base4
+
 
 
 block_timestamp = 1648541784259230029
@@ -249,6 +355,19 @@ LEFT JOIN FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG l2 ON
 LEFT JOIN FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG l3 ON l3.height = l1.height - 1
 WHERE (l2.height IS NULL OR l3.height IS NULL)
 ORDER BY l1.height
+
+SELECT date_trunc('week', block_timestamp) AS hour
+, COUNT(1) AS n
+, AVG(CASE WHEN SUCCEEDED = TRUE THEN 1.0 ELSE 0 END) AS pct_succeed
+FROM solana.fact_transactions
+WHERE block_timestamp >= CURRENT_DATE - 90
+GROUP BY 1
+
+
+Hat_Big Crown
+Mouth_Wagmi Beach
+Body_Oil Slick
+
 
 
 1648541784259230029

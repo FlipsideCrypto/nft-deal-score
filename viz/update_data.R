@@ -1,15 +1,10 @@
+# install.packages('reticulate')
 library(reticulate)
 library(httr)
 library(jsonlite)
 
 user <- Sys.info()[['user']]
 isRstudio <- user == 'rstudio-connect'
-if(isRstudio) {
-	source('/home/data-science/data_science/util/util_functions.R')
-} else {
-	source('~/data_science/util/util_functions.R')
-	setwd('~/git/nft-deal-score')
-}
 
 # nft_deal_score_listings_data.RData
 base_dir <- ifelse(
@@ -20,17 +15,33 @@ base_dir <- ifelse(
 		, '~/git/nft-deal-score/viz/'
 	)
 )
-base_dir <- '/srv/shiny-server/nft-deal-score/'
+# base_dir <- '/srv/shiny-server/nft-deal-score/'
 listings_file <- paste0(base_dir,'nft_deal_score_listings_data.RData')
 load(listings_file)
 
+if(isRstudio) {
+	source('/home/data-science/data_science/util/util_functions.R')
+	source_python('/home/data-science/data_science/nft-deal-score/scrape_terra_nfts.py')
+} else {
+	source('~/data_science/util/util_functions.R')
+	source_python(paste0(base_dir, 'scrape_terra_nfts.py'))
+}
+
 # py_install('pandas', pip = TRUE)
 # py_install('cloudscraper', pip = TRUE)
-# r reticulate python ModuleNotFoundError
-
+# py_install('snowflake-connector-python', pip = TRUE)
 # cloudscraper <- import('cloudscraper')
 
+base_dir <- ifelse(
+	user == 'rstudio-connect'
+	, '/rstudio-data/'
+	, ifelse(user == 'fcaster'
+		, '/srv/shiny-server/nft-deal-score/'
+		, '~/git/nft-deal-score/viz/'
+	)
+)
 source_python(paste0(base_dir, 'scrape_terra_nfts.py'))
+source_python(paste0(base_dir, 'add_sales.py'))
 
 query <- '
 	SELECT DISTINCT project_name AS collection
@@ -57,7 +68,7 @@ get_smb_url <- function(page) {
 solana_listings <- data.table()
 
 solana_collections <- c(
-	'okay_bears','catalina_whale_mixer','meerkat_millionaires_country_club','solgods','cets_on_creck','stoned_ape_crew','degods','aurory','thugbirdz','solana_monkey_business','degenerate_ape_academy','pesky_penguins'
+	'okay_bears','the_catalina_whale_mixer','meerkat_millionaires_country_club','solgods','cets_on_creck','stoned_ape_crew','degods','aurory','thugbirdz','solana_monkey_business','degenerate_ape_academy','pesky_penguins'
 )
 for(collection in solana_collections) {
 	print(paste0('Working on ', collection, '...'))
