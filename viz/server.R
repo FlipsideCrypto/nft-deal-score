@@ -1,5 +1,5 @@
 server <- function(input, output, session) {
-	load('data.Rdata')
+	# load('data.Rdata')
 	user <- Sys.info()[['user']]
 
 	base_dir <- ifelse(
@@ -654,12 +654,10 @@ server <- function(input, output, session) {
 	output$tokenimg <- renderUI({
 		id <- getTokenId()
 		selected <- getCollection()
-		print(paste0('id = ', id, '. selected = ', selected))
 		if (length(id) == 0 | selected == '') {
 			return(NULL)
 		}
 		src <- tokens[ (collection == eval(selected)) & (token_id == eval(id)) ]$image_url[1]
-		print(paste0('src = ', src))
 		t <- tags$img(src = src)
 		t
 	})
@@ -797,7 +795,7 @@ server <- function(input, output, session) {
                 if(length(att) >= i) {
                     att <- att[i]
                     include <- attributes[collection == eval(selected) & feature_name == eval(att) & feature_value == eval(val), list(token_id) ]
-                    data <- merge(data, include)
+                    data <- merge(data, include, by=c('token_id'))
                 }
             }
         }
@@ -839,8 +837,24 @@ server <- function(input, output, session) {
 		}
 		# data <- sales[ collection == eval(selected) , list( token_id, block_timestamp, price, pred, mn_20 )]
 		data <- sales[ collection == eval(selected)]
-		m <- pred_price[collection == eval(selected), list(token_id, rk)]
-		data <- merge(data, m, all.x=TRUE, by=c('token_id'))
+
+		coefsdf[, tot := lin_coef + log_coef ]
+		coefsdf[, lin_coef := lin_coef / tot]
+		coefsdf[, log_coef := log_coef / tot]
+
+		fmp <- merge( pred_price, coefsdf, by=c('collection') )
+		fmp <- merge( fmp, data[, list(token_id, collection, block_timestamp, price, mn_20)], by=c('token_id','collection') )
+		# fmp <- merge( fmp, floors, by=c('collection') )
+		fmp[, abs_chg := (mn_20 - floor_price) * lin_coef ]
+		fmp[, pct_chg := (mn_20 - floor_price) * log_coef ]
+		fmp[, pred := pred_price + abs_chg + (pct_chg * pred_price / floor_price) ]
+		# fmp[, fair_market_price := pred_price + abs_chg + (pct_chg * pred_price / floor_price) ]
+		data <- fmp
+
+		# m <- pred_price[collection == eval(selected), list(token_id, rk)]
+		# data <- merge(data, m, all.x=TRUE, by=c('token_id'))
+		# data[token_id == 5144]
+		# m[token_id == 5144]
 		if(nrow(data) == 0) {
 			return(data.table())
 		}
@@ -858,11 +872,11 @@ server <- function(input, output, session) {
         }
         if(input$minfloorinput != '') {
             r <- as.numeric(input$minfloorinput)
-            data <- data[ minfloorinput >= eval(r) ]
+            data <- data[ mn_20 >= eval(r) ]
         }
         if(input$maxfloorinput != '') {
             r <- as.numeric(input$maxfloorinput)
-            data <- data[ maxfloorinput <= eval(r) ]
+            data <- data[ mn_20 <= eval(r) ]
         }
         if(input$maxrarityrank2 != '') {
             r <- as.numeric(input$maxrarityrank2)
@@ -1003,31 +1017,31 @@ server <- function(input, output, session) {
         data[, pred := paste0(format(round(pred, 1), scientific = FALSE, digits=2, decimal.mark=".", big.mark=","))]
 		data[, vs_floor := NULL ]
         # data <- future(getSalesDataFn(selected, sales, tokens, pred_price, attributes)) %...>% 
-            reactable(data, 
-                defaultColDef = colDef(
-                    headerStyle = list(background = "#10151A")
-                ),
-                # filterable = TRUE,
-                borderless = TRUE,
-                outlined = FALSE,
-                searchable = FALSE,
-                columns = list(
-                    token_id = colDef(name = "Token ID", align = "left"),
-                    image_url = colDef(name = "Token", align = "left", cell = function(value, index) {
-                        if(index <= 100) {
-                            htmltools::tags$img(src=value)
-                        } else {
-                            return(NULL)
-                        }
-                    }),
-                    block_timestamp = colDef(name = "Sale Date", align = "left"),
-                    price = colDef(name = "Price", align = "left"),
-                    pred = colDef(name = "Fair Market Price", align = "left"),
-                    rk = colDef(name = "Deal Score Rank", align = "left"),
-                    nft_rank = colDef(name = "Rarity Rank", align = "left"),
-                    mn_20 = colDef(name = "Floor Price", align = "left")
-                )
-            )
+		reactable(data, 
+			defaultColDef = colDef(
+				headerStyle = list(background = "#10151A")
+			),
+			# filterable = TRUE,
+			borderless = TRUE,
+			outlined = FALSE,
+			searchable = FALSE,
+			columns = list(
+				token_id = colDef(name = "Token ID", align = "left"),
+				image_url = colDef(name = "Token", align = "left", cell = function(value, index) {
+					if(index <= 100) {
+						htmltools::tags$img(src=value)
+					} else {
+						return(NULL)
+					}
+				}),
+				block_timestamp = colDef(name = "Sale Date", align = "left"),
+				price = colDef(name = "Price", align = "left"),
+				pred = colDef(name = "Fair Market Price", align = "left"),
+				rk = colDef(name = "Deal Score Rank", align = "left"),
+				nft_rank = colDef(name = "Rarity Rank", align = "left"),
+				mn_20 = colDef(name = "Floor Price", align = "left")
+			)
+		)
 	})
 
 	getPriceDistributionData <- reactive({

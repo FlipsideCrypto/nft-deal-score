@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import time
 import pickle
 from textwrap import indent
 import warnings
@@ -74,7 +75,7 @@ def calculate_percentages(df, cols=[]):
 
 def get_sales(check_exclude = True, exclude=[]):
 
-	s_df = pd.read_csv('./data/sales.csv').rename(columns={'sale_date':'block_timestamp'})
+	s_df = pd.read_csv('./viz/nft_deal_score_sales.csv').rename(columns={'sale_date':'block_timestamp'})
 	sorted(s_df.collection.unique())
 	s_df['token_id'] = s_df.token_id.astype(str)
 	s_df['collection'] = s_df.collection.apply(lambda x: clean_name(x))
@@ -82,7 +83,7 @@ def get_sales(check_exclude = True, exclude=[]):
 	s_df = s_df.drop_duplicates(subset=['token_id','collection','price'])
 	s_df = s_df[-s_df.collection.isin(['Levana Meteors','Levana Dust'])]
 	s_df = s_df[ -s_df.collection.isin(['boryokudragonz', 'Boryoku Dragonz']) ]
-	s_df = s_df[[ 'chain','collection','block_timestamp','token_id','price','tx_id' ]]
+	s_df = s_df[[ 'collection','block_timestamp','token_id','price','tx_id' ]]
 	for e in exclude:
 		s_df = s_df[-( (s_df.collection == e[0]) & (s_df.token_id == str(e[1])) & (s_df.price == e[2]) )]
 	s_df = s_df[ -((s_df.collection == 'smb') & (s_df.price < 1)) ]
@@ -179,7 +180,6 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	s_df.groupby('collection').block_timestamp.max()
 	s_df[s_df.collection == 'BAYC'].sort_values('block_timestamp', ascending=0).head()[['token_id','block_timestamp','price']]
 	s_df[s_df.collection == 'MAYC'].sort_values('price', ascending=0).head()
-	s_df.train_exclude
 	# s_df[s_df.collection == 'Solana Monkey Business'].to_csv('./tableau/data/smb_sales.csv', index=False)
 	# s_df = s_df[-s_df.collection.isin(['BAYC','MAYC'])]
 	# s_df[s_df.collection.isnull()]
@@ -271,6 +271,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	# s_df.groupby(['collection','tmp']).mn_20.mean().reset_index().to_csv('~/Downloads/mn_20.csv', index=False)
 
 	listings = pd.read_csv('./data/listings.csv')
+	listings = pd.read_csv('./viz/nft_deal_score_listings.csv')
 	sorted(listings.collection.unique())
 	if supplement_with_listings:
 		pred_price = pd.read_csv('./data/pred_price.csv')
@@ -352,7 +353,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	# for collection in [ 'Aurory','Solana Monkey Business' ]:
 	sorted(pred_price.collection.unique())
 	sorted(s_df.collection.unique())
-	print(sorted(m_df.collection.unique()))
+	# print(sorted(m_df.collection.unique()))
 	# for collection in s_df.collection.unique():
 	saved_params = {}
 	file_to_store = open('./objects/saved_params.pickle', 'rb')
@@ -374,14 +375,16 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collections = [ x for x in collections if not x in ['Astrals','Cets on Cleck','DeFi Pirates'] ]
 	collections = ['Cets on Creck']
 	s_df.groupby('collection').block_timestamp.max()
-	collections = ['Meerkat Millionaires']
-	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
-	print(sorted(collections))
 	m_df[m_df.collection.isin(['Okay Bears','Catalina Whale Mixer'])]
 	s_df[s_df.collection.isin(['Okay Bears','Catalina Whale Mixer'])]
-	collections = [ 'Catalina Whale Mixer', 'Okay Bears' ]
+	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
+	collections = [ c for c in collections if not c in [ 'Galactic Punks','LunaBulls','Galactic Angels','Levana Dragon Eggs','BAKC','BAYC','Astrals','MAYC' ] ]
+	collections = ['Okay Bears']
+	print(sorted(collections))
+	# collections = [ 'Catalina Whale Mixer', 'Okay Bears', 'Pesky Penguins' ]
 	for collection in collections:
-		if collection in ['Astrals','Bakc','BAYC','MAYC']:
+		# if collection in ['Astrals','Bakc','BAKC']+[ 'Catalina Whale Mixer', 'Okay Bears', 'Pesky Penguins' ]:
+		if collection in ['Astrals','Bakc','BAKC']:
 			continue
 		if not collection in saved_params.keys():
 			saved_params[collection] = {}
@@ -535,7 +538,9 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		# 	std_pred_cols = [ 'std_essence_Dark','std_collection_rank_group_0','std_rarity_Legendary','std_rarity_Rare','std_rarity_Ancient','std_collection_rank','std_transformed_collection_rank' ]
 		mn = df.timestamp.min()
 		mx = df.timestamp.max()
-		df['wt'] = df.timestamp.apply(lambda x: 3.0 ** ((x - mn) / (mx - mn)) )
+		a_week_ago = (time.time() * 1000000000) - (60 * 60 * 24 * 7 * 1000000000)
+		df['wt'] = df.timestamp.apply(lambda x: 4.0 ** ((x - mn) / (mx - mn)) )
+		df.loc[ df.timestamp >= a_week_ago, 'wt' ] = 5
 		df['wt'] = df.apply(lambda x: 0 if (x['train_exclude']==1 and (x['train_exclude_price'] != x['train_exclude_price'] or x['train_exclude_price'] == x['price'])) else x['wt'], 1 )
 		df.loc[ (df.collection == 'Aurory') & (df.block_timestamp <= '2021-09-05'), 'wt' ] = 0.05
 		if collection == 'Levana Dragon Eggs':
@@ -576,6 +581,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 
 		df = df.reset_index(drop=True)
 		X = df[std_pred_cols].values
+		wt = df['wt'].values
 		y_0 = df.rel_price_0.values
 		y_1 = df.rel_price_1.values
 		df.sort_values('price', ascending=0).head(15)[['price','token_id','nft_rank','block_timestamp']]
@@ -630,13 +636,13 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 
 				if model in ['las','ridge']:
 					clf = ku.get_model(model, bst_p)
-					clf.fit(X, y)
+					clf.fit(X, y, wt)
 					coefs = get_coefs(cur_std_pred_cols, clf.coef_)
 					mn = coefs.val.min()
 					while mn < 0:
 						cur_std_pred_cols = [ c for c in coefs[coefs.val >= 0 ].col.unique() ]
 						X_new = df[cur_std_pred_cols].values
-						clf.fit(X_new, y)
+						clf.fit(X_new, y, wt)
 						coefs = get_coefs(cur_std_pred_cols, clf.coef_)
 						mn = coefs.val.min()
 						if mn >= 0:
@@ -714,6 +720,37 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 			test['pred'] = clf.predict( test[['pred_lin','pred_log']].values )
 		coefsdf = coefsdf.append(tmp)
 		df['err'] = (df.pred / df[target_col]).apply(lambda x: abs(x-1) )
+		df['err'] = df[target_col] - df.pred
+		df.head()
+		df[df['std_Attribute count_4']==1]['err']
+		df['w_err'] = df.err * df.wt
+		df[df['std_Attribute count_4']==1].sort_values('timestamp')[['err','w_err']].mean()
+		df[(df['std_Attribute count_4']==1)].sort_values('timestamp')[['err','w_err']].mean()
+		df[(df['std_Attribute count_4']==1) & (df.wt>=15)].sort_values('timestamp')[['err','w_err']].mean()
+		df[(df['std_Attribute count_4']==1) & (df.wt>=15)].sort_values('timestamp')[['err','w_err']].sum()
+		df[(df['std_Attribute count_4']==1) & (df.wt<15)].sort_values('timestamp')[['err','w_err']].mean()
+		df[(df['std_Attribute count_4']==1) & (df.wt<15)].sort_values('timestamp')[['err','w_err']].sum()
+		df[df['std_Attribute count_4']==1].sort_values('timestamp')[['err','price','pred','block_timestamp']].tail(20)
+		df[(df['std_Attribute count_4']==1) & (df.wt>=1)].sort_values('timestamp')[['err','price','pred','block_timestamp','wt','w_err']].tail(50)
+		df[df.wt >= 15].wt.sum() / df.wt.sum()
+		df[df.wt < 15].wt.sum()
+
+		recent_errs = []
+		recent = df[df.timestamp >= a_week_ago]
+		for c in [ c for c in cur_std_pred_cols if len(df[c].unique()) == 2]:
+			a = recent[recent[c] == 1]
+			recent_errs += [[ c, len(a), a.err.mean(), a.err.sum(), a.err.sum() / recent.price.sum() ]]
+		recent_errs = pd.DataFrame(recent_errs, columns=['col','n','avg','tot','rat']).sort_values('tot')
+		recent_errs['abs_rat'] = abs(recent_errs.rat)
+		recent_errs.sort_values('rat')
+		correct = recent_errs[(recent_errs.abs_rat > 0.003) & (recent_errs.n >= 10)]
+		if len(correct):
+			correct['chg'] = (correct.abs_rat / 0.001).apply(lambda x: min(1, x) * .7 ) * correct.avg
+			print(correct)
+		for row in correct.iterrows():
+			row = row[1]
+			c = row['col']
+			test['pred'] = test.apply(lambda x: x['pred'] if x[c] == 0 else x['pred'] + row['chg'], 1 )
 
 		# print out some summary stats
 		df['err'] = df[target_col] - df.pred
@@ -806,7 +843,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		imp['feature_value'] = imp.col.apply(lambda x: re.split('_', x)[1] if '_' in x else None )
 		sorted(imp.feature_name.unique())
 		imp.loc[imp.col == 'Matching_No', 'pct_vs_baseline'] = 0
-		imp[imp.feature_name == 'Matching']
+		imp[imp.feature_name == 'Attribute Count']
 		# if 'matching' in a:
 		# 	imp.loc[imp.feature_name == 'Matching', 'feature_value'] = 'Yes'
 		# 	test[test.matching==1].to_csv('~/Downloads/tmp1.csv', index=False)
@@ -840,6 +877,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	feature_values[ (feature_values.collection == 'Galactic Angels') ]
 	feature_values[ (feature_values.collection == 'Solana Monkey Business') &  (feature_values.feature_name == 'Clothes')  ]
 	feature_values[ (feature_values.collection == 'Solana Monkey Business') & (feature_values.feature_name == 'Clothes') & (feature_values.feature_value == 'Poncho') ]
+	feature_values[ (feature_values.collection == 'Okay Bears') & (feature_values.feature_name == 'Attribute Count')]
 	attributes[ (attributes.collection == 'Solana Monkey Business') & (attributes.feature_name == 'Clothes') & (attributes.feature_value == 'Poncho') & (attributes.token_id == '1') ]
 	attributes[ (attributes.collection == 'Solana Monkey Business') & (attributes.feature_name == 'Clothes') & (attributes.feature_value == 'Poncho') & (attributes.token_id == 1) ]
 

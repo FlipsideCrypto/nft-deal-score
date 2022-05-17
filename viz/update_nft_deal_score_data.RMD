@@ -18,6 +18,8 @@ Hello I am running this at `r Sys.time()`
 #EVEN IF YOU SOURCE util_functions.R 
 #YOU HAVE TO PUT THE LIBRARIES HERE I KNOW SORRY
 #BUT HERE THEY ALL ARE TO SAVE YOU TIME
+# install.packages('RCurl')
+library(RCurl)
 library(fasttime)
 library(gridExtra)
 library(ggplot2)
@@ -42,15 +44,23 @@ library(reticulate)
 
 #NOW COPY EVERYTHING ELSE FROM YOUR CURRENT
 #update_data.R FILE HERE ---------->
+# virtualenv_create('pyvenv')
+# use_virtualenv('pyvenv')
 # py_install('pandas', pip = TRUE)
+# py_install('snowflake-connector-python', pip = TRUE)
+# virtualenv_install('pyvenv', 'pandas')
+# virtualenv_install('pyvenv', 'pandas')
 # py_install('cloudscraper', pip = TRUE)
 # r reticulate python ModuleNotFoundError
+# print('54')
+# use_python('/opt/python/3.10.4/bin/python')
 
 SD_MULT = 3
 SD_SCALE = 1.95
 
 user <- Sys.info()[['user']]
 isRstudio <- user == 'rstudio-connect'
+# isRstudio <- TRUE
 
 base_dir <- ifelse(
 	isRstudio
@@ -62,10 +72,13 @@ base_dir <- ifelse(
 )
 
 if(isRstudio) {
+	print('74')
 	source('/home/data-science/data_science/util/util_functions.R')
 	source('/home/data-science/data_science/util/kafka_utils.R')
-	source_python('~/data_science/viz/nft-deal-score/scrape_terra_nfts.py')
-	source_python('~/data_science/viz/nft-deal-score/add_sales.py')
+	# source_python('/home/data-science/data_science/viz/nft-deal-score/scrape_terra_nfts.py')
+	source_python('/home/data-science/data_science/viz/nft-deal-score/add_sales.py')
+	# source_python('~/data_science/viz/nft-deal-score/scrape_terra_nfts.py')
+	# source_python('~/data_science/viz/nft-deal-score/add_sales.py')
 } else {
 	source('~/data_science/util/util_functions.R')
 	source('~/data_science/util/kafka_utils.R')
@@ -90,7 +103,7 @@ sum(coefsdf$log_coef) + sum(coefsdf$lin_coef)
 # write sales data to nft_deal_score_sales.csv
 add_solana_sales(usr, pwd, base_dir)
 add_ethereum_sales(usr, pwd, base_dir)
-add_terra_sales(usr, pwd, base_dir)
+# add_terra_sales(usr, pwd, base_dir)
 
 # read sales data from nft_deal_score_sales.csv
 raw_sales <- read.csv(paste0(base_dir,'nft_deal_score_sales.csv')) %>% as.data.table()
@@ -138,11 +151,12 @@ colnames(mints) <- c('collection','tokenMint','token_id')
 mints[ collection == 'Cets On Creck', collection := 'Cets on Creck']
 
 # pull terra listings
-terra_listings <- scrape_randomearth(base_dir)
-head(terra_listings)
-unique(terra_listings$collection)
+# terra_listings <- scrape_randomearth(base_dir)
+# head(terra_listings)
+# unique(terra_listings$collection)
 
 
+# 9c39e05c-db3c-4f3f-ac48-84099111b813
 get_me_url <- function(collection, offset) {
 	return(paste0('https://api-mainnet.magiceden.dev/v2/collections/',collection,'/listings?offset=',offset,'&limit=20'))
 }
@@ -155,9 +169,16 @@ solana_listings <- data.table()
 solana_collections <- c(
 	'okay_bears','the_catalina_whale_mixer','meerkat_millionaires_country_club','solgods','cets_on_creck','stoned_ape_crew','degods','aurory','thugbirdz','solana_monkey_business','degenerate_ape_academy','pesky_penguins'
 )
+solana_collections <- c(
+	'okay_bears','the_catalina_whale_mixer','meerkat_millionaires_country_club','solgods','cets_on_creck','stoned_ape_crew','degods','aurory','thugbirdz','solana_monkey_business','degenerate_ape_academy','pesky_penguins'
+)
+# headers = c(
+# 	'Authorization': 'Bearer 9c39e05c-db3c-4f3f-ac48-84099111b813'
+# )
 for(collection in solana_collections) {
 	print(paste0('Working on ', collection, '...'))
 	has_more <- TRUE
+	has_err <- FALSE
 	offset <- 0
 	while(has_more) {
 		Sys.sleep(1)
@@ -165,36 +186,64 @@ for(collection in solana_collections) {
 			{
 				print(paste0('Offset #', offset))
 				url <- get_me_url(collection, offset)
-				response <- GET(url)
+				response <- GET(
+					url = url
+					# , add_headers(.headers = c('Authorization'= 'Bearer 9c39e05c-db3c-4f3f-ac48-84099111b813'))
+					, add_headers('Authorization'= 'Bearer 9c39e05c-db3c-4f3f-ac48-84099111b813')
+				)
+				# r <- content(response, as = 'parsed')
 				content <- rawToChar(response$content)
 				content <- fromJSON(content)
-				is.data.table(content)
-				is.data.frame(content)
 				if( !is.data.frame(content) ) {
 					content <- rbindlist(content, fill=T) 
 				}
-				has_more <- nrow(content) >= 20
+				has_more <- nrow(content) > 0
 				if(nrow(content) > 0 && length(content) > 0) {
+					# content <- data.table(content)
 					df <- merge(content, mints, by=c('tokenMint')) %>% as.data.table()
+					# if(nrow(df) > 0) {
+					# 	print(min(df$price))
+					# }
 					df <- df[, list(collection, token_id, price)]
-					offset <- offset + 20
 					solana_listings <- rbind(solana_listings, df)
 				} else {
 					has_more <- FALSE
 				}
+				offset <- offset + 20
+				has_err <- FALSE
 			},
 			error=function(cond) {
 				print(paste0('Error: ', cond))
+				return(TRUE)
+				# has_more <- FALSE
+				# if(has_err) {
+				# 	has_err <- FALSE
+				# 	has_more <- FALSE
+				# 	return(TRUE)
+				# } else {
+				# 	Sys.sleep(15)
+				# 	has_err <- TRUE
+				# 	return(FALSE)
+				# }
+				# return(TRUE)
 			},
 			warning=function(cond) {
 				print(paste0('Warning: ', cond))
+				return(TRUE)
 			},
 			finally={
+				# return(TRUE)
 				# print(paste0('Finally'))
 			}
 		)
+		if(out) {
+			offset <- offset + 20
+			# has_more <- FALSE
+		}
 	}
 }
+
+solana_listings[order(token_id)]
 
 for(collection in c('Solana Monkey Business')) {
 	print(paste0('Working on ', collection, '...'))
@@ -225,9 +274,9 @@ for(collection in c('Solana Monkey Business')) {
 }
 
 head(solana_listings)
-head(terra_listings)
-new_listings <- rbind(solana_listings, terra_listings)
-new_listings <- unique(new_listings)
+# head(terra_listings)
+# new_listings <- rbind(solana_listings, terra_listings)
+new_listings <- unique(solana_listings)
 
 # listings <- read.csv('./data/listings.csv') %>% as.data.table()
 rem <- unique(new_listings$collection)
@@ -246,6 +295,20 @@ floors <- listings %>%
 	summarize(cur_floor = min(price)) %>%
 	as.data.table()
 
+
+get_fmp <- function(data, coefsdf, pred_price) {
+	coefsdf[, tot := lin_coef + log_coef ]
+	coefsdf[, lin_coef := lin_coef / tot]
+	coefsdf[, log_coef := log_coef / tot]
+	sum(coefsdf$log_coef) + sum(coefsdf$lin_coef)
+
+	fmp <- merge( pred_price, coefsdf, by=c('collection') )
+	fmp <- merge( fmp, data[, list(token_id, collection, block_timestamp, price, mn_20)], by=c('token_id','collection') )
+	# fmp <- merge( fmp, floors, by=c('collection') )
+	fmp[, abs_chg := (mn_20 - floor_price) * lin_coef ]
+	fmp[, pct_chg := (mn_20 - floor_price) * log_coef ]
+	fmp[, fair_market_price := pred_price + abs_chg + (pct_chg * pred_price / floor_price) ]
+}
 
 if(FALSE) {
 	coefsdf[, tot := lin_coef + log_coef ]
@@ -310,6 +373,9 @@ save(
 	listings
 	, file = listings_file
 )
+if(!isRstudio) {
+	write.csv(listings, paste0(base_dir, 'nft_deal_score_listings.csv'))
+}
 
 ```
 
