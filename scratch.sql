@@ -1,237 +1,1457 @@
 
 
-
-
-
-
 WITH base AS (
-	SELECT instructions[0]:data::string AS data
-	, instructions[0]:programId::string AS program_id
-	, *
-	FROM solana.fact_transactions
-	WHERE block_timestamp >= CURRENT_DATE - 2
-	AND tx_id = '25XwyS9jjZqs9xxqtVkRPRDRkydsrcCG9QMeqJMeY32ZQzMrSCpc9mdbUJFxMQDMfCNfB1E122krRKLTHW2JPoEx'
-	AND succeeded = TRUE
-	LIMIT 10
-), base2 AS (
-	SELECT b.tx_id
-	, b.block_timestamp
-	, t.value
-	, t.value:programId::string AS programId
-	, t.value:parsed:info:amount::int / POWER(10, 9) AS amount
-	, t.value:parsed:info:owner::string AS address
-	FROM base b
-	, LATERAL FLATTEN(
-		input => instructions
-	) t
-), base3 AS (
-	SELECT DISTINCT tx_id
-	FROM base2
-), base4 AS (
-	SELECT b2.tx_id
-	, b2.block_timestamp
-	, b2.address
-	, SUM(amount) AS amount
-	FROM base2 b2
-	JOIN base3 b3 ON b3.tx_id = b2.tx_id
-	WHERE amount IS NOT NULL
-	GROUP BY 1, 2, 3
+  SELECT DISTINCT address, symbol
+  FROM silver_crosschain.ntr
+  WHERE hodl = 0
+  AND symbol = 'SUSHI'
+  AND reward > 0
+), h AS (
+  SELECT DISTINCT address, symbol
+  FROM silver_crosschain.ntr
+  WHERE hodl = reward
+  AND symbol = 'SUSHI'
 )
 SELECT *
-FROM base4
+FROM silver_crosschain.ntr n
+JOIN base b ON b.address = n.address AND b.symbol = n.symbol 
+JOIN h ON h.address = n.address AND h.symbol = n.symbol 
 
 
-SELECT date_trunc('month', block_timestamp) AS month
-AVERAGE( CASE WHEN COALESCE(rune_amount_usd, 0) + COALESCE(asset_amount_usd, 0) < 1000 THEN 1 ELSE 0 END ) AS pct_smal
-FROM thorchain.liquidity_actions
-WHERE COALESCE(rune_amount_usd, 0) > 0 OR COALESCE(asset_amount_usd, 0) > 0
+
+SELECT *
+FROM silver_crosschain.ntr
+WHERE symbol = 'SUSHI' 
+//AND address = '0xa677bdf3a32ca287419343a6a2057fd4362ea996'
+//WHERE tx_id = 'C2C6997EBFA385F621FB2FA684FE62AA717719A833286385FB00FE8DB49CA1FF'
+ORDER BY xfer_date, reward DESC
+LIMIT 1000
+
+
+-- amt, timeframe, grouping, token, tot, pct, hodl_pct, metric, is_flipside
+
+WITH base AS (
+  SELECT address
+  , symbol
+  , MIN(xfer_date) AS mn_date
+  FROM silver_crosschain.ntr
+  GROUP BY 1
+)
+SELECT n.address
+, n.symbol
+, DATEDIFF('days', mn_date, xfer_date) AS days
+, reward
+, hodl
+, unlabeled_transfer
+, stake
+, cex_deposit
+, nft_buy
+, dex_swap
+FROM silver_crosschain.ntr n
+JOIN base b ON b.address = n.address AND b.symbol = n.symbol
+
+
+-- Automatic row-sampling now built in.
+-- As always, beware estimate errors from missing Flipside identical rows.
+-- Check example block balances with the below URL format:
+-- https://thornode.ninerealms.com/bank/balances/[address]?height=[block_id]
+
+
+/*
+--'Run Selected' to check the transfer events sum for just one block.
+SELECT *
+FROM thorchain.transfer_events
+WHERE (CONCAT(to_address, from_address) LIKE '%thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt%')
+  AND (block_id = 5205058)
+*/
+
+WITH
+target AS
+(
+SELECT 
+  TRIM('thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt') AS target_address,
+  SPLIT('THOR.RUNE', '-')[0] AS target_asset,
+  10000 AS target_rows 
+  --For displaying full ranges in Flipside, this should be below 100000 (one hundred thousand).
+  --In practice, there may be up to two extra rows per asset type (starting and ending non-zero balance estimates)
+),
+/*
+thor1v8ppstuf6e3x0r4glqc68d5jqcs2tf38cg2q6y [Minter Module - THOR.RUNE Switcher (from IOU.RUNE) and Synth Minter/Burner Module ('Genesis address')]
+thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt [Reserve Module]
+thor17gw75axcnr8747pkanye45pnrwk7p9c3cqncsv [Bond Module]
+thor1g98cy3n9mmjrpn0sxmn63lztelera37n8n67c0 [Pool Module]
+
+thor160yye65pf9rzwrgqmtgav69n6zlsyfpgm9a7xk is the THORSwap affiliate fee wallet.
+*/
+
+SELECT SPLIT(pool_name, '-')[0] AS pool_name
+, SUM(CASE WHEN from_asset LIKE '%/%' THEN -from_amount ELSE to_amount END) AS net_amt
+FROM thorchain.swaps
+WHERE (from_asset = 'THOR.RUNE' AND to_asset LIKE '%/%')
+OR (to_asset = 'THOR.RUNE' AND from_asset LIKE '%/%')
+group by 1
+
+burn as (select 
+  REGEXP_SUBSTR (pool_name,'[^\.]+',1,1)  as chain,
+--  REGEXP_SUBSTR (pool_name,'[^\.]+',1,2)  as assets,     
+  count(distinct tx_id) as NoOfBURNTransactions,
+  sum(to_amount) as amountBURN,
+  sum(to_amount_usd) as AmountBURNUSD
+from thorchain.swaps
+WHERE 
+to_asset = 'THOR.RUNE' AND from_asset LIKE '%/%' 
+group by 1)
+
+
+
+
+WITH a AS (
+  SELECT from_address AS address
+  , pool_name
+  , block_timestamp::date AS date
+  , SUM( CASE WHEN lp_action = 'add_liquidity' THEN stake_units ELSE -stake_units END) AS lp_units
+  FROM thorchain.liquidity_actions 
+  GROUP BY 1, 2, 3
+), cumu1 AS (
+  SELECT address
+  , pool_name
+  , date
+  , lp_units
+  , SUM(lp_units) OVER (PARTITION BY address, pool_name ORDER BY date) AS cumu_units
+  FROM a
+), cumu AS (
+  SELECT *
+  , cumu_units - lp_units AS prv_units
+  FROM cumu1
+), mn1 AS (
+  SELECT address
+  , pool_name
+  , MAX(date) AS date
+  FROM cumu
+  WHERE prv_units <= 0
+  GROUP BY 1, 2
+  UNION ALL
+  SELECT address
+  , pool_name
+  , MIN(date) AS date
+  FROM a
+  GROUP BY 1, 2
+), mn AS (
+  SELECT address
+  , pool_name
+  , MAX(date) AS date
+  FROM mn1
+  GROUP BY 1, 2
+), cur AS (
+  SELECT address
+  , pool_name
+  , SUM(lp_units) AS lp_units
+  FROM a
+  GROUP BY 1, 2
+  HAVING SUM(lp_units) > 0
+), tot AS (
+  SELECT pool_name
+  , SUM(lp_units) AS tot_units
+  FROM cur
+  GROUP BY 1
+), tvl1 AS (
+  SELECT pool_name
+  , asset_amount_usd + rune_amount_usd AS tvl
+  , ROW_NUMBER() OVER (PARTITION BY pool_name ORDER BY block_timestamp DESC) AS rn
+  FROM thorchain.pool_block_balances
+  WHERE block_timestamp >= CURRENT_DATE - 10
+), tvl AS (
+  SELECT *
+  , ROW_NUMBER() OVER (ORDER BY tvl DESC) AS pool_rank
+  FROM tvl1
+  WHERE rn = 1
+), base AS (
+  SELECT c.address
+  , SPLIT( c.pool_name, '-' )[0]::string AS pool_name
+  , SPLIT( c.pool_name, '.' )[0]::string AS chain
+  , c.lp_units / t.tot_units AS pct
+  , mn.date
+  , DATEDIFF('days', mn.date, CURRENT_TIMESTAMP) AS days
+  , mn.date
+  , tvl.tvl
+  , tvl.pool_rank
+  , pct * days AS w_days
+  FROM cur c
+  JOIN tot t ON t.pool_name = c.pool_name
+  LEFT JOIN mn ON mn.pool_name = c.pool_name AND mn.address = c.address
+  JOIN tvl ON tvl.pool_name = c.pool_name
+)
+SELECT pool_name
+, chain
+, tvl
+, pool_rank
+, SUM(pct) AS pct
+, SUM(w_days) AS w_days
+FROM base
+GROUP BY 1, 2, 3, 4
+
+
+
+
+with LP_ONE AS (
+  SELECT
+  DISTINCT ( from_address ) as wallet_added, pool_name, sum(stake_units) as amount_added
+  FROM thorchain.liquidity_actions
+  WHERE lp_action = 'add_liquidity'
+  GROUP BY wallet_added,pool_name
+),
+LP_TWO AS (
+    SELECT 
+    DISTINCT(from_address) as wallet_removed, pool_name, sum(stake_units) as amount_removed
+  
+  FROM thorchain.liquidity_actions
+WHERE lp_action = 'remove_liquidity'
+  GROUP BY wallet_removed,pool_name
+),
+LP_THREE AS (
+    SELECT 
+    x.pool_name, x.wallet_added, amount_added-ifnull(amount_removed,0) as remaining
+  
+  FROM LP_ONE x
+FULL OUTER join LP_TWO y
+    ON x.wallet_added = y.wallet_removed and x.pool_name = y.pool_name
+WHERE remaining > 0
+  GROUP BY x.pool_name,wallet_added,remaining
+),
+LP_FOUR AS (
+    SELECT 
+    block_timestamp::date as date, x.pool_name, x.wallet_added
+  
+    FROM LP_THREE x
+join thorchain.liquidity_actions y 
+    ON x.pool_name = y.pool_name and x.wallet_added = y.from_address
+WHERE lp_action = 'add_liquidity'
+),
+LP_FIVE AS (
+    SELECT
+    pool_name, wallet_added, min (date) as first_added
+  
+  FROM LP_FOUR
+  GROUP BY pool_name,wallet_added
+)
+SELECT 
+    split(pool_name, '-')[0] as "Pool Name", avg(datediff(day, first_added, CURRENT_DATE)) as "Average LP day"
+  
+  FROM LP_FIVE
+  GROUP BY "Pool Name"
+  ORDER BY "Average LP day" ASC
+
+
+with a as (
+  select 
+    from_address,
+    pool_name,
+    SUM(case when lp_action like 'add_liquidity' then stake_units else -1 * stake_units end) as lp_units
+  from thorchain.liquidity_actions 
+  where not from_address is null 
+  group by 1,2  
+), b as (
+  select 
+    pool_name  as p1,
+    avg((rune_amount_usd + asset_amount_usd)/stake_units) as ppu
+  from thorchain.liquidity_actions 
+  where block_timestamp > CURRENT_DATE - 2
+  group by 1
+), c as (
+  select 
+    from_address,
+    pool_name, 
+    lp_units * ppu as liquidity_provided_usd,
+    case when liquidity_provided_usd < 1000 then 'Shrimp'
+      when liquidity_provided_usd < 10000 then 'Fish'
+      when liquidity_provided_usd < 100000 then 'Shark'
+      when liquidity_provided_usd < 1000000 then 'Whale' end as balance_group
+  from a 
+    left outer join b 
+      ON p1 = pool_name 
+  where not balance_group is null
+), d as (
+  select 
+    from_address as fa1,
+    pool_name,
+    min(date_trunc('day', block_timestamp)) as min_day
+  from thorchain.liquidity_actions 
+  group by 1, 2 
+), e as (
+  select 
+    from_address,
+    c.pool_name,
+    liquidity_provided_usd,
+    DATEDIFF(week, min_day, CURRENT_DATE) as lp_age,
+     balance_group
+  from c 
+    left outer join d on fa1 = from_address AND d.pool_name = c.pool_name
+)
+
+select
+--  pool_name,
+--  balance_group,
+--- avg(lp_age) as avg_lp_age
+    pool_name,
+    SUM(lp_age * liquidity_provided_usd) / sum(liquidity_provided_usd) LPer_age 
+from e 
+where lp_age > 0
+and liquidity_provided_usd > 0
+group by 1
+
+
+  
+changes AS
+(
+SELECT block_timestamp, block_id, 
+  SPLIT(asset, '-')[0] AS asset,
+  (
+  POWER(10,-8) * CASE
+  WHEN from_address = (SELECT target_address FROM target) THEN -1 * amount_e8
+  WHEN to_address = (SELECT target_address FROM target) THEN amount_e8
+  ELSE 0 END
+  ) AS change
+FROM thorchain.transfer_events
+WHERE (change <> 0) AND (from_address <> to_address)
+),
+
+blockchanges AS
+( --To filter out cases where something flows through an address without changing its balance.
+SELECT block_timestamp, block_id, asset,
+  CAST(SUM(change) AS DECIMAL(17,8)) AS blockchange,
+  FLOOR(blockchange) AS integers,
+  CAST(blockchange - FLOOR(blockchange) AS DECIMAL(17,8)) AS decimals
+FROM changes
+GROUP BY block_timestamp, block_id, asset
+HAVING blockchange <> 0
+),
+
+cumulative1 AS
+(
+SELECT DISTINCT block_timestamp, block_id, asset, 
+  SUM(blockchange) OVER(PARTITION BY asset ORDER BY block_id ASC) AS balance_estimate,
+  CAST(SUM(blockchange) OVER(PARTITION BY asset ORDER BY block_id ASC) AS DECIMAL(17,8)) AS balance_estimate_2,
+  --Note that a CAST( AS DECIMAL(17,8)) here breaks decimals_estimate too, somehow.
+  --Bewildering, since decimals_estimate does not use balance_estimate here.
+  SUM(integers) OVER(PARTITION BY asset ORDER BY block_id ASC) AS integers_estimate1,
+  SUM(decimals) OVER(PARTITION BY asset ORDER BY block_id ASC) AS decimals_estimate1,
+  integers_estimate1 + FLOOR(decimals_estimate1) AS integers_estimate,
+  CAST(decimals_estimate1 - FLOOR(decimals_estimate1) AS DECIMAL(17,8)) AS decimals_estimate
+  --Note that this CAST is not necessary if selecting from cumulative1 directly, 
+  --but is necessary if selecting from cumulative which selects from cumulative1.
+FROM blockchanges
+),
+  
+cumulative AS
+(
+SELECT DISTINCT block_timestamp, block_id, asset, 
+  balance_estimate, balance_estimate_2, integers_estimate, decimals_estimate
+FROM cumulative1
+),
+
+rowcounting AS
+(
+SELECT 
+  COUNT(cumulative.*) AS rowcount,
+  MAX(target_rows) AS target_rows
+FROM cumulative, target
+)
+
+SELECT cumulative.*
+FROM cumulative, rowcounting
+
+WHERE block_id BETWEEN 4786560 AND 4786561 
+--For checking particular blocks, commenting out the below QUALIFY section with slash-asterisk comments.  
+--Note 4786560, 4786561 for balance_estimate inaccuracy.
+/*
+QUALIFY (
+  (MOD((ROW_NUMBER() OVER(PARTITION BY asset ORDER BY block_id ASC)), CEIL(rowcount/target_rows)) = 0)  
+  --Sampling for data-handling. COUNT(block_id)
+  OR (ROW_NUMBER() OVER(PARTITION BY asset ORDER BY block_id ASC) = 1)  
+  --Include the first balance estimate for each asset.
+  OR (ROW_NUMBER() OVER(PARTITION BY asset ORDER BY block_id DESC) = 1)  
+  --Include the last balance estimate for each asset.
+  )
+*/
+ORDER BY block_id DESC
+
+
+
+
+WITH a AS (
+  SELECT from_address AS address
+  , SUM(-rune_amount) AS amt
+  FROM thorchain.transfers
+  WHERE from_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt'
+  AND block_id <= 4786561
+  GROUP BY 1
+  UNION ALL
+  SELECT to_address AS address
+  , SUM(rune_amount) AS amt
+  FROM thorchain.transfers
+  WHERE to_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt'
+  AND block_id <= 4786561
+  GROUP BY 1
+)
+SELECT address
+, SUM(amt) AS amt
+FROM a
 GROUP BY 1
+ORDER BY 2
 
-SELECT date_trunc('month', l.block_timestamp) AS month
-, AVG( CASE WHEN COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) < 1000 THEN 1 ELSE 0 END ) AS pct_under_1k_usd
-, AVG( CASE WHEN (COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0)) / (p.rune_amount_usd / p.rune_amount) < 100 THEN 1 ELSE 0 END ) AS pct_under_100_rune
-, SUM( COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) ) AS liquidity_added_usd
-FROM thorchain.liquidity_actions l
-JOIN thorchain.pool_block_balances p ON p.block_id = l.block_id AND p.pool_name = l.pool_name
-WHERE COALESCE(l.rune_amount_usd, 0) > 0 OR COALESCE(l.asset_amount_usd, 0) > 0
-GROUP BY 1
 
-SELECT l.pool_name
-, AVG( CASE WHEN COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) < 1000 THEN 1 ELSE 0 END ) AS pct_under_1k_usd
-, AVG( CASE WHEN (COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0)) / (p.rune_amount_usd / p.rune_amount) < 100 THEN 1 ELSE 0 END ) AS pct_under_100_rune
-, SUM( COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) ) AS liquidity_added_usd
-FROM thorchain.liquidity_actions l
-JOIN thorchain.pool_block_balances p ON p.block_id = l.block_id AND p.pool_name = l.pool_name
-WHERE COALESCE(l.rune_amount_usd, 0) > 0 OR COALESCE(l.asset_amount_usd, 0) > 0
+WITH a AS (
+  SELECT from_address AS address
+  , SUM(-rune_amount) AS amt
+  FROM flipside_dev_db.thorchain.transfers
+  WHERE from_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt'
+  AND block_id <= 4786561
+  GROUP BY 1
+  UNION ALL
+  SELECT to_address AS address
+  , SUM(rune_amount) AS amt
+  FROM flipside_dev_db.thorchain.transfers
+  WHERE to_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt'
+  AND block_id <= 4786561
+  GROUP BY 1
+)
+SELECT address
+, SUM(amt) AS amt
+FROM a
 GROUP BY 1
+ORDER BY 2
+
+113254564
+113254489
+
+
+SELECT *
+FROM BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG
+WHERE height = 4786561
+
+WITH a AS (
+  SELECT from_addr AS address
+  , SUM(-amount_e8) * POWER(10, -8) AS amt
+  FROM bronze_midgard_2_6_9_20220405.midgard_transfer_events
+  WHERE from_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt'
+  AND block_timestamp <= 1647916734066108230
+  GROUP BY 1
+  UNION ALL
+  SELECT to_addr AS address
+  , SUM(amount_e8) * POWER(10, -8) AS amt
+  FROM bronze_midgard_2_6_9_20220405.midgard_transfer_events
+  WHERE to_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt'
+  AND block_timestamp <= 1647916734066108230
+  GROUP BY 1
+)
+SELECT address
+, SUM(amt) AS amt
+FROM a
+GROUP BY 1
+ORDER BY 2
+
 
 
 WITH base AS (
-	SELECT 
+  SELECT from_addr AS from_address, to_addr AS to_address, asset, amount_e8 * POWER(10, -8) AS rune_amount, TO_TIMESTAMP(block_timestamp) AS block_timestamp, COUNT(1) AS n
+  FROM bronze_midgard_2_6_9_20220405.midgard_transfer_events
+  WHERE (to_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' OR from_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt')
+  GROUP BY 1, 2, 3, 4, 5
+), gold AS (
+  SELECT from_address, to_address, asset, rune_amount, block_timestamp, COUNT(1) AS n2
+  FROM thorchain.transfer_events
+  WHERE (to_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' OR from_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt')
+  GROUP BY 1, 2, 3, 4, 5
 )
+SELECT b.*, g.n2
+FROM base b
+LEFT JOIN gold g 
+  ON g.from_address = b.from_address 
+  AND g.to_address = b.to_address
+  AND g.asset = b.asset
+  AND g.rune_amount = b.rune_amount
+  AND g.block_timestamp = b.block_timestamp
+  AND b.n <> COALESCE(g.n2, 0)
 
-SELECT SPLIT_PART(l.pool_name, ',', 0) AS chain
-, AVG( CASE WHEN COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) < 1000 THEN 1 ELSE 0 END ) AS pct_under_1k_usd
-, AVG( CASE WHEN (COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0)) / (p.rune_amount_usd / p.rune_amount) < 100 THEN 1 ELSE 0 END ) AS pct_under_100_rune
-, SUM( COALESCE(l.rune_amount_usd, 0) + COALESCE(l.asset_amount_usd, 0) ) AS liquidity_added_usd
-FROM thorchain.liquidity_actions l
-JOIN thorchain.pool_block_balances p ON p.block_id = l.block_id AND p.pool_name = l.pool_name
-WHERE (COALESCE(l.rune_amount_usd, 0) > 0 OR COALESCE(l.asset_amount_usd, 0) > 0)
-AND l.block_timestamp >= '2021-10-01'
-GROUP BY 1
 
-[1]   accounts: {
-[1]     nonce: 255,
-[1]     feeNonce: 255,
-[1]     homeNonce: 254,
-[1]     gameId: 'test-0423-02',
-[1]     homeGameId: 'H.test-0423-02',
-[1]     numBonus: 2000000000000,
-[1]     poolBonus: 'B4zqS7Zmja3ZFEX9jVZjMwhUT8F6AteAyv8MJ6Uk5bZD',
-[1]     bonusMint: '4ZbziJ8WAg1aTG2sTAMwRqqZAxHLPGnG9y7A8c3x4eyP',
-[1]     userBonusTokenAccount: '7P6P5LbSDpq1VWUy3kAjsUzp6oZA6DyRmZkENaL86Z6z',
-[1]     poolAccount: '3LAJqoLxdHFZY79EwchTyGJA9XtvdtDnsqtaYehTJX48',
-[1]     poolSigner: 'CxspEvViMXrcDSM7APUwtK9DfV4WfJ6vbuBc6ncSMQDt',
-[1]     homePoolSigner: 'FTZHcPvrmBPwfD3iV1S4zHRohAU9McftTsYAU8gfrLgt',
-[1]     distributionAuthority: '6Ch8KyKpkZHKHNzEioLYg6b3w1WM8NMYg4pYnVsBU3pk',
-[1]     propsMint: '9UPZjRRqygSKqEvdpTdPqFg51wNjRk2SpuKiew9c75r3',
-[1]     poolProps: '9yYsVekDCXT4v2MPun3qbJ9j4fEpyuv7UHKCZzzYHB1g',
-[1]     homePoolProps: '9yYsVekDCXT4v2MPun3qbJ9j4fEpyuv7UHKCZzzYHB1g',
-[1]     homeTeamToken: '8f92E7LBgBnVvwmfQch1uG8kQyN91t6y9hLG44RZ2158',
-[1]     tokenProgram: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-[1]     rent: 'SysvarRent111111111111111111111111111111111',
-[1]     clock: 'SysvarC1ock11111111111111111111111111111111',
-[1]     systemProgram: '11111111111111111111111111111111'
-
-iblumberg55@gmail.com
-Hayley27!
-
-249927439.27
-249947307.61 - 249927439.27
-
-Catalina Whale Mixer
-Blocksmith Labs
-Okay Bears
-Degen Apes
-Aurory
-
-Easy: 78 + 83
-Medium: 79 + 80
-Hard: 73 + 76
-
-git checkout -b AN-1134/missing-amount-from-lp-actions
+113254564
+113254489
 
 
 
-WITH stakes AS (
+/*
+--'Run Selected' to check the transfer events sum for just one block.
+SELECT *
+FROM thorchain.transfer_events
+WHERE (CONCAT(to_address, from_address) LIKE '%thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt%')
+  AND (block_id = 5205058)
+*/
 
-  SELECT
-    *
-  FROM
-    thorchain.stake_events
-  WHERE
-    TRUE
+WITH
+target AS
+(
+SELECT 
+  TRIM('thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt') AS target_address,
+  SPLIT('THOR.RUNE', '-')[0] AS target_asset,
+  10000 AS target_rows 
+  --For displaying full ranges in Flipside, this should be below 100000 (one hundred thousand).
+  --In practice, there may be up to two extra rows per asset type (starting and ending non-zero balance estimates)
 ),
-unstakes AS (
-  SELECT
-    *
-  FROM
-    thorchain.unstake_events
-  WHERE
-    TRUE
-), base AS (
-SELECT
-  se.block_timestamp,
-  se.block_id,
-  rune_tx_id AS tx_id,
-  'add_liquidity' AS lp_action,
-  se.pool_name,
-  rune_address AS from_address,
-  NULL AS to_address,
-  rune_e8 / pow(
-    10,
-    8
-  ) AS rune_amount,
-  rune_e8 / pow(
-    10,
-    8
-  ) * rune_usd AS rune_amount_usd,
-  asset_e8 / pow(
-    10,
-    8
-  ) AS asset_amount,
-  asset_e8 / pow(
-    10,
-    8
-  ) * asset_usd AS asset_amount_usd,
-  stake_units,
-  asset_tx_id,
-  asset_address,
-  asset_blockchain,
-  NULL AS il_protection,
-  NULL AS il_protection_usd,
-  NULL AS unstake_asymmetry,
-  NULL AS unstake_basis_points
-FROM
-  stakes se
-  LEFT JOIN thorchain.prices
-  p
-  ON se.block_id = p.block_id
-  AND se.pool_name = p.pool_name
-UNION
-SELECT
-  ue.block_timestamp,
-  ue.block_id,
-  tx_id,
-  'remove_liquidity' AS lp_action,
-  ue.pool_name,
-  from_address,
-  to_address,
-  emit_rune_e8,
-  COALESCE(emit_rune_e8 / pow(10, 8), 0) AS rune_amount,
-  COALESCE(emit_rune_e8 / pow(10, 8) * rune_usd, 0) AS rune_amount_usd,
-  COALESCE(asset_e8 / pow(10, 8), 0) AS asset_amount,
-  COALESCE(asset_e8 / pow(10, 8) * asset_usd, 0) AS asset_amount_usd,
-  stake_units,
-  NULL AS asset_tx_id,
-  NULL AS asset_address,
-  NULL AS asset_blockchain,
-  imp_loss_protection_e8 / pow(
-    10,
-    8
-  ) AS il_protection,
-  imp_loss_protection_e8 / pow(
-    10,
-    8
-  ) * rune_usd AS il_protection_usd,
-  asymmetry AS unstake_asymmetry,
-  basis_points AS unstake_basis_points
-FROM
-  unstakes ue
-  LEFT JOIN thorchain.prices
-  p
-  ON ue.block_id = p.block_id
-  AND ue.pool_name = p.pool_name
+/*
+thor1v8ppstuf6e3x0r4glqc68d5jqcs2tf38cg2q6y [Minter Module - THOR.RUNE Switcher (from IOU.RUNE) and Synth Minter/Burner Module ('Genesis address')]
+thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt [Reserve Module]
+thor17gw75axcnr8747pkanye45pnrwk7p9c3cqncsv [Bond Module]
+thor1g98cy3n9mmjrpn0sxmn63lztelera37n8n67c0 [Pool Module]
+
+thor160yye65pf9rzwrgqmtgav69n6zlsyfpgm9a7xk is the THORSwap affiliate fee wallet.
+*/
+  
+changes AS
+(
+SELECT block_timestamp, block_id, 
+  SPLIT(asset, '-')[0] AS asset,
+  (
+  POWER(10,-8) * CASE
+  WHEN from_address = (SELECT target_address FROM target) THEN -1 * amount_e8
+  WHEN to_address = (SELECT target_address FROM target) THEN amount_e8
+  ELSE 0 END
+  ) AS change
+FROM thorchain.transfer_events
+WHERE (change <> 0) AND (from_address <> to_address)
+),
+
+blockchanges AS
+( --To filter out cases where something flows through an address without changing its balance.
+SELECT block_timestamp, block_id, asset,
+  CAST(SUM(change) AS DECIMAL(17,8)) AS blockchange,
+  FLOOR(blockchange) AS integers,
+  CAST(blockchange - FLOOR(blockchange) AS DECIMAL(17,8)) AS decimals
+FROM changes
+GROUP BY block_timestamp, block_id, asset
+HAVING blockchange <> 0
+),
+
+cumulative1 AS
+(
+SELECT DISTINCT block_timestamp, block_id, asset, 
+  SUM(blockchange) OVER(PARTITION BY asset ORDER BY block_id ASC) AS balance_estimate,
+  --CAST(SUM(blockchange) OVER(PARTITION BY asset ORDER BY block_id ASC) AS DECIMAL(17,8)) AS balance_estimate,
+  --Note that a CAST( AS DECIMAL(17,8)) here breaks decimals_estimate too, somehow.
+  --Bewildering, since decimals_estimate does not use balance_estimate here.
+  SUM(integers) OVER(PARTITION BY asset ORDER BY block_id ASC) AS integers_estimate1,
+  SUM(decimals) OVER(PARTITION BY asset ORDER BY block_id ASC) AS decimals_estimate1,
+  integers_estimate1 + FLOOR(decimals_estimate1) AS integers_estimate,
+  CAST(decimals_estimate1 - FLOOR(decimals_estimate1) AS DECIMAL(17,8)) AS decimals_estimate
+  --Note that this CAST is not necessary if selecting from cumulative1 directly, 
+  --but is necessary if selecting from cumulative which selects from cumulative1.
+FROM blockchanges
+),
+  
+cumulative AS
+(
+SELECT DISTINCT block_timestamp, block_id, asset, 
+  balance_estimate, integers_estimate, decimals_estimate
+FROM cumulative1
+),
+
+rowcounting AS
+(
+SELECT 
+  COUNT(cumulative.*) AS rowcount,
+  MAX(target_rows) AS target_rows
+FROM cumulative, target
 )
-SELECT * FROM base WHERE rune_amount + asset_amount <= 0
+
+SELECT cumulative.*
+FROM cumulative, rowcounting
+
+WHERE block_id BETWEEN 4786560 AND 4786561 
+--For checking particular blocks, commenting out the below QUALIFY section with slash-asterisk comments.  
+--Note 4786560, 4786561 for balance_estimate inaccuracy.
+/*
+QUALIFY (
+  (MOD((ROW_NUMBER() OVER(PARTITION BY asset ORDER BY block_id ASC)), CEIL(rowcount/target_rows)) = 0)  
+  --Sampling for data-handling. COUNT(block_id)
+  OR (ROW_NUMBER() OVER(PARTITION BY asset ORDER BY block_id ASC) = 1)  
+  --Include the first balance estimate for each asset.
+  OR (ROW_NUMBER() OVER(PARTITION BY asset ORDER BY block_id DESC) = 1)  
+  --Include the last balance estimate for each asset.
+  )
+*/
+ORDER BY block_id DESC
 
 
-SELECT lp_action, COUNT(1) AS n
-FROM flipside_dev_db.thorchain.liquidity_actions
-WHERE RUNE_AMOUNT = 0 and asset_amount = 0
+SELECT block_timestamp::date AS date
+, SUM(il_protection_usd) AS il_protection_usd
+FROM THORCHAIN.LIQUIDITY_ACTIONS
+WHERE il_protection_usd > 0
 GROUP BY 1
 
-https://rstudio-server.flipsidecrypto.com/auth-sign-in
-https://science.flipsidecrypto.xyz/auth-sign-in
-https://science.flipsidecrypto.xyz/connect/
-https://rstudio-connect.flipsidecrypto.com/
 
-stake: 
-unstake: emit_rune_e8, emit_asset_e8
+WITH a AS (
+  SELECT from_address AS address
+  , SUM(-rune_amount) AS amt
+  FROM thorchain.transfers
+  GROUP BY 1
+  UNION ALL
+  SELECT to_address AS address
+  , SUM(rune_amount) AS amt
+  FROM thorchain.transfers
+  GROUP BY 1
+)
+SELECT address
+, SUM(amt) AS amt
+FROM a
+GROUP BY 1
+ORDER BY 2
+
+
+SELECT *
+FROM thorchain.prices
+ORDER BY block_timestamp DESC
+LIMIT 100
+
+SELECT split(memo, ':')[1]::string AS address
+, *
+FROM thorchain.bond_events
+WHERE address = 'thor1xd4j3gk9frpxh8r22runntnqy34lwzrdkazldh'
+
+
+
+SELECT split(memo, ':')[1]::string AS address
+, *
+FROM thorchain.bond_events
+
+    
+
+SELECT split(memo, ':')[1]::string AS address
+, *
+FROM thorchain.bond_events
+WHERE address = 'thor1xd4j3gk9frpxh8r22runntnqy34lwzrdkazldh'
+
+
+SELECT COUNT(1)
+FROM midgard.bond_events
+
+
+
+SELECT split(memo, ':')[1]::string AS address
+, split(to_address, '\n') AS detail
+, e8 * POWER(10, -8) AS amt
+, asset_e8 * POWER(10, -8) AS asset_amt
+, CASE WHEN bond_type = 'bond_paid' THEN amt ELSE -amt END AS net_amt
+, SUM(net_amt) OVER (ORDER BY block_timestamp, net_amt DESC) AS cumu_net_amt
+, *
+FROM thorchain.bond_events
+WHERE (
+  address = 'thor12qwtrq4njj2s29gq56jun43dvxalejaksptqqn' 
+  OR from_address like '%thor12qwtrq4njj2s29gq56jun43dvxalejaksptqqn%'
+  OR to_address like '%thor12qwtrq4njj2s29gq56jun43dvxalejaksptqqn%'
+)
+ORDER BY block_timestamp
+
+SELECT split(memo, ':')[1]::string AS address
+, SUM(CASE WHEN bond_type = 'bond_paid' THEN e8 ELSE -e8 END) * POWER(10, -8)  AS amt
+FROM thorchain.bond_events
+WHERE bond_type IN ('bond_paid','bond_returned')
+GROUP BY 1
+
+
+SELECT *
+FROM thorchain.update_node_account_status_events
+WHERE node_address = 'thor100dyywzrxaqsrlamkd7ssspc8ppf46306farkz'
+
+
+SELECT day
+, bonding_earnings
+, liquidity_earnings
+FROM thorchain.block_rewards
+
+
+
+WITH s AS (
+  SELECT node_address AS address
+  , current_status
+  , block_timestamp::date AS date
+  , ROW_NUMBER() OVER (PARTITION BY node_address, date ORDER BY block_timestamp DESC) AS rn
+  FROM thorchain.update_node_account_status_events
+), a AS (
+  SELECT split(memo, ':')[1]::string AS address
+  , block_timestamp::date AS date
+  , SUM(CASE WHEN bond_type = 'bond_paid' THEN e8 ELSE -e8 END) * POWER(10, -8)  AS amt
+  FROM thorchain.bond_events
+  WHERE bond_type IN ('bond_paid','bond_returned')
+  GROUP BY 1, 2
+), base AS (
+  SELECT a.*, SUM(amt) OVER (PARTITION BY address ORDER BY date) AS cumu_amt
+  FROM a
+), calendar AS (
+  SELECT DISTINCT date FROM base
+  UNION
+  SELECT DISTINCT date FROM s
+), joined AS (
+  SELECT c.date
+  , b.date AS amt_date
+  , b.address
+  , b.cumu_amt
+  , ROW_NUMBER() OVER (PARTITION BY address, c.date ORDER BY b.date DESC) AS rn
+  FROM calendar c
+  JOIN base b ON b.date <= c.date
+), j2 AS (
+  SELECT j.address
+  , j.date
+  , date_trunc('month', j.date) AS month
+  , j.amt_date
+  , s.date AS status_date
+  , j.cumu_amt
+  , s.current_status
+  , ROW_NUMBER() OVER (PARTITION BY j.address, j.date ORDER BY s.date DESC) AS rn
+  FROM joined j
+  JOIN s ON s.address = j.address AND s.date <= j.date
+  WHERE j.rn = 1
+), b2 AS (
+  SELECT * FROM j2 
+  WHERE rn = 1
+  AND current_status = 'Active'
+), b3 AS (
+  SELECT address
+  , current_status
+  , month
+  , cumu_amt
+  , ROW_NUMBER() OVER (PARTITION BY address, month ORDER BY date DESC) AS rn
+  FROM j2
+  WHERE rn = 1
+), pooled AS (
+  SELECT pool_name
+  , date_trunc('month', block_timestamp) AS month
+  , rune_amount AS pooled_rune
+  , ROW_NUMBER() OVER (PARTITION BY pool_name, month ORDER BY block_timestamp DESC) AS rn
+  FROM thorchain.pool_block_balances
+), bonded AS (
+  SELECT month
+  , SUM(cumu_amt) AS active_bonded_rune
+  FROM b3
+  WHERE rn = 1 AND current_status = 'Active'
+  GROUP BY 1
+), p AS (
+  SELECT month
+  , SUM(pooled_rune) AS pooled_rune
+  FROM pooled
+  WHERE rn = 1
+  GROUP BY 1
+), rewards AS (
+  SELECT date_trunc('month', day::date) AS month
+  , SUM(bonding_earnings::float) AS bonding_earnings
+  , SUM(liquidity_earnings::float) AS liquidity_earnings
+  FROM thorchain.block_rewards
+  WHERE day != '2021-07-15'
+  GROUP BY 1
+)
+SELECT p.*
+, b.active_bonded_rune, b.active_bonded_rune / p.pooled_rune AS bonded_to_pooled_ratio
+, bonding_earnings / b.active_bonded_rune AS bonded_rewards_ratio
+, liquidity_earnings / b.pooled_rune AS lp_rewards_ratio
+FROM p
+JOIN bonded b ON b.month = p.month
+JOIN rewards r ON r.month = p.month
+
+
+
+
+WITH s AS (
+  SELECT node_address AS address
+  , current_status
+  , block_timestamp::date AS date
+  , ROW_NUMBER() OVER (PARTITION BY node_address, date ORDER BY block_timestamp DESC) AS rn
+  FROM thorchain.update_node_account_status_events
+  -- WHERE address = 'thor12fw3syyy4ff78llh3fvhrvdy7xnqlegvru7seg'
+), a AS (
+  SELECT split(memo, ':')[1]::string AS address
+  , block_timestamp::date AS date
+  , SUM(CASE WHEN bond_type = 'bond_paid' THEN e8 ELSE -e8 END) * POWER(10, -8)  AS amt
+  FROM thorchain.bond_events
+  WHERE bond_type IN ('bond_paid','bond_returned')
+  -- AND address = 'thor12fw3syyy4ff78llh3fvhrvdy7xnqlegvru7seg'
+  GROUP BY 1, 2
+), base AS (
+  SELECT a.*, SUM(amt) OVER (PARTITION BY address ORDER BY date) AS cumu_amt
+  FROM a
+), calendar AS (
+  SELECT DISTINCT date FROM base
+  UNION
+  SELECT DISTINCT date FROM s
+), joined AS (
+  SELECT c.date
+  , b.date AS amt_date
+  , b.address
+  , b.cumu_amt
+  , ROW_NUMBER() OVER (PARTITION BY address, c.date ORDER BY b.date DESC) AS rn
+  FROM calendar c
+  JOIN base b ON b.date <= c.date
+), j2 AS (
+  SELECT j.address
+  , j.date
+  , j.amt_date
+  , s.date AS status_date
+  , j.cumu_amt
+  , s.current_status
+  , ROW_NUMBER() OVER (PARTITION BY j.address, j.date ORDER BY s.date DESC) AS rn
+  FROM joined j
+  JOIN s ON s.address = j.address AND s.date <= j.date
+  WHERE j.rn = 1
+)
+SELECT * FROM j2 
+WHERE rn = 1
+
+
+
+
+
+WITH s AS (
+  SELECT node_address AS address
+  , current_status
+  , block_timestamp::date AS date
+  , ROW_NUMBER() OVER (PARTITION BY node_address, date ORDER BY block_timestamp DESC) AS rn
+  FROM thorchain.update_node_account_status_events
+), a AS (
+  SELECT split(memo, ':')[1]::string AS address
+  , block_timestamp::date AS date
+  , SUM(CASE WHEN bond_type = 'bond_paid' THEN e8 ELSE -e8 END) * POWER(10, -8)  AS amt
+  FROM thorchain.bond_events
+  WHERE bond_type IN ('bond_paid','bond_returned')
+  GROUP BY 1, 2
+), base AS (
+  SELECT a.*, SUM(amt) OVER (PARTITION BY address ORDER BY date) AS cumu_amt
+  FROM a
+), calendar AS (
+  SELECT DISTINCT date FROM base
+), joined AS (
+  SELECT c.date
+  , b.address
+  , b.cumu_amt
+  , ROW_NUMBER() OVER (PARTITION BY address ORDER BY b.date DESC) AS rn
+  FROM calendar c
+  JOIN base b ON b.date <= c.date
+), j2 AS (
+  SELECT j.address
+  , j.date
+  , j.cumu_amt
+  , s.current_status
+  , ROW_NUMBER() OVER (PARTITION BY j.address, j.date ORDER BY s.date DESC) AS rn
+  FROM joined j
+  JOIN s ON s.address = j.address AND s.date <= j.date
+)
+SELECT * FROM j2 WHERE rn = 1
+
+
+
+WITH base AS (
+  SELECT timestamp, height
+  FROM thorchain.block_log
+  WHERE timestamp = 1650397837878161529
+)
+SELECT t.*
+FROM thorchain.transfer_events t
+JOIN base b ON b.timestamp = t.block_timestamp
+WHERE (from_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' OR to_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt')
+AND from_addr <> to_addr
+
+
+
+WITH base AS (
+  SELECT split(memo, ':')[1]::string AS address
+  , block_timestamp::date AS date
+  , SUM(CASE WHEN bond_type = 'bond_paid' THEN e8 ELSE -e8 END) * POWER(10, -8)  AS amt
+  FROM thorchain.bond_events
+  WHERE address = 'thor1xd4j3gk9frpxh8r22runntnqy34lwzrdkazldh'
+  AND bond_type IN ('bond_paid','bond_returned')
+  GROUP BY 1, 2
+)
+SELECT date
+, SUM(amt) OVER (ORDER BY date) AS cumu_bond
+FROM base
+ORDER BY 1
+
+with inflow as (select to_address,
+  sum(rune_amount) as rune_inflow
+from thorchain.transfers
+where asset = 'THOR.RUNE'
+  group by 1),
+
+outflow as (select from_address,
+  sum(rune_amount) as rune_outflow
+from thorchain.transfers
+where asset = 'THOR.RUNE'
+  group by 1),
+
+holdings as (select to_address AS from_address,
+  ifnull(rune_inflow, 0) - ifnull(rune_outflow, 0) as holding_rune
+from inflow a 
+full outer join outflow b 
+  on a.to_address = b.from_address),
+
+adding as (select 
+  from_address,
+  pool_name,
+  sum(stake_units) as add_liq
+  from thorchain.liquidity_actions
+where
+lp_action = 'add_liquidity'
+  group by 1,2),
+
+removing as (select 
+  from_address,
+  pool_name,
+  sum(stake_units) as remove_liq
+  from thorchain.liquidity_actions
+where lp_action = 'remove_liquidity'
+    group by 1,2),
+
+stake_unitz as (select a.from_address,
+  a.pool_name,
+  (add_liq - ifnull(remove_liq,0)) / total_stake as percentage
+  from adding a 
+  left join removing b 
+  on a.pool_name = b.pool_name and a.from_address = b.from_address
+  join thorchain.pool_block_statistics c
+  on a.pool_name = c.asset
+where day in (select max(day) from thorchain.pool_block_statistics)
+and percentage > 0),
+--and lp_action = 'remove_liquidity'
+
+rune_lped as (select a.from_address, 
+percentage * rune_liquidity as rune_lping
+from stake_unitz a 
+join thorchain.daily_pool_stats b 
+on a.pool_name = b.pool_name
+where day in (select max(day) from thorchain.daily_pool_stats)),
+
+lps as(select from_address,
+sum(rune_lping) as total_rune_lped
+from rune_lped 
+group by 1),
+
+base as (select 
+  a.from_address,
+  ifnull(holding_rune, 0) as rune_wallet,
+  ifnull(total_rune_lped, 0) as rune_liquidity_pool,
+  rune_wallet + rune_liquidity_pool as total_rune,
+  case
+  when total_rune <= 1 then 'total rune holdings <= 1'
+  when total_rune > 1 and total_rune <= 10 then 'total rune holdings > 1 and <= 10'
+  when total_rune > 10 and total_rune <= 100 then 'total rune holdings > 10 and <= 100'
+  when total_rune > 100 and total_rune <= 1000 then 'total rune holdings > 100 and <= 1K'
+  when total_rune > 1000 and total_rune <= 10000 then 'total rune holdings > 1K and <= 10K'
+  when total_rune > 10000 and total_rune <= 100000 then 'total rune holdings > 10K and <= 100K'
+  else 'total rune holdings > 100K'
+  end as total_rune_ranges,
+  case 
+    when total_rune < -10 then '-10'
+    when total_rune < -1 then '-1'
+    when total_rune < 0 then '-0'
+    when total_rune <= 1 then '0'
+  when total_rune > 1 and total_rune <= 10 then '1'
+  when total_rune > 10 and total_rune <= 100 then '2'
+  when total_rune > 100 and total_rune <= 1000 then '3'
+  when total_rune > 1000 and total_rune <= 10000 then '4'
+  when total_rune > 10000 and total_rune <= 100000 then '5'
+  else '9'
+  end as ordering
+from holdings a 
+left join lps b
+on a.from_address = b.from_address
+  where (total_rune > 1) )
+
+select *
+from base 
+
+
+SELECT *
+FROM thorchain.swap_events
+WHERE memo IS NOT NULL
+
+SELECT split(memo, ':')[1] AS asset
+, split(memo, ':')[3] AS lim
+, split(memo, ':')[4] AS affiliate
+, COUNT(1) AS n
+FROM thorchain.swap_events s
+WHERE block_timestamp >= CURRENT_DATE - 20
+AND s.memo IS NOT NULL
+GROUP BY 1, 2, 3
+
+SELECT RIGHT(split(memo, ':')[3], 3)
+, COUNT(1) AS n
+FROM thorchain.swap_events s
+WHERE block_timestamp >= CURRENT_DATE - 20
+AND s.memo IS NOT NULL
+AND from_address = 'thor1yep703ewakef0h2l9qel93xh96tvkm004pesq7'
+GROUP BY 1
+ORDER BY 2 DESC
+
+SELECT RIGHT(split(memo, ':')[3], 3)
+, COUNT(1) AS n
+FROM thorchain.swap_events s
+WHERE block_timestamp >= CURRENT_DATE - 20
+AND s.memo IS NOT NULL
+AND from_address = 'thor1yep703ewakef0h2l9qel93xh96tvkm004pesq7'
+LIMIT 100
+
+SELECT from_address
+, COUNT(1) AS n
+, AVG(CASE WHEN RIGHT(split(memo, ':')[3], 3) = '000' THEN 1 ELSE 0 END ) AS pct_000
+FROM thorchain.swap_events s
+WHERE block_timestamp >= CURRENT_DATE - 20
+AND s.memo IS NOT NULL
+GROUP BY 1
+ORDER BY 2 DESC
+
+SELECT
+RIGHT(split(memo, ':')[3], 3) AS lim
+, COUNT(1) AS n
+FROM thorchain.swap_events s
+WHERE block_timestamp >= CURRENT_DATE - 20
+AND s.memo IS NOT NULL
+GROUP BY 1
+
+SELECT
+LEFT(split(memo, ':')[4], 10) AS aff
+, COUNT(1) AS n
+FROM thorchain.swap_events s
+WHERE block_timestamp >= CURRENT_DATE - 20
+AND s.memo IS NOT NULL
+GROUP BY 1
+
+
+
+
+with inflow as (select to_address,
+  sum(rune_amount) as rune_inflow
+from thorchain.transfers
+where asset = 'THOR.RUNE'
+  group by 1),
+
+outflow as (select from_address,
+  sum(rune_amount) as rune_outflow
+from thorchain.transfers
+where asset = 'THOR.RUNE'
+  group by 1),
+
+holdings as (select from_address,
+  ifnull(rune_inflow, 0) - ifnull(rune_outflow, 0) as holding_rune
+from inflow a 
+full outer join outflow b 
+  on a.to_address = b.from_address),
+
+adding as (select 
+  from_address,
+  pool_name,
+  sum(stake_units) as add_liq
+  from thorchain.liquidity_actions
+where
+lp_action = 'add_liquidity'
+  group by 1,2),
+
+removing as (select 
+  from_address,
+  pool_name,
+  sum(stake_units) as remove_liq
+  from thorchain.liquidity_actions
+where lp_action = 'remove_liquidity'
+    group by 1,2),
+
+stake_unitz as (select a.from_address,
+  a.pool_name,
+  (add_liq - ifnull(remove_liq,0)) / total_stake as percentage
+  from adding a 
+  left join removing b 
+  on a.pool_name = b.pool_name and a.from_address = b.from_address
+  join thorchain.pool_block_statistics c
+  on a.pool_name = c.asset
+where day in (select max(day) from thorchain.pool_block_statistics)
+and percentage > 0),
+--and lp_action = 'remove_liquidity'
+
+rune_lped as (select a.from_address, 
+percentage * rune_liquidity as rune_lping
+from stake_unitz a 
+join thorchain.daily_pool_stats b 
+on a.pool_name = b.pool_name
+where day in (select max(day) from thorchain.daily_pool_stats)),
+
+lps as(select from_address,
+sum(rune_lping) as total_rune_lped
+from rune_lped 
+group by 1),
+
+base as (select 
+  a.from_address,
+  ifnull(holding_rune, 0) as rune_wallet,
+  ifnull(total_rune_lped, 0) as rune_liquidity_pool,
+  rune_wallet + rune_liquidity_pool as total_rune,
+  case
+  when total_rune <= 1 then 'total rune holdings <= 1'
+  when total_rune > 1 and total_rune <= 10 then 'total rune holdings > 1 and <= 10'
+  when total_rune > 10 and total_rune <= 100 then 'total rune holdings > 10 and <= 100'
+  when total_rune > 100 and total_rune <= 1000 then 'total rune holdings > 100 and <= 1K'
+  when total_rune > 1000 and total_rune <= 10000 then 'total rune holdings > 1K and <= 10K'
+  when total_rune > 10000 and total_rune <= 100000 then 'total rune holdings > 10K and <= 100K'
+  else 'total rune holdings > 100K'
+  end as total_rune_ranges,
+  case 
+    when total_rune < -10 then '-10'
+    when total_rune < -1 then '-1'
+    when total_rune < 0 then '-0'
+    when total_rune <= 1 then '0'
+  when total_rune > 1 and total_rune <= 10 then '1'
+  when total_rune > 10 and total_rune <= 100 then '2'
+  when total_rune > 100 and total_rune <= 1000 then '3'
+  when total_rune > 1000 and total_rune <= 10000 then '4'
+  when total_rune > 10000 and total_rune <= 100000 then '5'
+  else '9'
+  end as ordering
+from holdings a 
+left join lps b
+on a.from_address = b.from_address
+  where (total_rune > 0 OR TRUE) )
+
+select total_rune_ranges,
+ordering,
+count(distinct(from_address)) as number_of_wallet
+from base 
+group by 1,2
+order by 2
+
+ 
+
+
+with transfers as (
+select sum(rune_amount) as total_receive, to_address as wallet
+from thorchain.transfers
+where asset = 'THOR.RUNE'
+group by 2
+union 
+select sum(rune_amount * -1) as total_receive, from_address as wallet
+from thorchain.transfers
+where asset = 'THOR.RUNE'
+group by 2
+),
+
+first_in as (
+select min(block_timestamp::date) as first_in, to_address
+from thorchain.transfers
+group by 2
+),
+
+all_holders as (
+select sum(total_receive) as total_rune_holdings, wallet 
+from transfers
+group by 2
+),
+
+lp as (
+select sum(rune_amount) as total_add, from_address as lp_address
+from thorchain.liquidity_actions
+where lp_action = 'add_liquidity'
+group by 2
+union 
+select sum(rune_amount * -1) as total_withdraw, from_address as lp_address
+from thorchain.liquidity_actions
+where lp_action = 'remove_liquidity'
+group by 2
+),
+
+total_in_pool as (
+select sum(total_add) as total_rune_pool, lp_address 
+from lp 
+group by 2
+),
+
+rune_balance as (
+select wallet, total_rune_holdings, total_rune_pool
+from all_holders hol 
+left join total_in_pool lp on 
+hol.wallet = lp.lp_address
+
+),
+
+rune_holders_period as (
+select wallet, total_rune_holdings, first_in 
+from rune_balance run 
+left join first_in fir on
+run.wallet = fir.to_address
+where total_rune_holdings > 0
+),
+
+holding_period as (
+select count(distinct wallet) as num_holders, '<7 days' as holding_period
+from rune_holders_period 
+where first_in > current_date - 7
+group by 2
+union 
+select count(distinct wallet) as num_holders, '7-30 days' as holding_period
+from rune_holders_period
+where first_in > current_date - 30 
+and first_in < current_date - 7 
+group by 2
+union 
+select count(distinct wallet) as num_holders, '30-90 days' as holding_period
+from rune_holders_period
+where first_in > current_date - 90 
+and first_in < current_date - 30
+group by 2
+union 
+select count(distinct wallet) as num_holders, '90-180 days' as holding_period
+from rune_holders_period
+where first_in > current_date - 180 
+and first_in < current_date - 90 
+group by 2
+union 
+select count(distinct wallet) as num_holders, '180-365 days' as holding_period
+from rune_holders_period
+where first_in > current_date - 365
+and first_in < current_date - 180
+group by 2
+),
+
+distribution_holder as (
+select count(distinct wallet) as num_holders,
+case when total_rune_holdings > 0 and total_rune_holdings < 1000 then 'shrimp'
+when total_rune_holdings >= 1000 and total_rune_holdings < 10000 then 'fish'
+when total_rune_holdings >= 10000 and total_rune_holdings < 100000 then 'small whale'
+when total_rune_holdings >= 100000 and total_rune_holdings < 1000000 then 'medium whale'
+when total_rune_holdings >= 1000000 then 'boss whale'
+end as holding_size, 
+case when total_rune_holdings > 0 and total_rune_holdings < 1000 then '1-1k rune'
+when total_rune_holdings >= 1000 and total_rune_holdings < 10000 then '1k-10k rune'
+when total_rune_holdings >= 10000 and total_rune_holdings < 100000 then '10k - 100k'
+when total_rune_holdings >= 100000 and total_rune_holdings < 1000000 then '100k - 1M rune'
+when total_rune_holdings >= 1000000 then '>1M rune'
+  end as size_type
+
+
+
+
+
+
+
+
+conn = psycopg2.connect(
+    host="vic5o0tw1w-repl.twtim97jsb.tsdb.cloud.timescale.com",
+    user="tsdbadmin",
+    password="yP4wU5bL0tI0kP3k"
+)
+
+SHOW COLUMNS in table 
+
+SELECT block_timestamp
+, block_id
+, tx_id
+, asset
+, pool_deduct
+, asset_e8
+, COUNT(1) AS n
+SELECT *
+FROM bronze_midgard_2_6_9_20220405.midgard_fee_events
+LIMIT 10
+GROUP BY 1, 2, 3, 4, 5, 6
+HAVING COUNT(1) > 1
+ORDER BY 7 DESC
+LIMIT 10
+
+
+SELECT *
+, COUNT(1) AS n
+FROM thorchain.block_rewards
+GROUP BY 1, 2, 3, 4, 5, 6
+HAVING COUNT(1) > 1
+ORDER BY 7 DESC
+LIMIT 10
+
+SELECT *
+FROM thorchain.block_log
+WHERE height = 4310545
+
+timestamp = 1645094662447193601
+
+
+SELECT *
+FROM thorchain.transfers
+ORDER BY block_timestamp 
+LIMIT 100
+
+WITH mx AS (
+	SELECT pool_name, MAX(block_timestamp) AS mx
+	FROM thorchain.pool_block_balances
+	WHERE block_timestamp >= CURRENT_DATE - 2
+	GROUP BY 1
+)
+SELECT SUM(b.asset_amount_usd + b.synth_amount_usd) AS assets_locked, SUM(b.rune_amount) AS rune_amount
+FROM thorchain.pool_block_balances b
+JOIN mx ON mx.mx = b.block_timestamp
+	AND mx.pool_name = b.pool_name
+
+
+
+
+
+SELECT *
+FROM crosschain.address_labels
+WHERE blockchain = 'solana'
+AND label_subtype = 'nf_token_contract'
+LIMIT 10
+
+SELECT COUNT(DISTINCT project_name)
+FROM crosschain.address_labels
+WHERE blockchain = 'solana'
+AND label_subtype = 'nf_token_contract'
+LIMIT 10
+
+
+
+SELECT 
+coalesce(m.project_name, s.mint) as collection,
+s.purchaser as wallet,
+s.tx_id,
+s.block_timestamp
+from solana.fact_nft_mints s left join solana.dim_nft_metadata m on s.mint = m.mint
+where block_timestamp >=  '2022-01-01'
+
+
+SELECT program_id, COUNT(1) AS n_mints, SUM(mint_price) AS sol_volume
+FROM solana.fact_nft_mints
+GROUP BY 1
+
+SELECT date_part('DAYOFWEEK', block_timestamp) AS weekday, COUNT(1) AS n_mints, SUM(mint_price) AS sol_volume
+FROM solana.fact_nft_mints
+WHERE program_id IN (
+	'cndy3Z4yapfJBmL3ShUp5exZKqR3z33thTzeNMm2gRZ'
+	, 'cndyAnrLdpjq1Ssp1z8xxDsB8dxe7u4HL5Nxi2K5WXZ'
+)
+GROUP BY 1
+
+
+WITH collections AS (
+	SELECT project_name AS collection
+	, address AS mint_address
+	FROM crosschain.address_labels
+	WHERE blockchain = 'solana'
+	AND label_subtype = 'nf_token_contract'
+	UNION ALL 
+	SELECT project_name AS collection
+	, mint AS mint_address
+	FROM solana.dim_nft_metadata
+), c2 AS (
+	SELECT DISTINCT collection
+	, mint_address
+	FROM collections
+), base AS (
+	SELECT date_part('DAYOFWEEK', block_timestamp) AS weekday
+	, block_timestamp
+	, DATEADD('HOURS', -4, block_timestamp) AS est_time
+	, date_part('DAYOFWEEK', DATEADD('HOURS', -4, block_timestamp)) AS est_weekday
+	, COALESCE(c2.collection, 'Unknown') AS collection
+	, mint_price
+	FROM solana.fact_nft_mints m 
+	LEFT JOIN collections c2 ON c2.mint_address = m.mint
+	WHERE program_id IN (
+		'cndy3Z4yapfJBmL3ShUp5exZKqR3z33thTzeNMm2gRZ'
+		, 'cndyAnrLdpjq1Ssp1z8xxDsB8dxe7u4HL5Nxi2K5WXZ'
+	)
+	AND weekday < 1 OR weekday > 6
+)
+SELECT collection
+, CASE WHEN est_weekday = 1 THEN 'Monday'
+	WHEN est_weekday = 2 THEN 'Tuesday'
+	WHEN est_weekday = 3 THEN 'Wednesday'
+	WHEN est_weekday = 4 THEN 'Thursday'
+	WHEN est_weekday = 5 THEN 'Friday'
+	WHEN est_weekday = 6 THEN 'Saturday'
+	ELSE 'Sunday' 
+END AS clean_weekday
+, COUNT(1) AS n_mints
+, SUM(mint_price) AS sol_volume
+FROM base
+GROUP BY 1, 2
+
+
+WITH collections AS (
+	SELECT project_name AS collection
+	, address AS mint_address
+	FROM crosschain.address_labels
+	WHERE blockchain = 'solana'
+	AND label_subtype = 'nf_token_contract'
+	UNION ALL 
+	SELECT project_name AS collection
+	, mint AS mint_address
+	FROM solana.dim_nft_metadata
+), c2 AS (
+	SELECT DISTINCT LOWER(collection) AS collection
+	, mint_address
+	FROM collections
+)
+SELECT date_part('DAYOFWEEK', block_timestamp) AS weekday
+, block_timestamp
+, DATEADD('HOURS', -4, block_timestamp) AS est_time
+, date_part('DAYOFWEEK', DATEADD('HOURS', -4, block_timestamp)) AS est_weekday
+, COALESCE(c2.collection, 'Unknown') AS collection
+, mint_price
+FROM solana.fact_nft_mints m 
+LEFT JOIN collections c2 ON c2.mint_address = m.mint
+WHERE block_timestamp >= '2022-01-01'
+	AND program_id IN (
+	'cndy3Z4yapfJBmL3ShUp5exZKqR3z33thTzeNMm2gRZ'
+	, 'cndyAnrLdpjq1Ssp1z8xxDsB8dxe7u4HL5Nxi2K5WXZ'
+)
+AND mint_price < 100
+ORDER BY mint_price DESC
+LIMIT 1000
+
+
+SELECT *
+FROM solana.fact_nft_mints m 
+WHERE mint = 
+
+
+
+
+
+WITH collections AS (
+	SELECT project_name AS collection
+	, address AS mint_address
+	FROM crosschain.address_labels
+	WHERE blockchain = 'solana'
+	AND label_subtype = 'nf_token_contract'
+	UNION ALL 
+	SELECT project_name AS collection
+	, mint AS mint_address
+	FROM solana.dim_nft_metadata
+), c2 AS (
+	SELECT DISTINCT collection
+	, mint_address
+	FROM collections
+)
+SELECT * FROM c2 WHERE collection = 'Okay Bears'
+
+SELECT *
+FROM solana.fact_nft_mints
+WHERE mint IN ('13VcCoRBqyXsWNBJZQituivTtWd8USbzfRsUBBkSbw6Y','2CMQnGJMq1U611Dbim5ALqPQCDQQ1jseYLQfAhkxZ9cY')
+
+
 
 data-science
 DKiZEzE-CZ+o59}L
 boatpartydotbiz
+
+[Python]
+Enabled = true
+Executable = /opt/python/3.10.4/bin/python
+
+use_python('/opt/python/3.10.4/bin/python')
+
+Sys.setenv(RETICULATE_PYTHON = '/opt/python/3.10.4/bin/python')
+RETICULATE_PYTHON='/opt/python/3.10.4/bin/python'
+library(reticulate)
+
 
 grep -r 'update_nft_deal_score_data.RMD' ./
 grep -R "touch" .
@@ -334,27 +1554,34 @@ SELECT * FROM base4
 block_timestamp = 1648541784259230029
 
 SELECT *
-FROM FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_UNSTAKE_EVENTS
+FROM FLIPSIDE_PROD_DB.bronze_midgard_2_6_9_20220405.MIDGARD_UNSTAKE_EVENTS
 WHERE tx = '3E439D4DCA401602116BE07E2FB8751D6F491EE908E04A779D48780DF3972201'
 
 
 SELECT MAX(timestamp)
-FROM FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG
+FROM FLIPSIDE_PROD_DB.bronze_midgard_2_6_9_20220405.midgard_block_log
 
 SELECT ABS(timestamp - 1648541784259230029) AS abs_dff
 , (timestamp - 1648541784259230029) AS dff
 , *
-FROM FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG
+FROM FLIPSIDE_PROD_DB.bronze_midgard_2_6_9_20220405.midgard_block_log
 ORDER BY abs_dff
 LIMIT 100
 WHERE timestamp = 1648541784259230029
 
 SELECT l1.height AS missing_block_id
-FROM FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG l1
-LEFT JOIN FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG l2 ON l2.height = l1.height + 1
-LEFT JOIN FLIPSIDE_PROD_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG l3 ON l3.height = l1.height - 1
+FROM FLIPSIDE_PROD_DB.bronze_midgard_2_6_9_20220405.midgard_block_log l1
+LEFT JOIN FLIPSIDE_PROD_DB.bronze_midgard_2_6_9_20220405.midgard_block_log l2 ON l2.height = l1.height + 1
+LEFT JOIN FLIPSIDE_PROD_DB.bronze_midgard_2_6_9_20220405.midgard_block_log l3 ON l3.height = l1.height - 1
 WHERE (l2.height IS NULL OR l3.height IS NULL)
 ORDER BY l1.height
+
+SELECT *
+FROM silver.prices_v2
+WHERE recorded_at >= CURRENT_DATE - 2
+AND symbol ilike '%gold%'
+AND (name ilike '%defi%' OR name ilike '%dfk%')
+LIMIT 100
 
 SELECT date_trunc('week', block_timestamp) AS hour
 , COUNT(1) AS n
@@ -484,6 +1711,51 @@ from mints x, burns y where x.chain=y.chain
 order by 1 asc
 
 
+SELECT *
+FROM THORCHAIN.BOND_ACTIONS
+WHERE to_address like 'node%'
+
+SELECT SUM(CASE WHEN from_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' THEN -rune_amount ELSE rune_amount END) AS amount
+, MAX(block_timestamp) as mx
+, MAX(block_timestamp) as mx2
+FROM thorchain.transfers 
+WHERE (from_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' OR to_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt')
+AND from_address <> to_address
+
+SELECT SUM(CASE WHEN from_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' THEN -rune_amount ELSE rune_amount END) AS amount
+, MAX(block_timestamp) as mx
+, MAX(block_timestamp) as mx2
+FROM thorchain.transfers 
+WHERE (from_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' OR to_address = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt')
+AND from_address <> to_address
+
+SELECT SUM(CASE WHEN from_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' THEN -amount_e8 ELSE amount_e8 END) * POWER(10, -8) AS amount
+, MAX(block_timestamp) as mx
+FROM midgard.transfers 
+WHERE (from_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' OR to_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt')
+AND from_addr <> to_addr
+
+SELECT SUM(CASE WHEN from_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' THEN -amount_e8 ELSE amount_e8 END) * POWER(10, -8) AS amount
+, MAX(block_timestamp) as mx
+FROM bronze_midgard_2_6_9_20220405 
+WHERE (from_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt' OR to_addr = 'thor1dheycdevq39qlkxs2a6wuuzyn4aqxhve4qxtxt')
+AND from_addr <> to_addr
+
+
+
+
+111,373,009
+111,369,480
+
+112109286 - 112109338
+
+SELECT *
+FROM bronze_midgard_2_6_9_20220405.bond_actions
+WHERE to_addr like 'node%'
+
+
+
+
 
 WITH base AS (
 	SELECT native_to_address, COUNT(1) AS n
@@ -496,6 +1768,10 @@ JOIN base b ON b.native_to_address = s.native_to_address
 where block_timestamp >= '2022-04-10'
 ORDER BY block_timestamp, n, tx_id
 LIMIT 100
+
+SELECT *
+FROM thorchain.pool_balance_change_events
+WHERE block_id = 5486400
 
 
 
@@ -1308,7 +2584,7 @@ LIMIT 10
 
 SELECT tx_id
 , COUNT(1) AS n
-FROM FLIPSIDE_DEV_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_FEE_EVENTS
+FROM FLIPSIDE_DEV_DB.bronze_midgard_2_6_9_20220405.MIDGARD_FEE_EVENTS
 GROUP BY 1
 HAVING COUNT(1) > 1
 ORDER BY 2 DESC
@@ -1361,7 +2637,7 @@ FROM thorchain.pool_block_depths
 
 
 SELECT DISTINCT pool_name
-FROM FLIPSIDE_DEV_DB.BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_POOL_DEPTHS
+FROM FLIPSIDE_DEV_DB.bronze_midgard_2_6_9_20220405.MIDGARD_BLOCK_POOL_DEPTHS
 
 
 SELECT COUNT(1) AS n FROM flipside_dev_db.bronze_midgard_2_6_9.midgard_block_pool_depths

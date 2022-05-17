@@ -16,6 +16,7 @@ clean_names = {
 	,'boredapeyachtclub': 'BAYC'
 	,'mutantapeyachtclub': 'MAYC'
 	,'bayc': 'BAYC'
+	,'bakc': 'BAKC'
 	,'mayc': 'MAYC'
 	,'solgods': 'SOLGods'
 	,'meerkatmillionairescc': 'Meerkat Millionaires'

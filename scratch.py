@@ -1,10 +1,15 @@
 import os
 import json
+import psycopg2
 import pandas as pd
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
 COLLECTION = 'Stoned Ape Crew'
+
+def f():
+	conn = psycopg2.connect("dbname=suppliers user=postgres password=postgres")
+
 
 def read_tokenlist():
 	with open('./data/solana_tokenlist.json', 'r') as f:

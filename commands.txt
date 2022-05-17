@@ -31,14 +31,23 @@ sudo touch /srv/shiny-server/thorchain-console/update_data.R
 sudo cp ~/dfk_calculator_data.RData /rstudio-data/
 
 sudo cp ~/nft_deal_score_data.RData /rstudio-data/
+sudo touch /rstudio-data/nft_deal_score_data.RData
+
 sudo cp ~/ntr_data.RData /rstudio-data/
 python /rstudio-data/test.py
-sudo touch /rstudio-data/nft_deal_score_data.RData
 
 sudo cp ~/nft_deal_score_tokens.csv /rstudio-data/
 sudo touch /rstudio-data/nft_deal_score_tokens.csv
 
+sudo cp ~/nft_deal_score_sales.csv /rstudio-data/
+sudo touch /rstudio-data/nft_deal_score_sales.csv
+
 sudo cp ~/dfk_calculator_daily_data.RData /rstudio-data/
+sudo touch /rstudio-data/dfk_calculator_daily_data.RData
+
+sudo cp ~/ntr_data.RData /rstudio-data/
+sudo cp ~/data_science/viz/nft-deal-score/server.R /home/data-science/data_science/viz/nft-deal-score
+sudo cp ~/data_science/viz/native-token-recycling/server.R /home/data-science/data_science/viz/native-token-recycling
 sudo touch /rstudio-data/dfk_calculator_daily_data.RData
 
 sudo touch /srv/shiny-server/thorchain-console/ui.R

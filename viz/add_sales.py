@@ -42,7 +42,7 @@ def clean_name(name):
 		return(clean_names[x])
 	name = name.title()
 	name = re.sub('-', ' ', name)
-	# name = re.sub(' On ', ' on ', name)
+	name = re.sub(' On ', ' on ', name)
 	name = re.sub('Defi ', 'DeFi ', name)
 	return(name)
 
@@ -141,7 +141,7 @@ def add_solana_sales(usr, pwd, data_folder = '/rstudio-data/'):
 		, sales_amount AS price
 		FROM solana.fact_nft_sales s
 		JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
-		WHERE block_timestamp >= CURRENT_DATE - 3
+		WHERE block_timestamp >= CURRENT_DATE - 14
 		AND m.project_name IN (
 			'Astrals',
 			'Aurory',
@@ -177,7 +177,7 @@ def add_ethereum_sales(usr, pwd, data_folder = '/rstudio-data/'):
 			, 'BoredApeKennelClub'
 		)
 		AND price IS NOT NULL
-		AND block_timestamp >= CURRENT_DATE - 3
+		AND block_timestamp >= CURRENT_DATE - 14
 	'''
 	add_sales(query, usr, pwd, False, data_folder)
 
@@ -195,7 +195,7 @@ def add_terra_sales(usr, pwd, data_folder = '/rstudio-data/'):
 			WHERE event_attributes:action = 'execute_orders'
 				AND event_type = 'from_contract'
 				AND tx_status = 'SUCCEEDED'
-				AND block_timestamp >= CURRENT_DATE - 3
+				AND block_timestamp >= CURRENT_DATE - 14
 		),
 
 		RE_takers AS (
@@ -206,7 +206,7 @@ def add_terra_sales(usr, pwd, data_folder = '/rstudio-data/'):
 				terra.msgs
 			WHERE
 				tx_id IN (SELECT DISTINCT tx_id FROM RE_events)
-				AND block_timestamp >= CURRENT_DATE - 3
+				AND block_timestamp >= CURRENT_DATE - 14
 		),
 		allSales AS 
 		(
@@ -297,7 +297,7 @@ def add_terra_sales(usr, pwd, data_folder = '/rstudio-data/'):
 				terra.msg_events
 				WHERE 
 					tx_status = 'SUCCEEDED'
-					AND block_timestamp >= CURRENT_DATE - 3
+					AND block_timestamp >= CURRENT_DATE - 14
 					AND tx_id IN ( 
 						SELECT DISTINCT 
 							tx_id 
@@ -306,7 +306,7 @@ def add_terra_sales(usr, pwd, data_folder = '/rstudio-data/'):
 							msg_value:execute_msg:settle:auction_id is not null 
 							AND tx_status = 'SUCCEEDED' 
 							AND msg_value:contract = 'terra12v8vrgntasf37xpj282szqpdyad7dgmkgnq60j'
-							AND block_timestamp >= CURRENT_DATE - 3
+							AND block_timestamp >= CURRENT_DATE - 14
 					)
 				GROUP BY
 					block_timestamp,
@@ -331,7 +331,7 @@ def add_terra_sales(usr, pwd, data_folder = '/rstudio-data/'):
 				AND event_attributes:action = 'transfer_nft'
 				AND event_attributes:method = 'execute_order'
 				AND event_attributes:"0_contract_address" = 'terra1fj44gmt0rtphu623zxge7u3t85qy0jg6p5ucnk'
-				AND block_timestamp >= CURRENT_DATE - 3
+				AND block_timestamp >= CURRENT_DATE - 14
 			)
 			WHERE nft_address IN (
 				'terra13nccm82km0ttah37hkygnvz67hnvkdass24yzv',

@@ -48,6 +48,15 @@ pred_price[  collection == 'Aurory' & token_id %in% eval(ids_2), pred_price := (
 ids_3 <- attributes[ (collection == 'Aurory') & (grepl( 'Mask', feature_value, fixed = TRUE)) ]$token_id
 pred_price[  collection == 'Aurory' & token_id %in% eval(ids_3), pred_price := (pred_price * 0.975) ]
 
+sales[collection == 'Cets On Creck', collection := 'Cets on Creck']
+pred_price[collection == 'Cets On Creck', collection := 'Cets on Creck']
+listings[collection == 'Cets On Creck', collection := 'Cets on Creck']
+
+
+sort(unique(listings$collection))
+sort(unique(pred_price$collection))
+sort(unique(sales$collection))
+
 # filter for only collections that have all data
 a <- unique(pred_price[, list(collection)])
 b <- unique(sales[, list(collection)])
@@ -61,6 +70,7 @@ sales <- merge(sales, d, by=c('collection'))
 listings <- merge(listings, d, by=c('collection'))
 coefsdf <- merge(coefsdf, d, by=c('collection'))
 tokens <- merge(tokens, d, by=c('collection'))
+
 
 save(
 	pred_price
