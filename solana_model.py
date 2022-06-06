@@ -217,6 +217,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	m_df['feature_value'] = m_df.feature_value.apply(lambda x: re.split("\(", re.sub("\"", "", x))[0] if type(x)==str else x )
 	m_df[(m_df.feature_name=='rank') & (m_df.collection == 'Levana Dragon Eggs')]
 	sorted(m_df[ (m_df.collection == 'Solana Monkey Business') ].feature_name.unique())
+	sorted(m_df.collection.unique())
 
 
 	#####################################
@@ -229,7 +230,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	m_df['token_id'] = m_df.clean_token_id.fillna(m_df.token_id).astype(float).astype(int).astype(str)
 	s_df = merge(s_df, tokens[['collection','token_id','clean_token_id']].drop_duplicates(), how='left', ensure=True, on=['collection','token_id'], message='s_df x tokens')
 	s_df[s_df.token_id.isnull()]
-	sorted(s_df.token_id.unique())
+	sorted(s_df.collection.unique())
 	# np.isinf(s_df).values.sum()
 	# s_df['clean_token_id'] = s_df.clean_token_id.fillna(s_df.token_id)
 	# s_df['token_id'] = (s_df.clean_token_id).apply(lambda x: re.sub('"', '', str(x))).astype(float).astype(int).astype(str)
@@ -363,7 +364,6 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collection = 'Galactic Punks'
 	collection = 'Stoned Ape Crew'
 	collections = ['Levana Dragon Eggs']
-	collections = ['Stoned Ape Crew']
 	collections = ['Solana Monkey Business']
 	collections = ['Galactic Angels']
 	# collections = [ x for x in collections if not x in ['BAYC','MAYC','Bakc'] ]
@@ -373,13 +373,16 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	collections = ['MAYC']
 	collections = [ x for x in collections if not x in ['Bakc','BAKC','MAYC'] ]
 	collections = [ x for x in collections if not x in ['Astrals','Cets on Cleck','DeFi Pirates'] ]
-	collections = ['Cets on Creck']
 	s_df.groupby('collection').block_timestamp.max()
 	m_df[m_df.collection.isin(['Okay Bears','Catalina Whale Mixer'])]
 	s_df[s_df.collection.isin(['Okay Bears','Catalina Whale Mixer'])]
+	collections = ['Okay Bears']
+	collections = ['Cets on Creck']
 	collections = list(s_df[['collection']].drop_duplicates().merge(m_df[['collection']].drop_duplicates()).collection.unique())
 	collections = [ c for c in collections if not c in [ 'Galactic Punks','LunaBulls','Galactic Angels','Levana Dragon Eggs','BAKC','BAYC','Astrals','MAYC' ] ]
-	collections = ['Okay Bears']
+	collections = [ c for c in collections if not c in [ 'Okay Bears','Stoned Ape Crew','Cets on Creck' ] ]
+	collections = ['SOLGods']
+	collections = ['Cets on Creck','Pesky Penguins']
 	print(sorted(collections))
 	# collections = [ 'Catalina Whale Mixer', 'Okay Bears', 'Pesky Penguins' ]
 	for collection in collections:
@@ -722,18 +725,18 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		df['err'] = (df.pred / df[target_col]).apply(lambda x: abs(x-1) )
 		df['err'] = df[target_col] - df.pred
 		df.head()
-		df[df['std_Attribute count_4']==1]['err']
+		# df[df['std_Attribute count_4']==1]['err']
 		df['w_err'] = df.err * df.wt
-		df[df['std_Attribute count_4']==1].sort_values('timestamp')[['err','w_err']].mean()
-		df[(df['std_Attribute count_4']==1)].sort_values('timestamp')[['err','w_err']].mean()
-		df[(df['std_Attribute count_4']==1) & (df.wt>=15)].sort_values('timestamp')[['err','w_err']].mean()
-		df[(df['std_Attribute count_4']==1) & (df.wt>=15)].sort_values('timestamp')[['err','w_err']].sum()
-		df[(df['std_Attribute count_4']==1) & (df.wt<15)].sort_values('timestamp')[['err','w_err']].mean()
-		df[(df['std_Attribute count_4']==1) & (df.wt<15)].sort_values('timestamp')[['err','w_err']].sum()
-		df[df['std_Attribute count_4']==1].sort_values('timestamp')[['err','price','pred','block_timestamp']].tail(20)
-		df[(df['std_Attribute count_4']==1) & (df.wt>=1)].sort_values('timestamp')[['err','price','pred','block_timestamp','wt','w_err']].tail(50)
-		df[df.wt >= 15].wt.sum() / df.wt.sum()
-		df[df.wt < 15].wt.sum()
+		# df[df['std_Attribute count_4']==1].sort_values('timestamp')[['err','w_err']].mean()
+		# df[(df['std_Attribute count_4']==1)].sort_values('timestamp')[['err','w_err']].mean()
+		# df[(df['std_Attribute count_4']==1) & (df.wt>=15)].sort_values('timestamp')[['err','w_err']].mean()
+		# df[(df['std_Attribute count_4']==1) & (df.wt>=15)].sort_values('timestamp')[['err','w_err']].sum()
+		# df[(df['std_Attribute count_4']==1) & (df.wt<15)].sort_values('timestamp')[['err','w_err']].mean()
+		# df[(df['std_Attribute count_4']==1) & (df.wt<15)].sort_values('timestamp')[['err','w_err']].sum()
+		# df[df['std_Attribute count_4']==1].sort_values('timestamp')[['err','price','pred','block_timestamp']].tail(20)
+		# df[(df['std_Attribute count_4']==1) & (df.wt>=1)].sort_values('timestamp')[['err','price','pred','block_timestamp','wt','w_err']].tail(50)
+		# df[df.wt >= 15].wt.sum() / df.wt.sum()
+		# df[df.wt < 15].wt.sum()
 
 		recent_errs = []
 		recent = df[df.timestamp >= a_week_ago]
@@ -745,8 +748,10 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 		recent_errs.sort_values('rat')
 		correct = recent_errs[(recent_errs.abs_rat > 0.003) & (recent_errs.n >= 10)]
 		if len(correct):
-			correct['chg'] = (correct.abs_rat / 0.001).apply(lambda x: min(1, x) * .7 ) * correct.avg
-			print(correct)
+			mx = max(0.001, correct.abs_rat.max())
+			correct['chg'] = (correct.abs_rat / mx).apply(lambda x: min(1, x) * .7 ) * correct.avg
+			correct['abs_chg'] = abs(correct.chg)
+			print(correct.sort_values('chg'))
 		for row in correct.iterrows():
 			row = row[1]
 			c = row['col']
@@ -889,7 +894,7 @@ def train_model(check_exclude=False, supplement_with_listings=True, use_saved_pa
 	salesdf[salesdf.block_timestamp.isnull()]
 	salesdf.block_timestamp.max()
 	salesdf.groupby('collection').block_timestamp.max()
-	pred_price[pred_price.collection == 'DeGods'].to_csv('~/Downloads/tmp1.csv', index=False)
+	pred_price[pred_price.collection == 'SOLGods'].to_csv('~/Downloads/tmp1.csv', index=False)
 	# old = pd.read_csv('./data/pred_price.csv')
 	# old = old[old.collection == 'DeGods']
 	# old['token_id'] = old.token_id.astype(str)

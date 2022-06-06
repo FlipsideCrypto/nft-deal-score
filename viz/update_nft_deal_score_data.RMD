@@ -46,14 +46,14 @@ library(reticulate)
 #update_data.R FILE HERE ---------->
 # virtualenv_create('pyvenv')
 # use_virtualenv('pyvenv')
-# py_install('pandas', pip = TRUE)
-# py_install('snowflake-connector-python', pip = TRUE)
 # virtualenv_install('pyvenv', 'pandas')
 # virtualenv_install('pyvenv', 'pandas')
 # py_install('cloudscraper', pip = TRUE)
 # r reticulate python ModuleNotFoundError
 # print('54')
-# use_python('/opt/python/3.10.4/bin/python')
+use_python('/opt/python/3.10.4/bin/python')
+py_install('pandas', pip = TRUE)
+py_install('snowflake-connector-python', pip = TRUE)
 
 SD_MULT = 3
 SD_SCALE = 1.95
@@ -89,11 +89,12 @@ if(isRstudio) {
 usr <- readLines(file.path(base.path,"data_science/util/snowflake.usr"))
 pwd <- readLines(file.path(base.path,"data_science/util/snowflake.pwd"))
 
+load(paste0(base_dir,'nft_deal_score_data.RData'))
+
 listings_file <- paste0(base_dir,'nft_deal_score_listings_data.RData')
 sales_file <- paste0(base_dir,'nft_deal_score_sales_data.RData')
 load(listings_file)
 
-load(paste0(base_dir,'nft_deal_score_data.RData'))
 
 coefsdf[, tot := lin_coef + log_coef ]
 coefsdf[, lin_coef := lin_coef / tot]
@@ -286,6 +287,7 @@ listings <- listings[, list(collection, token_id, price)]
 listings <- rbind(listings, new_listings)
 listings <- listings[order(collection, price)]
 listings[, token_id := as.integer(token_id)]
+listings <- listings[ !(collection %in% c('LunaBulls','Galactic Punks','Galactic Angels','Levana Dragon Eggs')) ]
 
 listings <- listings[!is.na(price)]
 listings <- listings %>% as.data.table()
@@ -310,7 +312,7 @@ get_fmp <- function(data, coefsdf, pred_price) {
 	fmp[, fair_market_price := pred_price + abs_chg + (pct_chg * pred_price / floor_price) ]
 }
 
-if(FALSE) {
+if(TRUE) {
 	coefsdf[, tot := lin_coef + log_coef ]
 	coefsdf[, lin_coef := lin_coef / tot]
 	coefsdf[, log_coef := log_coef / tot]
@@ -321,6 +323,11 @@ if(FALSE) {
 	fmp[, abs_chg := (cur_floor - floor_price) * lin_coef ]
 	fmp[, pct_chg := (cur_floor - floor_price) * log_coef ]
 	fmp[, fair_market_price := pred_price + abs_chg + (pct_chg * pred_price / floor_price) ]
+
+	mn <- fmp %>% group_by(collection, cur_floor) %>% summarize(mn = min(fair_market_price)) %>% as.data.table()
+	mn[, ratio := cur_floor / mn]
+	fmp <- merge(fmp, mn[, list(collection, ratio)])
+	fmp[ratio < 1, fair_market_price := fair_market_price * ratio ]
 
 	fmp[, cur_sd := pred_sd * (cur_floor / floor_price) * SD_SCALE ]
 	fmp[, price_low := qnorm(.2, fair_market_price, cur_sd) ]
@@ -334,13 +341,118 @@ if(FALSE) {
 	fmp[, fair_market_price := pmax(cur_floor, fair_market_price) ]
 	fmp[, fair_market_price := round(fair_market_price, 2) ]
 	fmp[, cur_sd := round(cur_sd, 2) ]
+	head(fmp[collection == 'SOLGods'][order(fair_market_price)])
+	head(fmp[(collection == 'SOLGods') & (rk <= 4654)][order(fair_market_price)])
+	head(fmp[(collection == 'SOLGods') & (rk == 4654)][order(fair_market_price)])
 
 	tmp <- merge(listings, fmp, by = c('collection','token_id')) %>% as.data.table()
-	tmp[, deal_score := ((fair_market_price / price) - 1) ]
-	tmp[, deal_score := ((fair_market_price / price) - 0) ]
-	tmp <- tmp[order(-deal_score)]
-	tmp <- tmp[, list(collection, token_id, fair_market_price, price, deal_score)]
-	tmp[, .SD[1:3], collection]
+	tmp[, deal_score := pnorm(price, fair_market_price, cur_sd) ]
+	tmp[, deal_score := 100 * (1 - deal_score) ]
+	tmp[, vs_floor := (price / cur_floor) - 1 ]
+	tmp[, vs_floor_grp := ifelse(vs_floor < .1, '<10%', ifelse(vs_floor < .25, '<25%', '>25%')) ]
+	tmp[, vs_floor := (price - cur_floor) ]
+	tmp <- tmp[ !(collection %in% c('Levana Dragon Eggs','Galactic Punks','LunaBulls','Galactic Angels','MAYC')) ]
+
+
+	t2 <- tmp[order(-deal_score),.SD[2], list(vs_floor_grp, collection)] %>% as.data.table()
+	t2 <- t2[, list(collection, vs_floor_grp, deal_score)][order(collection, vs_floor_grp)]
+	t3 <- tmp[order(-deal_score),.SD[3], list(vs_floor_grp, collection)] %>% as.data.table()
+	t3 <- t3[, list(collection, vs_floor_grp, deal_score)][order(collection, vs_floor_grp)]
+	colnames(t2) <- c('collection','vs_floor_grp','deal_score_g2')
+	colnames(t3) <- c('collection','vs_floor_grp','deal_score_g3')
+	tmp <- merge(tmp, t2, by=c('collection','vs_floor_grp'))
+	tmp <- merge(tmp, t3, by=c('collection','vs_floor_grp'))
+
+
+	t2 <- tmp[order(-deal_score),.SD[2], list(collection)] %>% as.data.table()
+	t2 <- t2[, list(collection, deal_score)][order(collection)]
+	t3 <- tmp[order(-deal_score),.SD[3], list(collection)] %>% as.data.table()
+	t3 <- t3[, list(collection, deal_score)][order(collection)]
+	colnames(t2) <- c('collection','deal_score_2')
+	colnames(t3) <- c('collection','deal_score_3')
+
+	tmp <- merge(tmp, t2, by=c('collection'))
+	tmp <- merge(tmp, t3, by=c('collection'))
+
+	tmp[, pts := (deal_score * 5 - deal_score_g2 - deal_score_g3 - deal_score_2 - deal_score_3) * ((cur_floor / price)**0.75) + (100 * (1 - (( price - cur_floor ) / (fair_market_price - cur_floor)))) ]
+	url <- 'https://discord.com/api/webhooks/976332557996150826/8KZqD0ov5OSj1w4PjjLWJtmgnCM9bPWaCkZUUEDMeC27Z0iqiA-ZU5U__rYU9tQI_ijA'
+	unique(tmp$collection)
+	for(col in c('price','pred_price','fair_market_price','vs_floor','deal_score','deal_score_2','deal_score_3','pts')) {
+		if(!'price' %in% col) {
+			tmp[, eval(col) := round(get(col)) ]
+		} else {
+			tmp[, eval(col) := ifelse(
+				get(col) < 10
+				, round(get(col), 2)
+				, ifelse(
+					get(col) < 100
+					, round(get(col), 1)
+					, round(get(col)))
+				)
+			]
+		}
+	}
+	tmp <- tmp[order(-pts)]
+	head(tmp[, list(collection, token_id, price, nft_rank, rk, pred_price, cur_floor, fair_market_price, deal_score, deal_score_2, deal_score_3, pts)], 20)
+	head(tmp[, list(collection, token_id, price, nft_rank, rk, pred_price, cur_floor, fair_market_price, deal_score, deal_score_2, deal_score_3, pts)], 20)
+	paste(head(tmp$label), collapse='\n')
+
+	tmp[, l := nchar(collection)]
+	mx <- max(tmp$l)
+	# tmp$clean_collection <- str_pad(collection, eval(mx) - l, side = 'right', pad = '-') ]
+	tmp$n_pad <- mx - tmp$l
+	tmp$clean_collection <- str_pad(tmp$collection, mx - tmp$l, side = 'right', pad = '-')
+	tmp[, clean_collection := str_pad(collection, eval(mx), pad='-', side='right')]
+	tmp[, clean_collection := str_pad(collection, eval(mx), pad='-', side='both')]
+	tmp$clean_collection <- str_pad(tmp$collection, mx, pad='-', )
+	tmp[, label := paste(clean_collection, str_pad(token_id, 4, side='left'), price, fair_market_price, deal_score, sep='\t')]
+	tmp[, label := paste(
+		clean_collection
+		, str_pad(token_id, 4, side='left')
+		, str_pad(rk, 4, side='left')
+		, str_pad(price, 4, side='left')
+		, str_pad(vs_floor, 5, side='left')
+		, str_pad(fair_market_price, 4, side='left')
+		, str_pad(deal_score, 2, side='left')
+		, str_pad(deal_score_2, 2, side='left')
+		, str_pad(deal_score_3, 2, side='left')
+		, str_pad(pts, 3, side='left')
+		, sep='\t')
+	]
+	header <- paste(
+		str_pad('collection', mx, side='both', pad='-')
+		, str_pad('id', 4, side='left')
+		, str_pad('rk', 4, side='left')
+		, str_pad('$', 3, side='left')
+		, str_pad('floor', 5, side='left')
+		, str_pad('fmp', 3, side='left')
+		, str_pad('ds', 2, side='left')
+		, str_pad('ds2', 2, side='left')
+		, str_pad('ds3', 2, side='left')
+		, str_pad('pts', 3, side='left')
+		, sep='\t')
+
+	tmp <- tmp[order(-pts)]
+	content <- tmp[ (price < 0.9 * fair_market_price) , head(.SD, 2), by = collection]
+	content <- content[order(-pts)]
+	# content <- paste(c(header, content$label, collapse='\n'))
+
+	content <- paste(c(header, content$label), collapse='\n')
+	# content <- paste(c(header, head(tmp$label, 10)), collapse='\n')
+	data <- list(
+		content = paste0('```',content,'```')
+	)
+	res <- POST(url, body = data, encode = "form", verbose())
+
+	# tmp <- tmp[order(-deal_score)]
+	# head(tmp)
+	# plot_data[, deal_score := round(100 * (1 - y))]
+	# y <- pnorm(x, mu, sd)
+	# tmp[, deal_score := ((fair_market_price / price) - 1) ]
+	# tmp[, deal_score := ((fair_market_price / price) - 0) ]
+	# tmp <- tmp[order(-deal_score)]
+	# tmp <- tmp[, list(collection, token_id, fair_market_price, price, deal_score)]
+	# tmp[, .SD[1:3], collection]
 
 	# fmp <- fmp[, list(collection, token_id, nft_rank, rk, fair_market_price, price_low, price_high)]
 	fmp <- fmp[, list(collection, token_id, nft_rank, rk, fair_market_price, cur_floor, cur_sd, lin_coef, log_coef)]
