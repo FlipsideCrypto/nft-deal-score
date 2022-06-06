@@ -7,7 +7,7 @@ fluidPage(
 	    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Roboto+Mono"),
 	    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Inter")
 	),
-	tags$head(tags$script(src = "mixpanel.js")),
+	tags$head(tags$script(src = "rudderstack.js")),
 	tags$style(type="text/css",
 		".shiny-output-error { visibility: hidden; }",
 		".shiny-output-error:before { visibility: hidden; }"
@@ -15,12 +15,12 @@ fluidPage(
 	withTags({
 		header(class="top-banner",
 		  section(
-		    a(class="fs-logo", href="https://www.flipsidecrypto.com", "Powered by Flipside Crypto", onclick = "mixpanel.track('nft-click-flipside-icon')"),
+		    a(class="fs-logo", href="https://www.flipsidecrypto.com", "Powered by Flipside Crypto", onclick = "rudderstack.track('nft-click-flipside-icon')"),
 		    section(class="socials",
-		      a(class="twitter", href="https://twitter.com/flipsidecrypto", "Twitter", onclick = "mixpanel.track('nft-click-twitter-icon')"),
-		      a(class="linkedin", href="https://www.linkedin.com/company/flipside-crypto", "LinkedIn", onclick = "mixpanel.track('nft-click-linkedin-icon')"),
-		      a(class="discord", href="https://flipsidecrypto.com/discord", "Discord", onclick = "mixpanel.track('nft-click-discord-icon')"),
-		      a(href="https://app.flipsidecrypto.com/auth/signup/velocity", "Sign Up", onclick = "mixpanel.track('nft-click-signup-icon')")
+		      a(class="twitter", href="https://twitter.com/flipsidecrypto", "Twitter", onclick = "rudderstack.track('nft-click-twitter-icon')"),
+		      a(class="linkedin", href="https://www.linkedin.com/company/flipside-crypto", "LinkedIn", onclick = "rudderstack.track('nft-click-linkedin-icon')"),
+		      a(class="discord", href="https://flipsidecrypto.com/discord", "Discord", onclick = "rudderstack.track('nft-click-discord-icon')"),
+		      a(href="https://app.flipsidecrypto.com/auth/signup/velocity", "Sign Up", onclick = "rudderstack.track('nft-click-signup-icon')")
 		    )
 		  )
 		)
@@ -56,7 +56,10 @@ fluidPage(
 				, icon(id="select-token-tooltip", "info-circle")
 				, bsTooltip(id = "select-token-tooltip", title = "To search for a token, delete and then type in the desired token id", placement = "bottom", trigger = "hover")
 			)
-			, fluidRow(uiOutput("nftselect"))
+			# , fluidRow(uiOutput("nftselect"))
+			# , fluidRow(selectInput("nftselect", "name", multiple = FALSE, choices = c('1','2','3','4','5','6','7','8','9','10')))
+			, fluidRow(selectizeInput("tokenid", NULL, multiple = FALSE, choices = seq(1:100), selected=1))
+			# , fluidRow(selectizeInput("listid", "A long list", choices = NULL))
 		)
 		, column(4
 			, div(
@@ -100,17 +103,52 @@ fluidPage(
 				, plotlyOutput("pricedistributionplot", height = 280)
 			)
 			, div(class = "link", uiOutput('howrareisurl'))
+			# , div(
+			# 	class = 'light-container'
+			# 	, div(class = "title", textOutput("loanscore"))
+			# 	, fluidRow(
+			# 		column(4
+			# 			, div(
+			# 				class = "inputtitle"
+			# 				, "Days"
+			# 				, icon(id="loan-days-tooltip", "info-circle")
+			# 				, bsTooltip(id = "loan-days-tooltip", title = "Update this number with the duration of the loan", placement = "bottom", trigger = "hover")
+			# 			)
+			# 			, fluidRow(uiOutput("loandaysinput"))
+			# 		)
+			# 		, column(4
+			# 			, div(
+			# 				class = "inputtitle"
+			# 				, "Lending Amount"
+			# 				, icon(id="loan-amount-tooltip", "info-circle")
+			# 				, bsTooltip(id = "loan-amount-tooltip", title = "Update this number with the lending amount of the loan", placement = "bottom", trigger = "hover")
+			# 			)
+			# 			, fluidRow(uiOutput("loanamountinput"))
+			# 		)
+			# 		, column(4
+			# 			, div(
+			# 				class = "inputtitle"
+			# 				, "Return Amount"
+			# 				, icon(id="loan-return-tooltip", "info-circle")
+			# 				, bsTooltip(id = "loan-return-tooltip", title = "Update this number with the return amount of the loan", placement = "bottom", trigger = "hover")
+			# 			)
+			# 			, fluidRow(uiOutput("loanreturninput"))
+			# 		)
+			# 	)
+			# 	# , plotlyOutput("pricedistributionplot", height = 280)
+			# )
 		)
 	)
 	, fluidRow(
 		class="grey8row"
 		, h2("Listings", icon(class="padding-left-10", id="listings-tooltip", "info-circle"))
-		, bsTooltip(id = "listings-tooltip", title = "Plot only shows listings with deal score > 5; Click a dot to select the token", placement = "bottom", trigger = "hover")
+		# , bsTooltip(id = "listings-tooltip", title = "Plot only shows listings with deal score > 5; Click a dot to select the token", placement = "bottom", trigger = "hover")
+		, bsTooltip(id = "listings-tooltip", title = "Plot only shows listings with deal score > 5", placement = "bottom", trigger = "hover")
 		, div(
 			class = "listing-plot"
 			, plotlyOutput("listingplot", height = 500)
 			, div(class='description', 'Plot only shows listings with deal score > 5')
-			, div(class='description', 'Click a dot to select the token')
+			# , div(class='description', 'Click a dot to select the token')
 		)
 		, fluidRow(
             class = 'filters'

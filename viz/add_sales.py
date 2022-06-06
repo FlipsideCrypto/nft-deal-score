@@ -90,6 +90,7 @@ def add_sales(query, usr, pwd, do_clean_token_id = False, data_folder = '/rstudi
 	sales['collection'] = sales.collection.apply(lambda x: clean_name(x) )
 	sales['sale_date'] = sales.sale_date.apply(lambda x: str(x)[:19] )
 	sorted(sales.collection.unique())
+	print(sales.groupby('collection').token_id.count())
 
 	if do_clean_token_id:
 		sales['token_id'] = sales.token_id.apply(lambda x: str(int(float(x))) )

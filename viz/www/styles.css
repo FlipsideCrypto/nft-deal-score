@@ -158,6 +158,9 @@
 /*****************/
 /*     Forms     */
 /*****************/
+/* #nftselect-label {
+	display: none;
+} */
 .rt-search {
   color: #222;
 }

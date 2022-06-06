@@ -1,6 +1,7 @@
 server <- function(input, output, session) {
 	# load('data.Rdata')
 	user <- Sys.info()[['user']]
+	# options(warn=-1)
 
 	base_dir <- ifelse(
 		user == 'rstudio-connect'
@@ -54,6 +55,40 @@ server <- function(input, output, session) {
 			, width = "100%"
 			, placeholder = coefsdf[ collection == eval(selected) ]$floor_price[1]
 			, value = min(listings[ collection == eval(selected) ]$price)
+		)
+	})
+
+	output$loandaysinput <- renderUI({
+		selected <- getCollection()
+		if( selected == '' ) {
+			return(NULL)
+		}
+		textInput(
+			inputId = 'loandays'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+	output$loanamountinput <- renderUI({
+		selected <- getCollection()
+		if( selected == '' ) {
+			return(NULL)
+		}
+		textInput(
+			inputId = 'loanamount'
+			, label = NULL
+			, width = "100%"
+		)
+	})
+	output$loanreturninput <- renderUI({
+		selected <- getCollection()
+		if( selected == '' ) {
+			return(NULL)
+		}
+		textInput(
+			inputId = 'loanreturn'
+			, label = NULL
+			, width = "100%"
 		)
 	})
 
@@ -442,6 +477,19 @@ server <- function(input, output, session) {
 			, width = "100%"
 		)
 	})
+observeEvent(input$collectionname,
+{
+	cur_selected <- getCollection()
+	choices <- sort(pred_price[collection == eval(cur_selected)]$token_id)
+	updateSelectizeInput(session, 'tokenid', choices = choices, server = TRUE)
+})
+
+updateSelectizeInput(session, "listid", choices = c(1, 2, 3, 4), server = T)
+# cur_selected <- getCollection()
+# choices <- sort(pred_price[collection == eval(cur_selected)]$token_id)
+# choices <- sort(unique(pred_price$token_id))
+choices <- seq(1:10000)
+updateSelectizeInput(session, 'tokenid', choices = choices, server = TRUE)
 
 	output$nftselect <- renderUI({
 		selected <- getCollection()
@@ -449,12 +497,25 @@ server <- function(input, output, session) {
 			return(NULL)
 		}
 		choices <- sort(pred_price[collection == eval(selected)]$token_id)
-		selectInput(
-			inputId = 'tokenid'
-			, label = NULL
-			, choices = choices
-			, width = "100%"
-		)
+		updateSelectizeInput(session, 'nftselect', choices = choices, server = TRUE)
+		# selectInput(
+		# selectizeInput(
+		# 	inputId = 'tokenid'
+		# 	, label = NULL
+		# 	, choices = choices
+		# 	, width = "100%"
+		# 	, options = list(maxOptions = 10)
+		# 	# , size = 50
+		# 	# , selectize = FALSE
+		# )
+		# updateSelectizeInput(
+		# 	session
+		# 	, 'tokenid'
+		# 	, label = NULL
+		# 	, choices = choices
+		# 	, width = "100%"
+		# 	, server = TRUE
+		# )
 	})
 	getTokenId <- reactive({
 		if(length(input$tokenid) == 0) {
@@ -627,6 +688,9 @@ server <- function(input, output, session) {
 		return(p_1)
 	}
 
+	output$loanscore <- renderText({
+		paste0('Loan Score: ')
+	})
 	output$fairmarketprice <- renderText({
 		id <- getTokenId()
 		selected <- getCollection()
@@ -1226,14 +1290,14 @@ server <- function(input, output, session) {
 		df[, deal_score := pnorm(price, pred_price, eval(SD_SCALE) * pred_sd * pred_price / pred_price_0), by = seq_len(nrow(df)) ]
 		df[, deal_score := round(100 * (1 - deal_score)) ]
 		# df[, pred_price := round(pred_price) ]
-		df[, pred_price := paste0(format(round(pred_price, 1), digits=3, decimal.mark=".", big.mark=",")) ]
+		df[, pred_price_str := paste0(format(round(pred_price, 1), digits=3, decimal.mark=".", big.mark=",")) ]
 
-		df <- df[, list(image_url, token_id, price, pred_price, deal_score, rk, nft_rank)]
+		df <- df[, list(image_url, token_id, price, pred_price, pred_price_str, deal_score, rk, nft_rank)]
 		m <- dcast(attributes[collection == eval(selected)], collection + token_id ~ feature_name, value.var='feature_value')
 		df <- merge(df, m, all.x=TRUE, by=c('token_id'))
 		df[, collection := NULL]
 		df <- df[order(-deal_score)]
-		return(df)
+		return(copy(df))
 	})
 
 
@@ -1244,8 +1308,12 @@ server <- function(input, output, session) {
 			return(NULL)
 		}
 		df <- df[ deal_score >= 10 ]
-		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price,'<br>Deal Score: ',deal_score) ]
-        f <- min(df[price > 0]$price)
+		df[, hover_text := paste0('<b>#',token_id,'</b><br>Listing Price: ',price,'<br>Fair Market Price: ',pred_price_str,'<br>Deal Score: ',deal_score) ]
+		f <- min(df[price > 0]$price)
+
+		df <- df[ !(is.na(price)) & !(is.na(pred_price)) ]
+		df[, price := as.numeric(price)]
+		df[, pred_price := as.numeric(pred_price)]
 
 		fig <- plot_ly(
 			source = "listingLink",
@@ -1314,7 +1382,7 @@ server <- function(input, output, session) {
 		# plotly::config(displayModeBar = FALSE)
         #  %>%
 		# plotly::config(modeBarButtonsToRemove = c("zoomIn2d", "zoomOut2d"))
-		event_register(fig, 'plotly_click')
+		# event_register(fig, 'plotly_click')
 	})
 
 	convertCollectionName <- function(x) {
@@ -1419,17 +1487,21 @@ server <- function(input, output, session) {
 		HTML(paste(url))
     })
 
-	observe({
-		req(input$tokenid)
-		ed <- event_data("plotly_click", source = "listingLink")
-		if(!is.null(ed$key[1])) {
-			updateTextInput(session = session, inputId = "tokenid", value = ed$key[1])
-			shinyjs::runjs("window.scrollTo(0, 300)")
-		}
-	})
+	# observe({
+	# 	req(input$tokenid)
+	# 	req(nrow(getListingData()))
+	# 	ed <- event_data("plotly_click", source = "listingLink")
+	# 	if(!is.null(ed$key[1])) {
+	# 		if (ed$key[1] != input$tokenid) {
+	# 			updateSelectizeInput(session, 'tokenid', server = TRUE, selected = ed$key[1])
+	# 			# updateTextInput(session = session, inputId = "tokenid", value = ed$key[1])
+	# 			shinyjs::runjs("window.scrollTo(0, 300)")
+	# 		}
+	# 	}
+	# })
 
 	output$listingtable <- renderReactable({
-		df <- getListingData()
+		df <- copy(getListingData())
 		if( nrow(df) == 0 ) {
 			return(NULL)
 		}
@@ -1447,6 +1519,8 @@ server <- function(input, output, session) {
 			df <- df[ nft_rank <= eval(mx) ]
 		}
 		df[, price := round(price, 2)]
+		# df[, pred_price_str := paste0(format(round(pred_price, 1), digits=3, decimal.mark=".", big.mark=",")) ]
+		df[, pred_price := NULL ]
 
 		reactable(df,
 			defaultColDef = colDef(
@@ -1465,7 +1539,7 @@ server <- function(input, output, session) {
                 }),
 				token_id = colDef(name = "Token ID", align = "left"),
 				price = colDef(name = "Listed Price", align = "left"),
-				pred_price = colDef(name = "Fair Market Price", align = "left"),
+				pred_price_str = colDef(name = "Fair Market Price", align = "left"),
 				deal_score = colDef(name = "Deal Score", align = "left"),
 				rk = colDef(name = "Deal Score Rank", align = "left"),
 				nft_rank = colDef(name = "Rarity Rank", align = "left")

@@ -1,3 +1,4 @@
+import collections
 from curses import meta
 from lib2to3.pgen2.tokenize import tokenize
 from operator import index
@@ -38,7 +39,12 @@ def how_rare_is_api():
 	url = 'https://api.howrare.is/v0.1/collections'
 	r = requests.get(url)
 	j = r.json()
-	j.keys()
+	j['result'].keys()
+	j['result']['data'][:10]
+	c_df = pd.DataFrame(j['result']['data']).sort_values('floor_marketcap', ascending=0)
+	c_df.head(16)
+	seen = [ 'smb','aurory','degenapes','thugbirdz','degods','okay_bears','catalinawhalemixer','cetsoncreck','stonedapecrew','solgods' ]
+	len(j['result']['data'])
 	t_data = []
 	metadata = pd.DataFrame()
 	d = {
@@ -48,15 +54,20 @@ def how_rare_is_api():
 		, 'Solana Monkey Business': 'smb'
 		, 'Thugbirdz': 'thugbirdz'
 	}
-	d = {
-		'Stoned Ape Crew': 'stonedapecrew'
-	}
-	for collection, url in d.items():
+	# for collection, url in d.items():
+	# redo trippin ape tribe
+	for row in c_df.iterrows():
+		row = row[1]
+		collection = row['name']
+		url = row['url'][1:]
+		print('Working on collection {}, {}, {}'.format(collection, len(t_data), len(metadata)))
+		if url in seen or (len(metadata) and collection in metadata.collection.unique()):
+			print('Seen!')
+			continue
 		# collection = 'Cets on Creck'
 		# collection = 'SOLGods'
 		# collection = 'Meerkat Millionaires'
 		# collection = d['url'][1:]
-		print('Working on collection {}, {}, {}'.format(collection, len(t_data), len(metadata)))
 		# url = 'https://api.howrare.is/v0.1/collections'+d['url']
 		# url = 'https://api.howrare.is/v0.1/collections/meerkatmillionaires'
 		url = 'https://api.howrare.is/v0.1/collections/'+url
@@ -72,7 +83,8 @@ def how_rare_is_api():
 			m = pd.DataFrame(i['attributes'])
 			m['token_id'] = token_id
 			m['collection'] = collection
-			metadata = metadata.append(m)
+			# metadata = metadata.append(m)
+			metadata = pd.concat([metadata, m])
 	old = pd.read_csv('./data/tokens.csv')
 	sorted(old.collection.unique())
 	l0 = len(old)
@@ -94,9 +106,12 @@ def how_rare_is_api():
 		old['clean_token_id'] = old.clean_token_id.fillna(old.token_id)
 		old['chain'] = old.chain.fillna('Solana')
 	else:
-		old = old.append(tokens).drop_duplicates(subset=['collection','token_id'], keep='last')
+		old = old.append(tokens)
+		old['token_id'] = old.token_id.astype(str)
+		old = old.drop_duplicates(subset=['collection','token_id'], keep='last')
 	print('Adding {} rows'.format(len(old) - l0))
 	old[old.collection.isin(tokens.collection.unique())]
+	old[(old.collection.isin(tokens.collection.unique())) & (old.token_id == '6437')]
 	old[old.nft_rank.isnull()].groupby('collection').token_id.count()
 	old.to_csv('./data/tokens.csv', index=False)
 
@@ -329,7 +344,7 @@ def calculate_deal_scores(listings, alerted):
 	s += '```'
 	print(s)
 
-	mUrl = 'https://discord.com/api/webhooks/931615663565443082/L_cQCI_fs1D4vOC5lCoP0qJuzvZKVX-3wx-jNSBw32v0HwWxz6OcKK0iGOz9T1-1xElf'
+	mUrl = 'https://discord.com/api/webhooks/976332557996150826/8KZqD0ov5OSj1w4PjjLWJtmgnCM9bPWaCkZUUEDMeC27Z0iqiA-ZU5U__rYU9tQI_ijA'
 
 	data = {"content": s}
 	response = requests.post(mUrl, json=data)

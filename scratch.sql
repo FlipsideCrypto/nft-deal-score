@@ -1,21 +1,741 @@
 
+rsync -azvv --progress -e "ssh -i /Users/kellenblumberg/git/props/aws/props-aws.pem" /Users/kellenblumberg/git/props/discord-pbt-bot/ ubuntu@34.204.49.162:~/
+rsync -azvv --progress -e "ssh -i /Users/kellenblumberg/git/props/aws/props-aws.pem" ~/Downloads/node-v16.15.0-linux-arm64.tar.xz ubuntu@34.204.49.162:~/
+rsync -azvv --progress -e "ssh -i /Users/kellenblumberg/git/props/aws/props-aws.pem" /Users/kellenblumberg/git/props/discord-pbt-bot/pm2.json ubuntu@34.204.49.162:~/pm2.json
+
+
+
+
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+
+
+ssh -i "Users/kellenblumberg/git/props/aws/props-aws.pem" ubuntu@ec2-34-204-49-162.compute-1.amazonaws.com
+ssh -i "~/git/props/aws/props-aws.pem" ubuntu@34.204.49.162
+
+API Key: IioFYwv2t7KEsWjbh8xsEKd8d
+API Secret Key: 0650aF7Vo3gz2H7z1o10ws4ojXgjbl8UWk3N8kqVUtqvgIBv26
+Bearer Token: AAAAAAAAAAAAAAAAAAAAAF%2BRdAEAAAAAQ2emwRpqU1B7Cj22LUxfJ%2Btrhck%3DpFpWm4G4Wd5dNLJjP2Ru5EuVVHEx6lroYfkiEAlPQZ0HQvqwsn
+
+Hey just wanted introduce myself and let you know we really like your project. We're also a sports-related crypto project (actually giving away a Suite for one of our contests rn).
+
+I used to work in the analytics department for the Jacksonville Jaguars for 5 years and am now a Rust dev. Anyways just wanted to say hello and happy to keep the lines open if you guys ever wanted to talk about ideas or synergies between our projects.
+
+The things that seemed to resonate most with Gaius were:
+1. Team experience
+2. We already had a live product
+3. Our tokenomics
+
+So maybe a few things to highlight would be
+
+The things that seemed to resonate most with Gaius were:
+1. We have background working in sports analytics for an NFL team
+2. We already have a live product live on mainnet
+3. Our tokenomics
+
+Updates
+Made a cool thing to show off our THORChain awesomeness
+Getting Rishi up to speed on stuff and saw him create some amazing dashboards
+Working on Airdrop NTR for Optimism
+Chatting with Yawww people to get Deal Score into their site
+Problems Encountered
+Errors on NFT Deal Score
+Priorities
+Fix errors on NFT Deal Score
+NFT Loan Score
+Concerns
+Hopefully THORChain pays us more; it's been an up-and-down relationship
 
 WITH base AS (
-  SELECT DISTINCT address, symbol
+  SELECT t.from AS address
+  , hash
+  , RIGHT(CONCAT(REPEAT('0', 64), substr(CAST(l.data AS VARCHAR),3,64)), 64) as n
+  , l.data
+  , 4294967296::decimal as exp0 -- 16^8
+  , 72057594037927936::decimal as exp1 -- 16^14
+  , t.block_time
+  FROM optimism.transactions t
+  INNER JOIN optimism.logs l
+      ON t.hash = l.tx_hash
+  AND t.to = '\xfedfaf1a10335448b7fa0268f56d2b44dbd357de'
+  AND l.topic1 = '\xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+  AND t.block_time > '2022-05-25'
+  AND t.block_time <= '2022-06-03 22:57'
+  AND success
+), b2 AS (
+  SELECT address
+  , MIN(block_time)
+  , SUM(
+      CONCAT('x00',CAST((substring(n, 1, 14)) AS VARCHAR))::bit(64)::bigint * exp0 * exp1 * exp1 * exp1
+      + CONCAT('x00',CAST((substring(n, 15, 14)) AS VARCHAR))::bit(64)::bigint * exp0 * exp1 * exp1
+      + CONCAT('x00',CAST((substring(n, 29, 14)) AS VARCHAR))::bit(64)::bigint * exp0 * exp1
+      + CONCAT('x00',CAST((substring(n, 43, 14)) AS VARCHAR))::bit(64)::bigint * exp0
+      + CONCAT('x00',CAST((substring(n, 57, 14)) AS VARCHAR))::bit(64)::bigint
+  ) / POWER(10,18) AS claim_amount 
+  FROM base
+  GROUP BY 1, 2
+), swaps AS (
+  SELECT b2.address
+  , SUM(
+    CASE WHEN d.trader_a = b2.address
+  )
+  FROM b2
+  JOIN dex.trades d ON d.block_time >= b2.block_time AND (
+    (d.trader_a = b2.address AND token_a_address = '\x4200000000000000000000000000000000000042')
+    OR (d.trader_b = b2.address AND token_b_address = '\x4200000000000000000000000000000000000042')
+  )
+  AND (
+    token_a_address = '\x4200000000000000000000000000000000000042'
+    OR token_b_address = '\x4200000000000000000000000000000000000042'
+  )
+  AND usd_amount > 0 
+  AND token_a_amount_raw>0
+  AND token_b_amount_raw>0
+)
+SELECT SUM(claim_amount) AS claim_amount, MAX(block_time) AS mx
+ FROM b2
+
+
+
+
+WITH base AS (
+  SELECT from_address AS address
+  , date_trunc('month', block_timestamp) AS month
+  , SUM(-rune_amount) AS net_rune_amount
+  FROM thorchain.transfers
+  GROUP BY 1, 2
+  UNION
+  SELECT to_address AS address
+  , date_trunc('month', block_timestamp) AS month
+  , SUM(rune_amount) AS net_rune_amount
+  FROM thorchain.transfers
+  GROUP BY 1, 2
+), b2 AS (
+  SELECT address
+  , MIN(month) AS month
+  , SUM(net_rune_amount) AS net_rune_amount
+  FROM base
+  GROUP BY 1
+), l AS (
+  SELECT
+  from_address AS address
+  , pool_name
+  , sum(CASE WHEN lp_action = 'add_liquidity' THEN stake_units ELSE -stake_units END) as net_stake_units
+  FROM thorchain.liquidity_actions
+  WHERE lp_action IN ('add_liquidity','remove_liquidity')
+  AND address LIKE 'thor%'
+  GROUP BY 1, 2
+), l2 AS (
+  SELECT DISTINCT address
+  FROM l 
+  WHERE net_stake_units > 0
+), f AS (
+  SELECT DISTINCT address
   FROM silver_crosschain.ntr
-  WHERE hodl = 0
-  AND symbol = 'SUSHI'
-  AND reward > 0
-), h AS (
-  SELECT DISTINCT address, symbol
-  FROM silver_crosschain.ntr
-  WHERE hodl = reward
-  AND symbol = 'SUSHI'
+  WHERE address LIKE 'thor%'
+), tot_pool AS (
+  SELECT pool_name
+  , SUM(net_stake_units) AS tot_stake_units
+  FROM l
+  WHERE net_stake_units > 0
+  GROUP BY 1
+), pct_pool AS (
+  SELECT address
+  , l.pool_name
+  , net_stake_units
+  , tot_stake_units
+  , net_stake_units / tot_stake_units AS pct_pool
+  FROM l
+  JOIN tot_pool t ON t.pool_name = l.pool_name
+  WHERE net_stake_units > 0
+), p AS (
+  SELECT *
+  , ROW_NUMBER() OVER (PARTITION BY pool_name ORDER BY block_timestamp DESC) AS rn
+  FROM thorchain.pool_block_balances
+  WHERE block_timestamp >= CURRENT_DATE - 3
+), pool_val AS (
+  SELECT pool_name
+  , rune_amount_usd + asset_amount_usd AS tvl
+  FROM p
+  WHERE rn = 1
+), user_val AS (
+  SELECT pp.address
+  , pct_pool * tvl AS lp_val
+  FROM pct_pool pp
+  JOIN pool_val v ON v.pool_name = pp.pool_name
+)
+SELECT 
+-- date_trunc('year', month) AS month
+CASE WHEN f.address IS NULL THEN 0 ELSE 1 END AS is_flipside
+, COUNT(1) AS n
+, AVG(CASE WHEN net_rune_amount > 0 OR l2.address IS NOT NULL THEN 1 ELSE 0 END) AS pct_hold
+, AVG(CASE WHEN net_rune_amount > 0 AND l2.address IS NULL THEN 1 ELSE 0 END) AS pct_rune_only
+, AVG(CASE WHEN net_rune_amount <= 0 AND l2.address IS NOT NULL THEN 1 ELSE 0 END) AS pct_lp_only
+, AVG(CASE WHEN net_rune_amount > 0 AND l2.address IS NOT NULL THEN 1 ELSE 0 END) AS pct_lp_and_rune
+, SUM( COALESCE(lp_val, 0)) AS lp_val
+FROM b2
+LEFT JOIN l2 ON l2.address = b2.address
+LEFT JOIN f ON f.address = b2.address
+LEFT JOIN user_val u ON u.address = b2.address
+GROUP BY 1
+
+
+
+WITH op_claims AS (
+SELECT `from`
+, block_time
+, hash
+, (
+CAST(conv(substring(n, 1, 14), 16, 10) AS STRING) * exp0 * exp1 * exp1 * exp1
++ CAST(conv(substring(n, 15, 14), 16, 10) AS STRING) * exp0 * exp1 * exp1
++ CAST(conv(substring(n, 29, 14), 16, 10) AS STRING) * exp0 * exp1
++ CAST(conv(substring(n, 43, 14), 16, 10) AS STRING) * exp0
++ CAST(conv(substring(n, 57, 14), 16, 10) AS STRING)
+)/POWER(10,18) AS claim_amount
+FROM (
+    SELECT `from`
+    , hash
+    , lpad(substr(l.data,3,64), 64, '0') as n
+    , '4294967296' as exp0 -- 16^8
+    , '72057594037927936' as exp1 -- 16^14
+    , t.block_time
+    FROM optimism.transactions t
+    INNER JOIN optimism.logs l
+        ON t.hash = l.tx_hash
+    WHERE `to` = '0xfedfaf1a10335448b7fa0268f56d2b44dbd357de'
+    AND topic1 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+    AND t.block_time > '2022-05-25'
+    AND success
+    ) a
+  LIMIT 1000
+)
+SELECT c.*
+, CASE WHEN d.trader_a = `from` THEN 1 ELSE 0 END AS is_trader_a
+FROM op_claims
+LEFT JOIN dex.trades d ON d.block_time >= c.block_time AND (d.trader_a = `from` OR d.trader_b = `from`)
+AND (
+  token_a_address = '\x4200000000000000000000000000000000000042'
+  OR token_b_address = '\x4200000000000000000000000000000000000042'
+)
+AND usd_amount > 0 
+AND token_a_amount_raw>0
+AND token_b_amount_raw>0
+
+
+
+
+SELECT *
+FROM thorchain.prices
+WHERE pool_name like '%.ETH%'
+AND block_timestamp >= '2021-11-11'
+ORDER BY block_timestamp, pool_name
+LIMIT 10000
+
+
+SELECT *
+FROM solana.fact_transactions 
+WHERE block_timestamp >= CURRENT_DATE - 2
+AND tx_id = 'URjxfD1SFfYwySGRVaD9iC3PX4b8mheC4LYuik9fY9uQV2kfyfr7gXkGHeQY4RHSaRwn7mN9mPQ5J8Y8mE5xEtt'
+AND instructions[0]:programId = 'GrcZwT9hSByY1QrUTaRPp6zs5KxAA5QYuqEhjT1wihbm'
+
+
+SELECT MAX(block_timestamp)
+FROM solana.fact_transactions 
+
+
+Zac: CeVXxgDm6MR5biBzRqLW7U9uv47nfrZMYJ5BtTbGLPY3
+
+
+thinking about the JJ idea a little more... what do you think about this... I have someone that I work closely with that is also deeply ingrained in the hip crypto news that fills this role with me. They are also data savvy but more importantly are very up to date with crypto.
+The person that comes most to mind is Nhat (not sure what his bandwidth looks like), but Jessica could also fit the bill.
+
+SELECT *
+FROM THORCHAIN.LIQUIDITY_ACTIONS
+LIMIT 100
+
+SELECT
+
+
+SELECT *
+FROM thorchain.prices
+WHERE 1=1
+AND block_timestamp >= '2021-11-18 18:00:00'
+AND block_timestamp <= '2021-11-18 20:00:00'
+GROUP BY 1
+
+
+WITH mints AS (
+  SELECT DISTINCT LOWER(project_name) AS collection
+  , address AS mint
+  FROM crosschain.address_labels
+  WHERE blockchain = 'solana'
+  AND label_subtype = 'nf_token_contract'
+  UNION 
+  SELECT DISTINCT LOWER(project_name) AS collection
+  , mint
+  FROM solana.dim_nft_metadata
+)
+SELECT collection
+, SUM(sales_amount) AS sales_amount
+, MIN(block_timestamp::date) AS start_date
+, MIN(CASE WHEN block_timestamp >= CURRENT_DATE - 3 THEN sales_amount ELSE NULL END) AS mm
+, MAX(CASE WHEN block_timestamp >= CURRENT_DATE - 3 THEN sales_amount ELSE NULL END) AS mx
+, COUNT(1) AS n_sales
+FROM solana.fact_nft_sales s
+JOIN mints m ON m.mint = s.mint
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 200
+
+
+SELECT instructions[0]:programId AS programId, LEFT(instructions[0]:data::string, 4) AS data, COUNT(1) AS n
+FROM solana.fact_transactions t
+WHERE t.block_timestamp >= '2022-01-01'
+AND t.block_timestamp <= '2022-01-02'
+-- AND LEFT(instructions[0]:data::string, 4) IN ('ENwH','3GyW')
+AND instructions[0]:programId like 'MEisE1HzehtrDpAAT8PnLHjpSSkRYakotTuJRPjTpo8'
+AND 
+GROUP BY 1, 2
+
+
+
+SELECT instructions[0]:programId AS programId, LEFT(instructions[0]:data::string, 4) AS data, *
+FROM solana.fact_transactions t
+WHERE t.block_timestamp >= '2022-01-01'
+AND t.block_timestamp <= '2022-01-02'
+-- AND LEFT(instructions[0]:data::string, 4) IN ('ENwH','3GyW')
+AND instructions[0]:programId like 'MEisE1HzehtrDpAAT8PnLHjpSSkRYakotTuJRPjTpo8'
+
+
+SELECT *
+FROM solana.fact_transactions t
+WHERE t.block_timestamp >= CURRENT_DATE - 2
+AND tx_id = '3xpAMpkcuhKb6grqfmFTcquAKBuFHnRAd2C3goSvVyabFX28GeoJyARXnMjPgYjPDMqf6HzYTH1etF4W9BsbsSSk'
+-- AND LEFT(instructions[0]:data::string, 4) IN ('ENwH','3GyW')
+AND instructions[0]:programId like 'SHARKobtfF1bHhxD2eqftjHBdVSCbKo9JtgK71FhELP'
+AND inner_instructions[0]:instructions[2]:parsed:info:destination::string = 'AoNVE2rKCE2YNA44V7NQt8N73JdPM7b6acZ2vzSpyPyi'
+
+
+
+SELECT SPLIT(pool_name, '-')[0]::string AS pool_name
+, COUNT(1) AS n_swaps
+, AVG(from_amount_usd) AS avg_size
+, SUM( CASE WHEN from_address = 'THOR.RUNE' THEN from_amount ELSE -to_amount END) AS net_rune
+, SUM( CASE WHEN from_address = 'THOR.RUNE' THEN from_amount_usd ELSE -from_amount_usd END) AS net_rune_usd
+FROM thorchain.swaps
+WHERE 1=1
+AND block_timestamp >= '2021-11-18 18:00:00'
+AND block_timestamp <= '2021-11-18 20:00:00'
+GROUP BY 1
+
+
+SELECT MIN(block_timestamp)
+FROM thorchain.swaps 
+WHERE pool_name like 'ETH.ETH%'
+AND block_timestamp: >= '2021-09-17'
+ORDER BY block_timestamp
+LIMIT 1000
+
+
+
+WITH base AS (
+  SELECT DISTINCT SPLIT(pool_name, '-')[0]::string AS pool_name
+  , block_timestamp::date AS date
+  , SUM(from_amount_usd) AS amt
+  FROM thorchain.swaps
+  GROUP BY 1, 2
+), b2 AS (
+  SELECT *
+  , ROW_NUMBER() OVER (PARTITION BY pool_name ORDER BY date) AS rn
+  FROM base
+)
+SELECT b.*, COALESCE(c.date, CURRENT_DATE) AS n_date, DATEDIFF('days', b.date, n_date) AS lag, c.amt AS n_amt
+FROM b2 b
+LEFT JOIN b2 c ON c.pool_name = b.pool_name AND c.rn = b.rn + 1
+
+
+
+SELECT *
+, ROW_NUMBER() OVER (PARTITION BY pool_name ORDER BY block_timestamp)
+FROM thorchain.swaps
+
+SELECT *
+FROM thorchain.prices
+WHERE pool_name like 'ETH.ETH%'
+AND block_timestamp >= '2021-10-21'
+//AND block_timestamp <= '2021-10-10'
+//AND ROUND(asset_usd) <> 8007
+ORDER BY block_timestamp
+LIMIT 1000
+
+
+
+WITH tc AS (
+  SELECT height AS tc_block_id
+  , TO_TIMESTAMP(CAST(timestamp * POWER(10, -9) AS INT)) AS tc_block_timestamp
+  FROM thorchain_midgard_public.block_log
+), base AS (
+  SELECT t.block_id AS terra_block_id
+  , t.block_timestamp AS terra_block_timestamp
+  , tc.*
+  , ROW_NUMBER() OVER (PARTITION BY t.block_id ORDER BY tc.tc_block_timestamp DESC) AS rn
+  FROM terra.blocks t
+  JOIN tc ON tc.tc_block_timestamp <= t.block_timestamp
+  AND tc.tc_block_timestamp >= DATEADD('hours', -1, t.block_timestamp)
+  WHERE t.block_id = 7544910
 )
 SELECT *
-FROM silver_crosschain.ntr n
-JOIN base b ON b.address = n.address AND b.symbol = n.symbol 
-JOIN h ON h.address = n.address AND h.symbol = n.symbol 
+FROM base
+
+
+WITH tc AS (
+  -- get each THORChain block
+  SELECT height AS tc_block_id
+  , TO_TIMESTAMP(CAST(timestamp * POWER(10, -9) AS INT)) AS tc_block_timestamp
+  FROM thorchain_midgard_public.block_log
+), base AS (
+  SELECT t.block_id AS terra_block_id
+  , t.block_timestamp AS terra_block_timestamp
+  , tc.*
+  -- get the earliest THORChain block in the "Post-attack" timeframe
+  , ROW_NUMBER() OVER (PARTITION BY t.block_id ORDER BY tc.tc_block_timestamp ASC) AS rn
+  FROM terra.blocks t
+  JOIN tc ON tc.tc_block_timestamp >= t.block_timestamp
+  AND tc.tc_block_timestamp <= DATEADD('hours', 1, t.block_timestamp)
+  WHERE t.block_id = 7790000
+)
+SELECT *
+FROM base
+WHERE rn = 1
+
+
+
+SELECT *
+FROM terra.blocks t
+WHERE t.block_id = 7790000
+-- WHERE t.block_id = 7544910
+
+SELECT rune_address
+, asset_address
+, rune_e8 * POWER(10, -8) AS rune_amt
+, asset_e8 * POWER(10, -8) AS asset_amt
+, stake_units
+FROM thorchain.stake_events
+WHERE block_id <= 5461281
+AND pool_name like 'TERRA%'
+UNION ALL
+SELECT rune_address
+, asset_address
+, -rune_e8 * POWER(10, -8) AS rune_amt
+, -asset_e8 * POWER(10, -8) AS asset_amt
+, -stake_units AS stake_units
+FROM thorchain.unstake_events
+WHERE block_id <= 5461281
+AND pool_name like 'TERRA%'
+
+
+
+SELECT *
+, height AS block_id
+, TO_TIMESTAMP(timestamp) AS block_timestamp
+FROM thorchain_midgard_public.block_log
+LIMIT 100
+
+WITH mints AS (
+    SELECT DISTINCT LOWER(project_name) AS collection
+    , mint
+    , token_id
+    FROM solana.dim_nft_metadata
+    WHERE token_id IS NOT NULL
+), base AS (
+  SELECT m.collection
+  , m.token_id
+  , s.tx_id
+  , s.block_timestamp
+  , s.mint
+  , s.sales_amount AS price
+  FROM solana.fact_nft_sales s
+  JOIN mints m ON LOWER(m.mint) = LOWER(s.mint)
+  WHERE succeeded = TRUE
+)
+SELECT *
+FROM base
+
+
+PATH=/Library/Frameworks/Python.framework/Versions/3.10/bin
+
+/Users/kellenblumberg/.nvm/versions/node/v16.10.0/bin
+/Users/kellenblumberg/.cargo/bin
+/Users/kellenblumberg/.local/share/solana/install/active_release/bin
+/Users/kellenblumberg/Documents/google-cloud-sdk/bin
+/Users/kellenblumberg/opt/anaconda3/bin
+/Users/kellenblumberg/opt/anaconda3/condabin
+/usr/local/bin
+/usr/bin
+/bin
+/usr/sbin
+/sbin
+/usr/local/share/dotnet
+~/.dotnet/tools
+/Library/Apple/usr/bin
+/Library/Frameworks/Mono.framework/Versions/Current/Commands
+
+
+
+SELECT DISTINCT inner_instructions[0]:instructions[0]:parsed:info:authority::string AS address
+FROM solana.fact_transactions 
+WHERE block_timestamp >= CURRENT_DATE - 7
+AND instructions[0]:programId = 'GrcZwT9hSByY1QrUTaRPp6zs5KxAA5QYuqEhjT1wihbm'
+AND ARRAY_SIZE(inner_instructions[0]:instructions) = 3
+
+https://discordapp.com/api/oauth2/authorize?scope=bot&client_id=
+
+PROPS_KEYPAIR=[79, 195, 45, 204, 181, 174, 129, 152, 73, 156, 16, 108, 98, 36, 250, 122, 218, 77, 24, 101, 32, 82, 39, 15, 58, 55, 163, 229, 102, 19, 190, 55 ]
+
+% own RUNE before first bounty
+% own RUNE currently
+
+
+
+WITH base AS (
+  SELECT from_address AS address
+  , SUM(-rune_amount) AS net_rune
+  FROM thorchain.transfers
+  GROUP BY 1
+  UNION ALL
+  SELECT to_address AS address
+  , SUM(rune_amount) AS net_rune
+  FROM thorchain.transfers
+  GROUP BY 1
+)
+SELECT address
+, SUM(net_rune) AS net_rune
+FROM base
+GROUP BY 1
+
+
+SELECT from_address AS address
+, SPLIT(pool_name, '-')[0]::string AS pool_name
+, SUM(CASE WHEN lp_action = 'add_liquidity' THEN stake_units ELSE -stake_units END) AS net_stake_units
+FROM thorchain.liquidity_actions
+GROUP BY 1, 2
+
+
+SELECT to_address
+, COUNT(1) AS n
+FROM thorchain.liquidity_actions
+WHERE lp_action = 'add_liquidity'
+AND to_address like 'thor%'
+GROUP BY 1
+
+
+
+ssh -i "~/git/props/aws/props-aws.pem" ubuntu@34.204.49.162
+
+with add as (
+  SELECT
+  from_address as address
+  , pool_name
+  , block_timestamp::date AS date
+  , sum(stake_units) as net_units
+  , sum(rune_amount) as net_rune_amount
+  , sum(asset_amount) as net_asset_amount
+  FROM thorchain.liquidity_actions
+  WHERE lp_action = 'add_liquidity'
+  AND pool_name like '%TERRA%'
+  AND address like 'thor%'
+  GROUP BY 1, 2, 3
+), remove AS (
+  SELECT
+  from_address as address
+  , pool_name
+  , block_timestamp::date AS date
+  , sum(-stake_units) as net_units
+  , sum(-rune_amount) as net_rune_amount
+  , sum(-asset_amount) as net_asset_amount
+  FROM thorchain.liquidity_actions
+  WHERE lp_action = 'remove_liquidity'
+  AND pool_name like '%TERRA%'
+  AND address like 'thor%'
+  GROUP BY 1, 2, 3
+), b1 AS (
+  SELECT *
+  FROM add
+  UNION ALL
+  SELECT *
+  FROM remove
+), b2 AS (
+  SELECT address
+  , pool_name
+  , date
+  , SUM(net_units) AS net_units
+  , SUM(net_rune_amount) AS net_rune_amount
+  , SUM(net_asset_amount) AS net_asset_amount
+  FROM b1
+  GROUP BY 1, 2, 3
+), b3 AS (
+  SELECT *
+  , SUM(net_units) OVER (PARTITION BY address, pool_name ORDER BY date) AS cumu_net_units
+  , SUM(net_rune_amount) OVER (PARTITION BY address, pool_name ORDER BY date) AS cumu_net_rune_amount
+  , SUM(net_asset_amount) OVER (PARTITION BY address, pool_name ORDER BY date) AS cumu_net_asset_amount
+  FROM b2
+), b4 AS (
+  SELECT *
+  , CASE WHEN cumu_net_units > 0 AND cumu_net_units = net_units THEN 1
+    WHEN cumu_net_units <= 0 AND net_units < 0 THEN -1
+    ELSE 0 END
+    AS chg_in_lpers
+  FROM b3
+), b5 AS (
+  SELECT pool_name
+  , date
+  , SUM(chg_in_lpers) AS net_lpers
+  FROM b4
+  GROUP BY 1, 2
+)
+SELECT *
+, SUM(net_lpers) OVER (PARTITION BY pool_name ORDER BY date) AS cumu_lpers
+FROM b5
+
+
+SELECT
+COALESCE(address, '') AS address
+, pool_name
+, sum(CASE WHEN lp_action = 'add_liquidity' THEN stake_units ELSE -stake_units END) as net_stake_units
+, sum(CASE WHEN lp_action = 'add_liquidity' THEN rune_amount ELSE -rune_amount END) as net_rune_amount
+, sum(CASE WHEN lp_action = 'add_liquidity' THEN asset_amount ELSE -asset_amount END) as net_asset_amount
+, sum(asset_amount) as net_asset_amount
+FROM thorchain.liquidity_actions
+WHERE lp_action IN ('add_liquidity','remove_liquidity')
+AND pool_name like '%TERRA%'
+GROUP BY 1, 2
+
+
+  GROUP BY 1, 2, 3
+), remove AS (
+  SELECT
+  from_address as address
+  , pool_name
+  , block_timestamp::date AS date
+  , sum(-stake_units) as net_units
+  , sum(-rune_amount) as net_rune_amount
+  , sum(-asset_amount) as net_asset_amount
+  FROM thorchain.liquidity_actions
+  WHERE lp_action = 'remove_liquidity'
+  AND pool_name like '%TERRA%'
+  AND address like 'thor%'
+  GROUP BY 1, 2, 3
+)
+
+
+
+SELECT MAX(block_timestamp)
+FROM thorchain.liquidity_actions
+WHERE lp_action = 'remove_liquidity'
+AND pool_name like '%TERRA%'
+AND address like 'thor%'
+
+
+  combo as (select
+  a.address as addresses,
+  a.poolname as pools,
+  a.units as add_units,
+  b.units as remove_units,
+  a.units - ifnull(b.units, 0) as net_add
+  from add a 
+  left join remove b
+  on (a.address = b.address and a.poolname = b.poolname)
+  where net_add > 0
+  group by 1,2,3,4),
+  
+earliest_still_add as (select from_address,
+min(date_trunc('month',block_timestamp)) as earliest_month
+from thorchain.liquidity_actions
+where from_address in (select addresses from combo)
+and lp_action = 'add_liquidity'
+group by 1),
+
+  -- total_added
+add_liq as (select
+  from_address as address,
+  tx_id,
+  block_timestamp,
+  pool_name as poolname,
+  sum(stake_units) as units
+from thorchain.liquidity_actions
+  where lp_action = 'add_liquidity'
+  and from_address like 'thor%'
+  group by 1,2,3,4),
+
+earliest_total_add as (select address,
+min(date_trunc('month', block_timestamp)) as earliest_month
+from add_liq
+group by address)
+
+select count(distinct(from_address)) as wallets_still_providing_liquidity, 'wallets_still_providing_liquidity'
+from earliest_still_add
+union 
+select count(distinct(address)) - count(distinct(from_address)) as total_wallets_removed_liquidity, 'total_wallets_removed_liquidity'
+from earliest_total_add, earliest_still_add
+
+
+WITH base AS (
+  SELECT * 
+  FROM flipside_prod_db.bronze.prod_data_science_uploads_1748940988
+  WHERE record_content[0]:collection IS NOT NULL
+  AND record_metadata:key like '%nft-deal-score-rankings-%'
+  AND record_content[0]:collection = 'Solana Monkey Business'
+), base2 AS (
+  SELECT t.value:collection::string AS collection
+  , t.value:cur_floor AS old_floor
+  , t.value:cur_sd AS old_sd
+  , t.value:deal_score_rank AS deal_score_rank
+  , t.value:fair_market_price AS old_fair_market_price
+  , t.value:lin_coef AS lin_coef
+  , t.value:log_coef AS log_coef
+  , t.value:rarity_rank AS rarity_rank
+  , t.value:token_id AS token_id
+  , ROW_NUMBER() OVER (PARTITION BY collection, token_id ORDER BY record_metadata:CreateTime DESC) AS rn
+  FROM base
+  , LATERAL FLATTEN(
+  input => record_content
+  ) t
+  JOIN solana.dim_nft_metadata m ON m.token_id = t.value:token_id AND m.project_name = t.value:collection
+  WHERE m.mint = '${mint}'
+), base3 AS (
+  SELECT *
+  FROM flipside_prod_db.bronze.prod_data_science_uploads_1748940988
+  WHERE record_content[0]:collection IS NOT NULL
+  AND record_metadata:key like '%nft-deal-score-floors-%'
+), base4 AS (
+  SELECT t.value:collection::string AS collection
+  , t.value:cur_floor AS new_floor
+  , b.*
+  , ROW_NUMBER() OVER (PARTITION BY collection ORDER BY record_metadata:CreateTime DESC) AS rn
+  FROM base3 b
+  , LATERAL FLATTEN(
+  input => record_content
+  ) t
+), base5 AS (
+  SELECT b2.*
+  , b4.new_floor
+  FROM base2 b2
+  JOIN base4 b4 ON b2.collection = b4.collection AND b4.rn = 1
+  WHERE b2.rn = 1
+), base6 AS (
+  SELECT *
+  , old_sd * new_floor / old_floor AS cur_sd
+  , old_fair_market_price + ((new_floor - old_floor) * lin_coef) + (( new_floor - old_floor) * log_coef * old_fair_market_price / old_floor) AS new_fair_market_price
+  FROM base5
+)
+SELECT collection
+, token_id
+, deal_score_rank
+, rarity_rank
+, new_floor AS floor_price
+, ROUND(CASE WHEN new_fair_market_price < floor_price THEN floor_price ELSE new_fair_market_price END, 2) AS fair_market_price
+, ROUND(CASE WHEN new_fair_market_price - cur_sd < floor_price * 0.975 THEN floor_price * 0.975 ELSE new_fair_market_price - cur_sd END, 2) AS price_low
+, ROUND(CASE WHEN new_fair_market_price + cur_sd < floor_price * 1.025 THEN floor_price * 1.025 ELSE new_fair_market_price + cur_sd END, 2) AS price_high
+FROM base6
 
 
 
@@ -425,7 +1145,7 @@ ORDER BY 2
 113254489
 
 
-SELECT *
+SELECT max(block_timestamp)
 FROM BRONZE_MIDGARD_2_6_9_20220405.MIDGARD_BLOCK_LOG
 WHERE height = 4786561
 
@@ -1231,8 +1951,77 @@ when total_rune_holdings >= 1000000 then '>1M rune'
 
 
 
+WITH a AS (
+  SELECT DISTINCT tx_id
+  FROM ethereum.events_emitted
+  WHERE block_timestamp >= CURRENT_DATE - 1
+  AND contract_address = LOWER('0xa5f2211B9b8170F694421f2046281775E8468044')
+), b AS (
+  SELECT DISTINCT e.tx_id
+  FROM ethereum.events_emitted e
+  JOIN a ON a.tx_id = e.tx_id
+  WHERE block_timestamp >= CURRENT_DATE - 1
+  AND tx_to_address = LOWER('0x815c23eca83261b6ec689b60cc4a58b54bc24d8d')
+  AND event_name = 'Withdraw'
+), c AS (
+  SELECT DISTINCT e.tx_id
+  FROM ethereum.events_emitted e
+  JOIN b ON b.tx_id = e.tx_id
+  WHERE block_timestamp >= CURRENT_DATE - 1
+  AND tx_to_address = LOWER('0x815c23eca83261b6ec689b60cc4a58b54bc24d8d')
+  AND event_name = 'DelegateVotesChanged'
+)
+SELECT block_timestamp::date AS date
+, SUM(CASE WHEN e.event_name = 'Transfer' 
+  AND contract_address = '0xa5f2211b9b8170f694421f2046281775e8468044' 
+  AND LENGTH(event_inputs:value::string) <= 25
+  THEN CAST(event_inputs:value::string AS INT) * POWER(10, -18)
+  ELSE 0 END) AS thor_amt
+FROM ETHEREUM.events_emitted e
+JOIN c ON c.tx_id = e.tx_id
+GROUP BY 1
 
 
+
+
+WITH a AS (
+  SELECT DISTINCT tx_id
+  FROM ethereum.events_emitted
+  WHERE block_timestamp >= CURRENT_DATE - 18
+  AND contract_address = LOWER('0xa5f2211B9b8170F694421f2046281775E8468044')
+  LIMIT 1000
+), b AS (
+  SELECT DISTINCT e.tx_id
+  FROM ethereum.events_emitted e
+  JOIN a ON a.tx_id = e.tx_id
+  WHERE block_timestamp >= CURRENT_DATE - 18
+  AND tx_to_address = LOWER('0x815c23eca83261b6ec689b60cc4a58b54bc24d8d')
+  AND event_name = 'Deposit'
+), c AS (
+  SELECT DISTINCT e.tx_id
+  FROM ethereum.events_emitted e
+  JOIN b ON b.tx_id = e.tx_id
+  WHERE block_timestamp >= CURRENT_DATE - 18
+  AND tx_to_address = LOWER('0x815c23eca83261b6ec689b60cc4a58b54bc24d8d')
+  AND event_name = 'DelegateVotesChanged'
+)
+SELECT block_timestamp::date AS date
+, event_inputs:value AS thor_amt
+FROM ETHEREUM.events_emitted e
+JOIN c ON c.tx_id = e.tx_id
+WHERE block_timestamp >= CURRENT_DATE - 18
+
+
+
+SELECT *
+FROM ETHEREUM_CORE.FACT_TOKEN_TRANSFERS
+WHERE contract_address = '0xa5f2211B9b8170F694421f2046281775E8468044'
+LIMIT 100
+
+SELECT *
+FROM ethereum.events_emitted
+WHERE contract_address = '0xa5f2211b9b8170f694421f2046281775e8468044'
+LIMIT 100
 
 
 conn = psycopg2.connect(
@@ -1241,7 +2030,94 @@ conn = psycopg2.connect(
     password="yP4wU5bL0tI0kP3k"
 )
 
-SHOW COLUMNS in table 
+-- onboarding new users
+-- we have run scavenger hunts specifically designed to onboard new users
+-- show weekly new users and color when they come from Flipside
+-- CAC vs block rewards
+
+-- what % were new to the ecosystem in the last 3 weeks
+
+  -- show new LPers and color when they come from flipside
+
+-- show twitter stats
+
+-- show Rune holder retention from Flipside
+-- show wallet and when they first get their rune and if they are still a participant in the ecosystem
+-- stay involved in the ecosystem
+
+ l AS (
+  SELECT
+  COALESCE(address, '') AS address
+  , pool_name
+  , sum(CASE WHEN lp_action = 'add_liquidity' THEN stake_units ELSE -stake_units END) as net_stake_units
+  FROM thorchain.liquidity_actions
+  WHERE lp_action IN ('add_liquidity','remove_liquidity')
+  GROUP BY 1, 2
+), l2 AS (
+  SELECT *
+  , SUM(net_stake_units) OVER (PARTITION BY address, pool_name ORDER BY month) AS cumu_stake_units
+  FROM l
+),
+
+
+WITH base AS (
+  SELECT from_address AS address
+  , date_trunc('month', block_timestamp) AS month
+  , SUM(-rune_amount) AS net_rune_amount
+  FROM thorchain.transfers
+  GROUP BY 1, 2
+  UNION
+  SELECT to_address AS address
+  , date_trunc('month', block_timestamp) AS month
+  , SUM(rune_amount) AS net_rune_amount
+  FROM thorchain.transfers
+  GROUP BY 1, 2
+), b2 AS (
+  SELECT address
+  , MIN(month) AS month
+  , SUM(net_rune_amount) AS net_rune_amount
+  FROM base
+  GROUP BY 1
+), l AS (
+  SELECT
+  from_address AS address
+  , pool_name
+  , sum(CASE WHEN lp_action = 'add_liquidity' THEN stake_units ELSE -stake_units END) as net_stake_units
+  FROM thorchain.liquidity_actions
+  WHERE lp_action IN ('add_liquidity','remove_liquidity')
+  AND address LIKE 'thor%'
+  GROUP BY 1, 2
+), l2 AS (
+  SELECT DISTINCT address
+  FROM l 
+  WHERE net_stake_units > 0
+), f AS (
+  SELECT DISTINCT address
+  FROM silver_crosschain.ntr
+  WHERE address LIKE 'thor%'
+)
+SELECT 
+-- date_trunc('year', month) AS month
+CASE WHEN f.address IS NULL THEN 0 ELSE 1 END AS is_flipside
+, COUNT(1) AS n
+, AVG(CASE WHEN net_rune_amount > 0 OR l2.address IS NOT NULL THEN 1 ELSE 0 END) AS pct_hold
+, AVG(CASE WHEN net_rune_amount > 0 AND l2.address IS NULL THEN 1 ELSE 0 END) AS pct_rune_only
+, AVG(CASE WHEN net_rune_amount <= 0 AND l2.address IS NOT NULL THEN 1 ELSE 0 END) AS pct_lp_only
+, AVG(CASE WHEN net_rune_amount > 0 AND l2.address IS NOT NULL THEN 1 ELSE 0 END) AS pct_lp_and_rune
+FROM b2
+LEFT JOIN l2 ON l2.address = b2.address
+LEFT JOIN f ON f.address = b2.address
+GROUP BY 1
+
+SELECT * 
+FROM silver_crosschain.ntr
+WHERE symbol = 'RUNE'
+LIMIT 10
+
+
+SELECT * FROM flipside_dev_db.silver_crosschain.nft_fair_market_value LIMIT 100
+
+SELECT * FROM flipside_prod_db.silver_crosschain.nft_fair_market_value LIMIT 100
 
 SELECT block_timestamp
 , block_id
@@ -1275,9 +2151,29 @@ timestamp = 1645094662447193601
 
 
 SELECT *
-FROM thorchain.transfers
-ORDER BY block_timestamp 
+FROM dex.trades
+WHERE (
+  token_a_address = '\x4200000000000000000000000000000000000042'
+  OR token_b_address = '\x4200000000000000000000000000000000000042'
+)
+AND usd_amount > 0 
+AND token_a_amount_raw>0
+AND token_b_amount_raw>0
 LIMIT 100
+
+
+SELECT payment_currency
+, SUM(payment_amount) AS payment_amount
+, COUNT(1) AS n
+FROM BI_ANALYTICS.BRONZE.HEVO_PAYMENTS
+GROUP BY 1
+
+SELECT block_timestamp::date AS date
+, COUNT(1) AS n
+, COUNT(1) AS n2
+FROM thorchain.transfers
+WHERE block_timestamp >= '2022-05-01'
+GROUP BY 1
 
 WITH mx AS (
 	SELECT pool_name, MAX(block_timestamp) AS mx
@@ -1300,11 +2196,10 @@ WHERE blockchain = 'solana'
 AND label_subtype = 'nf_token_contract'
 LIMIT 10
 
-SELECT COUNT(DISTINCT project_name)
+SELECT DISTINCT project_name
 FROM crosschain.address_labels
 WHERE blockchain = 'solana'
 AND label_subtype = 'nf_token_contract'
-LIMIT 10
 
 
 
@@ -1436,11 +2331,642 @@ SELECT *
 FROM solana.fact_nft_mints
 WHERE mint IN ('13VcCoRBqyXsWNBJZQituivTtWd8USbzfRsUBBkSbw6Y','2CMQnGJMq1U611Dbim5ALqPQCDQQ1jseYLQfAhkxZ9cY')
 
+SELECT DISTINCT project_name
+FROM solana.dim_nft_metadata
+
+
+
+
+SELECT COUNT(1)
+FROM thorchain.bond_events
+
+SELECT COUNT(1)
+FROM bronze_midgard_2_6_9_20220405.midgard_bond_events
+
+
+with aa as (
+  select from_address,
+  pool_name,
+  SUM(COALESCE(il_protection_usd, 0)) as il_protection,
+  MIN(block_timestamp) as min_date,
+  MAX(block_timestamp) as max_date
+  from thorchain.liquidity_actions 
+  group by 1, 2
+)
+select 
+CAST(DATEDIFF('days', min_date, max_date) AS INT) AS weeks_in_pool
+, SUM(il_protection) AS il_protection
+from aa 
+group by 1 
+
+
+SELECT *
+FROM thorchain.liquidity_actions
+WHERE from_address = 'thor1zfef8qe3xcxnwwn9ntd2thzyw6n7a4m9xuyr56'
+
+SELECT project_name AS collection
+, mint
+, token_id
+FROM solana.dim_nft_metadata
+LIMIT 10
+
+
+SELECT * 
+FROM solana.dim_nft_metadata m
+JOIN flipside_prod_db.bronze.prod_data_science_uploads_1748940988 u 
+  ON m.token_id = u.token_id
+  AND m.token_id = u.token_id
+WHERE record_content[0]:collection IS NOT NULL
+AND record_metadata:key like '%nft-deal-score-rankings-%'
+AND record_content[0]:collection = 'Solana Monkey Business'
+
+WITH base AS (
+  SELECT * 
+  FROM flipside_prod_db.bronze.prod_data_science_uploads_1748940988
+  WHERE record_content[0]:collection IS NOT NULL
+  AND record_metadata:key like '%nft-deal-score-rankings-%'
+  AND record_content[0]:collection = 'Solana Monkey Business'
+), base2 AS (
+  SELECT t.value:collection::string AS collection
+  , t.value:cur_floor AS old_floor
+  , t.value:cur_sd AS old_sd
+  , t.value:deal_score_rank AS deal_score_rank
+  , t.value:fair_market_price AS old_fair_market_price
+  , t.value:lin_coef AS lin_coef
+  , t.value:log_coef AS log_coef
+  , t.value:rarity_rank AS rarity_rank
+  , t.value:token_id AS token_id
+  , ROW_NUMBER() OVER (PARTITION BY collection, token_id ORDER BY record_metadata:CreateTime DESC) AS rn
+  FROM base
+  , LATERAL FLATTEN(
+  input => record_content
+  ) t
+  JOIN solana.dim_nft_metadata m ON m.token_id = t.value:token_id AND m.project_name = t.value:collection
+  WHERE m.mint = 'B4GxvM6EjBKUUvQ3bhrs1UK8qhbNXVm6Q2ewZNM7hcgB'
+), base3 AS (
+  SELECT *
+  FROM flipside_prod_db.bronze.prod_data_science_uploads_1748940988
+  WHERE record_content[0]:collection IS NOT NULL
+  AND record_metadata:key like '%nft-deal-score-floors-%'
+), base4 AS (
+  SELECT t.value:collection::string AS collection
+  , t.value:cur_floor AS new_floor
+  , b.*
+  , ROW_NUMBER() OVER (PARTITION BY collection ORDER BY record_metadata:CreateTime DESC) AS rn
+  FROM base3 b
+  , LATERAL FLATTEN(
+  input => record_content
+  ) t
+), base5 AS (
+  SELECT b2.*
+  , b4.new_floor
+  FROM base2 b2
+  JOIN base4 b4 ON b2.collection = b4.collection AND b4.rn = 1
+  WHERE b2.rn = 1
+), base6 AS (
+  SELECT *
+  , old_sd * new_floor / old_floor AS cur_sd
+  , old_fair_market_price + ((new_floor - old_floor) * lin_coef) + (( new_floor - old_floor) * log_coef * old_fair_market_price / old_floor) AS new_fair_market_price
+  FROM base5
+)
+SELECT collection
+, token_id
+, deal_score_rank
+, rarity_rank
+, new_floor AS floor_price
+, ROUND(CASE WHEN new_fair_market_price < floor_price THEN floor_price ELSE new_fair_market_price END, 2) AS fair_market_price
+, ROUND(CASE WHEN new_fair_market_price - cur_sd < floor_price * 0.975 THEN floor_price * 0.975 ELSE new_fair_market_price - cur_sd END, 2) AS price_low
+, ROUND(CASE WHEN new_fair_market_price + cur_sd < floor_price * 1.025 THEN floor_price * 1.025 ELSE new_fair_market_price + cur_sd END, 2) AS price_high
+FROM base6
+
+
+
+with add as (select
+  from_address as address,
+  pool_name as poolname,
+  sum(stake_units) as units
+from thorchain.liquidity_actions
+  where lp_action = 'add_liquidity'
+  group by 1,2),
+
+  remove as (select
+  from_address as address,
+  pool_name as poolname,
+  sum(stake_units) as units
+  from thorchain.liquidity_actions
+  where lp_action = 'remove_liquidity'
+  group by 1,2),
+
+  combo as (select
+  a.address as addresses,
+  a.poolname as pools,
+  a.units as add_units,
+  b.units as remove_units,
+  a.units - ifnull(b.units, 0) as net
+  from add a
+  left join remove b
+  on (a.address = b.address and a.poolname = b.poolname)
+  --where addresses = 'thor1tecpk5zmd225ec4ma56q20j0xejd7ay7xmtajl'
+  where net > 0
+  group by 1,2,3,4,5),
+  
+table1 as (select addresses,
+a.pools,
+date_trunc('day',block_timestamp) as day
+from combo a 
+join thorchain.liquidity_actions b
+on a.addresses = b.from_address and a.pools = b.pool_name
+where lp_action = 'add_liquidity'),
+
+table2 as (select addresses,
+pools,
+min(day) as earliest_add
+from table1
+group by 1,2),
+
+active AS (
+  SELECT DISTINCT split(pool_name, '-')[0]
+  FROM thorchain.swaps WHERE block_timestamp >= CURRENT_DATE - 3
+)
+
+base as (select addresses, --ifnull(count(addresses),0) as addresses,
+  pools,
+  split(pools, '-')[0] as pool_namez,
+  datediff(day, earliest_add, current_date) as lp_period
+from table2
+order by 3 asc)
+
+select pool_namez,
+avg(lp_period)
+from base b
+JOIN active a ON a.pool_name = b.pool_namez
+group by 1
+
+
+
+
+SELECT block_timestamp::date AS date
+, tx_id
+, ARRAY_SIZE(inner_instructions[0]:instructions) AS sz
+, inner_instructions[0]:instructions[0]:parsed:info:amount::int * POWER(10, -8) AS amt_pay
+, inner_instructions[0]:instructions[0]:parsed:info:authority::string AS address
+, inner_instructions[0]:instructions[1]:parsed:info:amount::int * POWER(10, -8) AS amt_fee
+, inner_instructions[0]:instructions[2]:parsed:info:amount::int * POWER(10, -8) AS amt_buy
+, inner_instructions[0]:instructions[2]:parsed:info:mint::string AS mint
+FROM solana.fact_transactions 
+WHERE block_timestamp >= CURRENT_DATE - 4
+AND instructions[0]:programId = 'GrcZwT9hSByY1QrUTaRPp6zs5KxAA5QYuqEhjT1wihbm'
+AND ARRAY_SIZE(inner_instructions[0]:instructions) = 3
+
+
+WITH mint AS (
+  SELECT block_timestamp::date AS date
+  , tx_id
+  , ARRAY_SIZE(inner_instructions[0]:instructions) AS sz
+  , inner_instructions[0]:instructions[0]:parsed:info:amount::int * POWER(10, -8) AS amt_pay
+  , inner_instructions[0]:instructions[0]:parsed:info:authority::string AS address
+  , inner_instructions[0]:instructions[1]:parsed:info:amount::int * POWER(10, -8) AS amt_fee
+  , inner_instructions[0]:instructions[2]:parsed:info:amount::int * POWER(10, -8) AS amt_buy
+  , inner_instructions[0]:instructions[2]:parsed:info:mint::string AS mint
+  FROM solana.fact_transactions 
+  WHERE block_timestamp >= CURRENT_DATE - 7
+  AND instructions[0]:programId = 'GrcZwT9hSByY1QrUTaRPp6zs5KxAA5QYuqEhjT1wihbm'
+  AND ARRAY_SIZE(inner_instructions[0]:instructions) = 3
+  AND mint IN ('Fgf39CUcAN5CLduHCswTzTj42TRTLV8511iCnSEnkdpJ','9e99vFWTaxDewCUv5RpMp45G5wjMpygtpAY3NXuWDk3A')
+), burn AS (
+  SELECT block_timestamp::date AS date
+  , tx_id
+  , ARRAY_SIZE(inner_instructions[0]:instructions) AS sz
+  , inner_instructions[0]:instructions[0]:parsed:info:amount::int * POWER(10, -8) AS amt_brn
+  , inner_instructions[0]:instructions[0]:parsed:info:authority::string AS address
+  , inner_instructions[0]:instructions[0]:parsed:info:mint::string AS mint
+  , inner_instructions[0]:instructions[1]:parsed:info:amount::int * POWER(10, -8) AS amt_pbt
+  , inner_instructions[0]:instructions[2]:parsed:info:amount::int * POWER(10, -8) AS amt_props
+  FROM solana.fact_transactions 
+  WHERE block_timestamp >= CURRENT_DATE - 7
+  AND instructions[0]:programId = 'GrcZwT9hSByY1QrUTaRPp6zs5KxAA5QYuqEhjT1wihbm'
+  AND ARRAY_SIZE(inner_instructions[0]:instructions) = 4
+  AND mint IN ('Fgf39CUcAN5CLduHCswTzTj42TRTLV8511iCnSEnkdpJ','9e99vFWTaxDewCUv5RpMp45G5wjMpygtpAY3NXuWDk3A')
+), m AS (
+  SELECT address
+  , mint
+  , SUM(amt_pay) AS amt_pay
+  , SUM(amt_fee) AS amt_fee
+  , SUM(amt_buy) AS amt_buy
+  FROM mint
+  GROUP BY 1, 2
+), b AS (
+  SELECT address
+  , mint
+  , SUM(amt_brn) AS amt_brn
+  , SUM(amt_pbt) AS amt_pbt
+  , SUM(amt_props) AS amt_props
+  FROM burn
+  GROUP BY 1, 2
+), reward AS (
+  SELECT m.mint
+  , SUM(amt_pbt) / SUM(amt_buy) AS pbt_per_token
+  , SUM(amt_props) / SUM(amt_buy) AS props_per_token
+  FROM m
+  JOIN b ON b.address = m.address AND b.mint = m.mint
+  WHERE amt_pbt > 0 AND amt_props > 0
+  GROUP BY 1
+)
+SELECT COALESCE(m.address, b.address) AS address
+, COALESCE(m.mint, b.mint) AS mint
+, ROUND(COALESCE(m.amt_pay, 0), 4) AS amt_pay
+, ROUND(COALESCE(m.amt_fee, 0), 4) AS amt_fee
+, ROUND(COALESCE(m.amt_buy, 0), 4) AS amt_buy
+, ROUND(amt_pay + amt_fee, 4) AS cost
+, ROUND(cost / amt_buy, 4) AS price
+, ROUND(COALESCE(b.amt_brn, 0), 4) AS amt_brn
+, ROUND(COALESCE(b.amt_pbt, 0), 4) AS amt_pbt_1
+, ROUND(COALESCE(b.amt_props, 0), 4) AS amt_props_1
+, ROUND(COALESCE(m.amt_buy * pbt_per_token, 0), 4) AS amt_pbt
+, ROUND(COALESCE(m.amt_buy * props_per_token, 0), 4) AS amt_props
+FROM m
+FULL OUTER JOIN b ON b.address = m.address AND b.mint = m.mint
+LEFT JOIN reward r ON r.mint = m.mint
+
+
+
+
+-- 8: initialize the pool
+-- 5: burn pool
+-- 4: sell team tokens
+-- 3: buy team token
+
+
+
+with aa as (
+  select from_address,
+  pool_name,
+  SUM(COALESCE(il_protection_usd, 0)) as il_protection,
+  MIN(CASE WHEN lp_action = 'add_liquidity' THEN block_timestamp ELSE NULL END) as min_date,
+  MIN(CASE WHEN lp_action = 'remove_liquidity' THEN block_timestamp ELSE NULL END) as max_date,
+  from thorchain.liquidity_actions 
+  group by 1, 2
+)
+select 
+CAST(DATEDIFF('days', min_date, max_date) AS INT) + 1 AS weeks_in_pool
+, SUM(il_protection) AS il_protection
+from aa 
+WHERE max_date IS NOT NULL AND min_date IS NOT NULL
+group by 1 
+
+
+
+SELECT COUNT(1)
+FROM thorchain.bond_actions
+
+
+
+
+WITH mints AS (
+  SELECT DISTINCT project_name
+  , mint
+  , token_id
+  FROM solana.dim_nft_metadata
+  WHERE project_name = 'Okay Bears'
+), rem AS (
+  SELECT pre_token_balances[0]:mint::string AS mint
+  , m.project_name
+  , m.token_id
+  , t.tx_id AS remove_tx
+  , t.block_timestamp AS remove_time
+  , LEFT(instructions[0]:data::string, 4) AS remove_data
+  , CASE WHEN s.tx_id IS NULL THEN 0 ELSE 1 END AS is_sale
+  , s.sales_amount
+  , ROW_NUMBER() OVER (PARTITION BY m.mint ORDER BY t.block_timestamp DESC) AS rn
+  FROM solana.fact_transactions t
+  JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+  LEFT JOIN solana.fact_nft_sales s ON s.tx_id = t.tx_id
+  WHERE t.block_timestamp >= CURRENT_DATE - 3
+  AND LEFT(instructions[0]:data::string, 4) IN ('ENwH','3GyW')
+  AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+), add AS (
+  SELECT pre_token_balances[0]:mint::string AS mint
+  , m.project_name
+  , m.token_id
+  , t.tx_id AS listing_tx
+  , block_timestamp AS listing_time
+  , ROW_NUMBER() OVER (PARTITION BY mint ORDER BY block_timestamp DESC) AS rn
+  FROM solana.fact_transactions t
+  JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+  WHERE block_timestamp >= CURRENT_DATE - 3
+  AND LEFT(instructions[0]:data::string, 4) IN ('2B3v')
+  AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+  AND succeeded = TRUE
+)
+SELECT a.*
+, r.remove_tx
+, r.remove_time
+, DATEDIFF('hours', a.listing_time, r.remove_time) AS time_to_sell
+, r.is_sale
+, r.sales_amount
+, CASE WHEN r.remove_time IS NULL OR a.listing_time > r.remove_time THEN 1 ELSE 0 END AS is_listed
+FROM add a
+LEFT JOIN rem r ON r.mint = a.mint AND r.rn = 1 AND a.listing_time <= r.remove_time
+WHERE a.rn = 1 AND is_sale = 1
+
+WITH mints AS (
+  SELECT DISTINCT LOWER(project_name) AS project_name
+  , address AS mint
+  FROM crosschain.address_labels
+  WHERE blockchain = 'solana'
+  AND label_subtype = 'nf_token_contract'
+  UNION 
+  SELECT DISTINCT LOWER(project_name) AS project_name
+  , mint
+  FROM solana.dim_nft_metadata
+)
+SELECT project_name, mint, COUNT(1) AS n
+FROM mints
+GROUP BY 1, 2
+ORDER BY 3 DESC
+
+
+
+
+
+
+
+WITH mints AS (
+  SELECT DISTINCT LOWER(project_name) AS project_name
+  , address AS mint
+  FROM crosschain.address_labels
+  WHERE blockchain = 'solana'
+  AND label_subtype = 'nf_token_contract'
+  UNION 
+  SELECT DISTINCT LOWER(project_name) AS project_name
+  , mint
+  FROM solana.dim_nft_metadata
+), rem AS (
+  SELECT pre_token_balances[0]:mint::string AS mint
+  , m.project_name
+  , t.tx_id AS remove_tx
+  , t.block_timestamp AS remove_time
+  , CASE WHEN s.tx_id IS NULL THEN 0 ELSE 1 END AS is_sale
+  , s.sales_amount
+  , ROW_NUMBER() OVER (PARTITION BY m.mint ORDER BY t.block_timestamp DESC) AS rn
+  FROM solana.fact_transactions t
+  JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+  LEFT JOIN solana.fact_nft_sales s ON s.tx_id = t.tx_id
+  WHERE t.block_timestamp >= CURRENT_DATE - 13
+  AND LEFT(instructions[0]:data::string, 4) IN ('ENwH','3GyW')
+  AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+), add AS (
+  SELECT pre_token_balances[0]:mint::string AS mint
+  , m.project_name
+  , t.tx_id AS listing_tx
+  , block_timestamp AS listing_time
+  , ROW_NUMBER() OVER (PARTITION BY mint ORDER BY block_timestamp DESC) AS rn
+  FROM solana.fact_transactions t
+  JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+  WHERE block_timestamp >= CURRENT_DATE - 13
+  AND LEFT(instructions[0]:data::string, 4) IN ('2B3v')
+  AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+  AND succeeded = TRUE
+), base AS (
+  SELECT a.*
+  , r.remove_tx
+  , r.remove_time
+  , date_trunc('day', a.listing_time) AS listing_day
+  , date_trunc('day', r.remove_time) AS remove_day
+  , r.is_sale
+  , r.sales_amount
+  , CASE WHEN r.remove_time IS NULL OR a.listing_time > r.remove_time THEN 1 ELSE 0 END AS is_listed
+  , ROW_NUMBER() OVER (PARTITION BY a.listing_tx ORDER BY r.remove_time ASC) AS rn2
+  FROM add a
+  LEFT JOIN rem r ON r.mint = a.mint AND a.listing_time <= r.remove_time
+), b2 AS (
+  SELECT *
+  , ROW_NUMBER() OVER (PARTITION BY remove_tx ORDER BY listing_time DESC) AS rn3
+  FROM base 
+  WHERE rn2 = 1
+), b3 AS (
+  SELECT *
+  FROM b2
+  WHERE rn3 = 1
+), days AS (
+  SELECT DISTINCT listing_day AS day
+  FROM b3
+  UNION
+  SELECT DISTINCT remove_day AS day
+  FROM b3
+), filter AS (
+  SELECT project_name
+  , SUM(sales_amount) AS amt
+  FROM base
+  WHERE remove_day >= CURRENT_DATE - 14
+  AND sales_amount > 0
+  GROUP BY 1
+  ORDER BY 2 DESC
+  LIMIT 100
+)
+SELECT h.day
+, b.project_name
+, MIN(sales_amount) AS floor
+FROM days h
+JOIN b3 b ON b.listing_day <= h.day AND COALESCE(b.remove_day, h.day) >= h.day
+JOIN filter f ON f.project_name = b.project_name
+WHERE COALESCE(b.sales_amount, 0) > 0
+GROUP BY 1, 2
+ORDER BY 1
+
+
+
+
+
+
+
+
+WITH mints AS (
+  SELECT DISTINCT project_name
+  , mint
+  , token_id
+  FROM solana.dim_nft_metadata
+  WHERE project_name IN ('Okay Bears','Catalina Whale Mixer')
+), rem AS (
+  SELECT pre_token_balances[0]:mint::string AS mint
+  , m.project_name
+  , m.token_id
+  , t.tx_id AS remove_tx
+  , t.block_timestamp AS remove_time
+  , CASE WHEN s.tx_id IS NULL THEN 0 ELSE 1 END AS is_sale
+  , s.sales_amount
+  , ROW_NUMBER() OVER (PARTITION BY m.mint ORDER BY t.block_timestamp DESC) AS rn
+  FROM solana.fact_transactions t
+  JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+  LEFT JOIN solana.fact_nft_sales s ON s.tx_id = t.tx_id
+  WHERE t.block_timestamp >= CURRENT_DATE - 3
+  AND LEFT(instructions[0]:data::string, 4) IN ('ENwH','3GyW')
+  AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+), add AS (
+  SELECT pre_token_balances[0]:mint::string AS mint
+  , m.project_name
+  , m.token_id
+  , t.tx_id AS listing_tx
+  , block_timestamp AS listing_time
+  , ROW_NUMBER() OVER (PARTITION BY mint ORDER BY block_timestamp DESC) AS rn
+  FROM solana.fact_transactions t
+  JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+  WHERE block_timestamp >= CURRENT_DATE - 3
+  AND LEFT(instructions[0]:data::string, 4) IN ('2B3v')
+  AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+  AND succeeded = TRUE
+), base AS (
+  SELECT a.*
+  , r.remove_tx
+  , r.remove_time
+  , date_trunc('hour', a.listing_time) AS listing_hour
+  , date_trunc('hour', r.remove_time) AS remove_hour
+  , r.is_sale
+  , r.sales_amount
+  , CASE WHEN r.remove_time IS NULL OR a.listing_time > r.remove_time THEN 1 ELSE 0 END AS is_listed
+  , ROW_NUMBER() OVER (PARTITION BY a.listing_tx ORDER BY r.remove_time ASC) AS rn2
+  FROM add a
+  LEFT JOIN rem r ON r.mint = a.mint AND a.listing_time <= r.remove_time
+), b2 AS (
+  SELECT *
+  , ROW_NUMBER() OVER (PARTITION BY remove_tx ORDER BY listing_time DESC) AS rn3
+  FROM base 
+  WHERE rn2 = 1
+), b3 AS (
+  SELECT *
+  FROM b2
+  WHERE rn3 = 1
+), hours AS (
+  SELECT DISTINCT listing_hour AS hour
+  FROM b3
+  UNION
+  SELECT DISTINCT remove_hour AS hour
+  FROM b3
+)
+SELECT h.hour
+, project_name
+, MIN(sales_amount) AS floor
+FROM hours h
+JOIN b3 b ON b.listing_hour <= h.hour AND COALESCE(b.remove_hour, h.hour) >= h.hour
+WHERE COALESCE(b.sales_amount, 0) > 0
+GROUP BY 1, 2
+ORDER BY 1
+
+
+
+
+WITH mints AS (
+  SELECT DISTINCT project_name
+  , mint
+  , token_id
+  FROM solana.dim_nft_metadata
+  WHERE project_name = 'Okay Bears'
+), rem AS (
+  SELECT pre_token_balances[0]:mint::string AS mint
+  , m.project_name
+  , m.token_id
+  , t.tx_id AS remove_tx
+  , t.block_timestamp AS remove_time
+  , CASE WHEN s.tx_id IS NULL THEN 0 ELSE 1 END AS is_sale
+  , s.sales_amount
+  , ROW_NUMBER() OVER (PARTITION BY m.mint ORDER BY t.block_timestamp DESC) AS rn
+  FROM solana.fact_transactions t
+  JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+  LEFT JOIN solana.fact_nft_sales s ON s.tx_id = t.tx_id
+  WHERE t.block_timestamp >= CURRENT_DATE - 3
+  AND LEFT(instructions[0]:data::string, 4) IN ('ENwH','3GyW')
+  AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+), add AS (
+  SELECT pre_token_balances[0]:mint::string AS mint
+  , m.project_name
+  , m.token_id
+  , t.tx_id AS listing_tx
+  , block_timestamp AS listing_time
+  , ROW_NUMBER() OVER (PARTITION BY mint ORDER BY block_timestamp DESC) AS rn
+  FROM solana.fact_transactions t
+  JOIN mints m ON m.mint = t.pre_token_balances[0]:mint::string
+  WHERE block_timestamp >= CURRENT_DATE - 3
+  AND LEFT(instructions[0]:data::string, 4) IN ('2B3v')
+  AND instructions[0]:programId = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K'
+  AND succeeded = TRUE
+), base AS (
+  SELECT a.*
+  , r.remove_tx
+  , r.remove_time
+  , date_trunc('hour', a.listing_time) AS listing_hour
+  , date_trunc('hour', r.remove_time) AS remove_hour
+  , r.is_sale
+  , r.sales_amount
+  , CASE WHEN r.remove_time IS NULL OR a.listing_time > r.remove_time THEN 1 ELSE 0 END AS is_listed
+  FROM add a
+  LEFT JOIN rem r ON r.mint = a.mint AND r.rn = 1
+  WHERE a.rn = 1
+), hours AS (
+  SELECT DISTINCT listing_hour AS hour
+  FROM base
+  UNION
+  SELECT DISTINCT remove_hour AS hour
+  FROM base
+)
+SELECT h.hour
+, MIN(sales_amount) AS floor
+FROM hours h
+JOIN base b ON b.listing_hour <= h.hour AND COALESCE(b.remove_hour, h.hour) >= h.hour
+WHERE COALESCE(b.sales_amount, 0) > 0
+GROUP BY 1
+ORDER BY 1
+
+
+SELECT *
+FROM thorchain.fee_events
+WHERE block_id = 5687427
+QUALIFY COUNT(tx_id) OVER(PARTITION BY tx_id) <> 3
+ORDER BY pool_deduct
+
+SELECT * FROM midgard.fee_events
+LIMIT 100
+
 
 
 data-science
 DKiZEzE-CZ+o59}L
 boatpartydotbiz
+
+sudo cp /rstudio-data/algorand_console_data.RData ~/
+sudo cp /rstudio-data/nft_deal_score_sales.csv ~/
+
+SELECT pool
+, asset
+, asset_e8
+, block_timestamp
+, COUNT(1) AS n
+, COUNT(1) AS n2
+FROM bronze_midgard_2_6_9_20220405.midgard_slash_amounts
+GROUP BY 1, 2, 3, 4
+
+SELECT pool
+, asset
+, asset_e8
+, block_timestamp
+, COUNT(1) AS n
+, COUNT(1) AS n2
+FROM midgard.slash_amounts
+GROUP BY 1, 2, 3, 4
+
+sudo chmod 774 nft_deal_score_data.RData
+ls -l
+
+SELECT *
+FROM thorchain.liquidity_actions
+WHERE pool_name ilike '%vthor%'
+LIMIT 100
+
+
+SELECT pool, COUNT(1) as n
+FROM bronze_midgard_2_6_9_20220405.midgard_stake_events
+WHERE pool ilike '%thor%'
+GROUP BY 1
+LIMIT 100
 
 [Python]
 Enabled = true
@@ -2570,6 +4096,20 @@ dbt deps to install dependencies
 dbt test 
 dbt run --full-refresh -s models/thorchain
 dbt test -s models/thorchain
+dbt run --full-refresh -s models/crosschain
+dbt test -s models/crosschain
+
+WITH base AS (
+  SELECT project_name AS collection
+  , token_id
+  , mint
+  , ROW_NUMBER() OVER (PARTITION BY collection, token_id ORDER BY created_at_timestamp DESC) AS rn
+  FROM solana.dim_nft_metadata
+)
+SELECT *
+FROM solana.dim_nft_metadata m
+JOIN base b ON b.project_name = m.project_name AND b.token_id = m.token_id
+ORDER BY m.project_name, m.token_id
 
 SELECT *
 SELECT MIN(block_timestamp) AS mn

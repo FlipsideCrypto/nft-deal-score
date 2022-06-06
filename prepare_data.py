@@ -164,11 +164,15 @@ def add_rarities():
 	# m_df[m_df.collection == 'BAYC'].feature_name.unique()
 
 	tokens = pd.read_csv('./data/tokens.csv')[['collection','token_id','nft_rank']]
+	tokens[((tokens.collection == 'Pesky Penguins')) & (tokens.token_id=='6437')]
+	tokens[((tokens.collection == 'Pesky Penguins')) & (tokens.token_id==6437)]
 	tokens[tokens.collection == 'SOLGods']
 	solana_rarities = pd.read_csv('./data/solana_rarities.csv')
 	sorted(solana_rarities.collection.unique())
 	solana_rarities[solana_rarities.collection == 'cets-on-creck']
 	solana_rarities = solana_rarities[solana_rarities.collection != 'cets-on-creck']
+	solana_rarities = solana_rarities[solana_rarities.collection != 'peskypenguinclub']
+	sorted(solana_rarities.collection.unique())
 	ga_ranks = pd.read_csv('./data/metadata/Galactic Angels.csv')[['nft_rank','token_id']]
 	ga_ranks['collection'] = 'Galactic Angels'
 	ga_ranks[ (ga_ranks.collection == 'Galactic Angels') & (ga_ranks.token_id == 1) ]
@@ -279,7 +283,7 @@ def add_rarities():
 	m_df[((m_df.collection == 'Cets on Creck') & (m_df.token_id == '1'))]
 	m_df[((m_df.collection == 'SOLGods') & (m_df.token_id == '1'))]
 	m_df[((m_df.collection == 'Meerkat Millionaires'))]
-	m_df[((m_df.collection == 'Meerkat Millionaires')) & (m_df.token_id=='1')]
+	m_df[((m_df.collection == 'Pesky Penguins')) & (m_df.token_id=='6437')]
 	sorted(m_df.collection.unique())
 
 	l1 = len(m_df)

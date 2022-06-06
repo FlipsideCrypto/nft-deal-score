@@ -1,11 +1,28 @@
 import os
 import json
-import psycopg2
+# import psycopg2
 import pandas as pd
+import requests
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
 COLLECTION = 'Stoned Ape Crew'
+
+def thorchain():
+	r = requests.get('https://thornode.ninerealms.com/thorchain/pool/TERRA.LUNA/liquidity_providers?height=5461281')
+	df_luna = pd.DataFrame(r.json())
+	df_luna['pre_attack_luna_value'] = df_luna.asset_deposit_value
+
+	r = requests.get('https://thornode.ninerealms.com/thorchain/pool/TERRA.UST/liquidity_providers?height=5461281')
+	df_ust = pd.DataFrame(r.json())
+	df_ust['pre_attack_ust_value'] = df_ust.asset_deposit_value
+
+	df = df_luna[['asset_address','pre_attack_luna_value']].dropna().merge(df_ust[['asset_address','pre_attack_ust_value']].dropna(), how='outer').fillna(0)
+	for c in [ 'pre_attack_luna_value','pre_attack_ust_value' ]:
+		df[c] = df[c].astype(int)
+	df = df[ (df.pre_attack_luna_value > 0) | (df.pre_attack_ust_value > 0) ]
+
+	df.to_csv('~/Downloads/pre_attack_terra.csv', index=False)
 
 def f():
 	conn = psycopg2.connect("dbname=suppliers user=postgres password=postgres")
