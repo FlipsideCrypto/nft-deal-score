@@ -1,11 +1,131 @@
 import re
 import os
+import json
 import pandas as pd
+import snowflake.connector
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
 from solana_model import get_sales
 from scrape_sol_nfts import clean_name
+
+def get_ctx():
+	usr = os.getenv('SNOWFLAKE_USR')
+	pwd = os.getenv('SNOWFLAKE_PWD')
+	# with open('snowflake.pwd', 'r') as f:
+	# 	pwd = f.readlines()[0].strip()
+	# with open('snowflake.usr', 'r') as f:
+	# 	usr = f.readlines()[0].strip()
+
+	ctx = snowflake.connector.connect(
+		user=usr,
+		password=pwd,
+		account='vna27887.us-east-1'
+	)
+	return(ctx)
+
+def clean_colnames(df):
+	names = [ x.lower() for x in df.columns ]
+	df.columns = names
+	return(df)
+
+def overlap():
+	query = '''
+		WITH sales AS (
+			SELECT l.label AS collection, SUM(sales_amount) AS volume, MIN(block_timestamp::date) AS first_sale_date
+			FROM solana.fact_nft_sales s
+			JOIN solana.dim_labels l ON LOWER(l.address) = LOWER(s.mint)
+			WHERE block_timestamp >= CURRENT_DATE - 30
+			GROUP BY 1
+		), base AS (
+			SELECT *
+			, ROW_NUMBER() OVER (ORDER BY volume DESC) AS volume_rank
+			FROM sales
+			ORDER BY volume DESC
+			LIMIT 50
+		), b2 AS (
+			SELECT DISTINCT collection, first_sale_date, volume_rank, purchaser, mint
+			FROM solana.fact_nft_sales s
+			JOIN solana.dim_labels l ON LOWER(l.address) = LOWER(s.mint)
+			JOIN base b ON b.collection = l.label
+			UNION 
+			SELECT DISTINCT collection, first_sale_date, volume_rank, purchaser, mint
+			FROM solana.fact_nft_mints m
+			JOIN solana.dim_labels l ON LOWER(l.address) = LOWER(m.mint)
+			JOIN base b ON b.collection = l.label
+		)
+		SELECT DISTINCT INITCAP(collection) AS collection, first_sale_date, date_trunc('month', first_sale_date) AS first_sale_month, volume_rank, purchaser, mint
+		FROM b2
+	'''
+	ctx = get_ctx()
+	df = ctx.cursor().execute(query)
+	df = pd.DataFrame.from_records(iter(df), columns=[x[0] for x in df.description])
+	df = clean_colnames(df)
+	df[df.collection == 'okay bears']
+	len(df[df.collection == 'okay bears'].mint.unique())
+	data = []
+	list(df.collection.unique()).index(a)
+	list(df.collection.unique()).index(b)
+	cur = df[df.volume_rank <= 50]
+	for a in cur.collection.unique():
+		print(a)
+		a1 = set(cur[cur.collection == a].purchaser.unique())
+		ar = cur[cur.collection == a].volume_rank.values[0]
+		am = cur[cur.collection == a].first_sale_month.values[0]
+		# for b in cur[cur.collection > a].collection.unique():
+		for b in cur.collection.unique():
+			b1 = set(cur[cur.collection == b].purchaser.unique())
+			br = cur[cur.collection == b].volume_rank.values[0]
+			bm = cur[cur.collection == b].first_sale_month.values[0]
+			data += [[ a, b, int(a < b), am, bm, ar, br, len(a1), len(b1), len(a1.intersection(b1)) ]]
+	cur = pd.DataFrame(data, columns=['col_1','col_2','include','am','bm','r_1','r_2','n_1','n_2','n_int'])
+	cur['pct'] = cur.apply(lambda x: x['n_int'] / min(x['n_1'], x['n_2']), 1 )
+	cur = cur[cur.n_int.notnull()]
+	cur.to_csv('~/Downloads/overlap.csv', index=False)
+	cur.include.unique()
+
+
+def add_back_metadata():
+	query = '''
+		SELECT *
+		FROM solana.dim_nft_metadata
+		WHERE LOWER(project_name) IN (
+		'degods'
+		, 'astrals'
+		, 'solstein'
+		, 'solgods'
+		, 'okay bears'
+		, 'meerkat millionaires'
+		, 'catalina whale mixer'
+		, 'citizens by solsteads'
+		, 'defi pirates'
+		)
+	'''
+	ctx = get_ctx()
+	mdf = ctx.cursor().execute(query)
+	mdf = pd.DataFrame.from_records(iter(mdf), columns=[x[0] for x in mdf.description])
+	print('Loaded {} metadata'.format(len(mdf)))
+	mdf = clean_colnames(mdf)
+	mdf = mdf[[ 'contract_name','token_id','token_metadata' ]]
+	m = json.loads(mdf.token_metadata.values)
+	m = [json.loads(x) for x in mdf.token_metadata.values]
+	data = []
+	collection = mdf.contract_name.values
+	token_id = mdf.token_id.values
+	for i in range(len(m)):
+		for k, v in m[i].items():
+			data += [[ collection[i], token_id[i], k, v ]]
+	old = pd.read_csv('./data/metadata.csv')
+	metadata = pd.DataFrame(data, columns=['collection','token_id','feature_name','feature_value'])
+	del old['chain']
+	old = old.append(metadata)
+	old['collection'] = old.collection.apply(lambda x: clean_name(x) )
+	old = old.drop_duplicates(subset=['collection','token_id','feature_name'], keep='last')
+	old[old.collection == 'Cets On Creck'].feature_name.unique()
+	old[old.collection == 'Cets on Creck'].feature_name.unique()
+	tmp = old[['collection','feature_name']].drop_duplicates().groupby('collection').feature_name.count().reset_index()
+	tmp.to_csv('~/Downloads/tmp-1.csv', index=False)
+	old.to_csv('./data/metadata.csv', index=False)
 
 def add_sf_metadata():
 	old = pd.read_csv('./data/metadata.csv')
@@ -141,8 +261,25 @@ def add_att_count():
 	print('Adding {} rows'.format(l1 - l0))
 	m_df.to_csv('./data/metadata.csv', index=False)
 
+
+def tmp():
+	m1 = pd.read_csv('./data/metadata.csv')
+	m2 = pd.read_csv('./data/metadata_2.csv')
+	t1 = pd.read_csv('./data/tokens.csv')
+	t2 = pd.read_csv('./data/tokens_2.csv')
+	m = m1.append(m2).drop_duplicates(keep='last')
+	t = t1.append(t2).drop_duplicates(keep='last')
+	t.to_csv('./data/tokens.csv', index=False)
+	m.to_csv('./data/metadata.csv', index=False)
+
 def add_rarities():
+	include = [ 'DeGods' ]
 	m_df = pd.read_csv('./data/metadata.csv')
+	# m_df = m_df[-m_df.collection.isin([''])]
+	g0 = m_df.groupby('collection').token_id.count().reset_index()
+
+	m_df['collection'] = m_df.collection.apply(lambda x: clean_name(x))
+	# m_df = m_df[m_df.collection.isin(include)]
 	# m_df['feature_name'] = m_df.feature_name.fillna(m_df.name)
 	# m_df['feature_value'] = m_df.feature_value.fillna(m_df.value)
 	for c in [ 'name','value','rarity' ]:
@@ -164,6 +301,8 @@ def add_rarities():
 	# m_df[m_df.collection == 'BAYC'].feature_name.unique()
 
 	tokens = pd.read_csv('./data/tokens.csv')[['collection','token_id','nft_rank']]
+	tokens['collection'] = tokens.collection.apply(lambda x: clean_name(x))
+	# tokens = tokens[tokens.collection.isin(include)]
 	tokens[((tokens.collection == 'Pesky Penguins')) & (tokens.token_id=='6437')]
 	tokens[((tokens.collection == 'Pesky Penguins')) & (tokens.token_id==6437)]
 	tokens[tokens.collection == 'SOLGods']
@@ -287,6 +426,10 @@ def add_rarities():
 	sorted(m_df.collection.unique())
 
 	l1 = len(m_df)
+	g1 = m_df.groupby('collection').token_id.count().reset_index()
+	g = g0.merge(g1, how='outer', on=['collection'])
+	g['dff'] = g.token_id_y - g.token_id_x
+	print(g[g.dff != 0].sort_values('dff', ascending=0))
 	print('Adding {} rows'.format(l1 - l0))
 	# m_df[m_df.collection == 'Galactic Angels']
 	# m_df[ (m_df.collection == 'Galactic Angels') & (m_df.token_id == '1') ]

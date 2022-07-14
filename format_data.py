@@ -4,6 +4,7 @@ import os
 import math
 import json
 from typing import Collection
+from nbformat import write
 import pandas as pd
 import snowflake.connector
 
@@ -364,15 +365,37 @@ def solana():
 
 
 
+	query = '''
+		SELECT DISTINCT project_name
+		FROM solana.dim_nft_metadata
+	'''
+	seen = ctx.cursor().execute(query)
+	seen = pd.DataFrame.from_records(iter(seen), columns=[x[0] for x in seen.description])
+	seen = clean_colnames(seen)
+	seen = list(seen.project_name.values)
+	seen = [ x.lower() for x in seen ]
+
 	metadata = pd.read_csv('./data/metadata.csv')
+	len(metadata)
 	# print(sorted(metadata.collection.unique()))
 	# metadata = metadata[metadata.collection == collection]
 	# print(sorted(metadata.collection.unique()))
 	metadata = metadata[-(metadata.feature_name.isin(['adj_nft_rank_0','adj_nft_rank_1','adj_nft_rank_2','nft_rank']))]
+	metadata[['collection']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
 	len(metadata.token_id.unique())
-	id_map = pd.read_csv('./data/mint_to_token_id_map.csv')
+	# id_map = pd.read_csv('./data/mint_to_token_id_map.csv')
 	id_map = pd.read_csv('./data/tokens.csv')
-	cs = ['Stoned Ape Crew']
+	tokens = pd.read_csv('./data/tokens.csv')
+	tokens.collection.unique()
+	len(tokens.collection.unique())
+	cs = [ x for x in id_map.collection.unique() if not x.lower() in seen ]
+	len(id_map.collection.unique())
+	len(cs)
+	id_map = id_map[id_map.collection.isin(cs)]
+	metadata = metadata[metadata.collection.isin(cs)]
+
+	# cs = metadata[metadata.chain.fillna('Solana') == 'Solana'].collection.unique()
+	cs = metadata.collection.unique()
 	id_map = id_map[id_map.collection.isin(cs)]
 	metadata = metadata[metadata.collection.isin(cs)]
 	sorted(id_map.collection.unique())
@@ -399,51 +422,180 @@ def solana():
 	# sorted(metadata.feature_name.unique())
 
 	# metadata[['collection']].drop_duplicates().to_csv('~/Downloads/tmp.csv', index=False)
+	# Python code to convert into dictionary
+	def Convert(tup, di):
+		di = dict(tup)
+		return di
 
+	metadata = metadata[-metadata.collection.isin(['LunaBulls', 'Levana Dragon Eggs'])]
+	metadata['token_id'] = metadata.token_id.astype(float)
 	metadata['token_id'] = metadata.token_id.astype(int)
 	metadata.groupby(['collection','feature_name']).token_id.count()
 	metadata.head()
+	metadata[metadata.mint_address.isnull()].collection.unique()
 	assert(len(metadata[metadata.mint_address.isnull()]) == 0)
-	for collection in metadata.collection.unique():
-		print(collection)
+	dirs = sorted(list(set(os.listdir('./data/metadata/')).intersection(set(metadata.collection.unique()))))
+	sorted(list(metadata.collection.unique()))
+	# collection = 'Bubblegoose Ballers'
+	it = 0
+	tot = len(metadata.collection.unique())
+	data = []
+	for collection in metadata.collection.unique()[:1]:
+		print('#{} / {}: {}'.format(it, tot, collection))
 		mdf = metadata[metadata.collection == collection]
-		results = []
-		for token_id in sorted(mdf.token_id.unique()):
-			if token_id % 1000 == 1:
-				print(token_id, len(results))
-			cur = mdf[mdf.token_id == token_id]
-			token_metadata = {}
-			# m = mints[(mints.collection == collection) & (mints.token_id == token_id) ]
-			m = metadata[(metadata.collection == collection) & (metadata.token_id == token_id) ]
-			m = m.fillna('None')
-			if not len(m):
-				print(token_id)
-				continue
-			# mint_address = m.mint_address.values[0] if 'mint_address' in m.columns else ''
-			mint_address = m.mint_address.values[0]
-			for row in cur.iterrows():
-				row = row[1]
-				token_metadata[row['feature_name']] = row['feature_value']
+		df.groupby('Column1')[['Column2', 'Column3']].apply(lambda g: g.values.tolist()).to_dict()
+		mdf.head(20).groupby(['collection','image_url','token_id'])[[ 'feature_name','feature_value' ]].apply(lambda g: g.values.tolist()).to_dict()
 
-			d = {
-				'commission_rate': None
-				, 'mint_address': mint_address
-				, 'token_id': token_id
-				, 'contract_address': mint_address
-				, 'contract_name': row['collection']
-				, 'created_at_block_id': 0
-				, 'created_at_timestamp': str('2021-01-01')
-				, 'created_at_tx_id': ''
-				, 'creator_address': mint_address
-				, 'creator_name': row['collection']
-				, 'image_url': 'None'
-				, 'project_name': row['collection']
-				, 'token_id': int(token_id)
-				, 'token_metadata': token_metadata
-				, 'token_metadata_uri': row['image_url']
-				, 'token_name': row['collection']
+		mdf.head(20).groupby(['collection','image_url','token_id'])[[ 'feature_name','feature_value' ]].apply(lambda g: list(map(tuple, g.values.tolist())) ).to_dict()
+
+		mdf.head(20).groupby(['collection','image_url','token_id'])[[ 'feature_name','feature_value' ]].apply(lambda g: Convert(list(map(tuple, g.values.tolist())), {}) ).to_dict()
+		a = mdf.head(20).groupby(['collection','mint_address','token_id','image_url'])[[ 'feature_name','feature_value' ]].apply(lambda g: Convert(list(map(tuple, g.values.tolist())), {}) ).reset_index()
+
+
+		a = metadata.groupby(['collection','mint_address','token_id','image_url'])[[ 'feature_name','feature_value' ]].apply(lambda g: Convert(list(map(tuple, g.values.tolist())), {}) ).reset_index()
+		a.columns = ['collection','mint_address','token_id','image_url', 'token_metadata']
+		a['commission_rate'] = None
+		a['contract_address'] = a.mint_address
+		a['contract_name'] = a.collection
+		a['created_at_block_id'] = 0
+		a['created_at_timestamp'] = '2021-01-01'
+		a['created_at_tx_id'] = ''
+		a['creator_address'] = a.mint_address
+		a['creator_name'] = a.collection
+		a['project_name'] = a.collection
+		a['token_metadata_uri'] = a.image_url
+		a['token_name'] = a.collection
+		a.to_csv('./data/metadata/results.csv', index=False)
+		a['n'] = range(len(a))
+		a['n'] = a.n.apply(lambda x: int(x/50) )
+		a['token_id'] = a.token_id.astype(int)
+		cols = ['collection', 'mint_address', 'token_id', 'image_url', 'token_metadata',
+       'commission_rate', 'contract_address', 'contract_name',
+       'created_at_block_id', 'created_at_timestamp', 'created_at_tx_id',
+       'creator_address', 'creator_name', 'project_name', 'token_metadata_uri',
+       'token_name']
+
+		n = 100000
+		tot = int(len(a) / n) + 1
+		for i in range(0, len(a), n):
+			ind = int(i/n)
+			print('#{} / {}'.format(ind, tot))
+			g = a.head(i+n).tail(n).to_dict('records')
+			txt  = [
+				{
+					"model": {
+						"blockchain": "solana",
+						"sinks": [
+							{
+								"destination": "{database_name}.silver.nft_metadata",
+								"type": "snowflake",
+								"unique_key": "blockchain || contract_address || token_id"
+							}
+						],
+					},
+					"results": g[x:x+50]
+				}
+				for x in range(0, len(g), 50)
+			]
+			w = pd.DataFrame({'ind': range(len(txt)), 'results':[json.dumps(x) for x in txt] })
+			# w['results'] = w.results.apply(lambda x: x[1:-1] )
+			w.to_csv('./data/metadata/results/{}.csv'.format(ind), index=False)
+			# with open('./data/metadata/results/{}.json'.format(i), 'w') as outfile:
+			# 	json.dump(results[i:i+100000], outfile)
+
+		g = a.head(200).groupby('n')[cols].apply(lambda g: Convert(list(map(tuple, g.values.tolist())), {}) ).to_dict()
+		g = a.head(200).groupby('n')[cols].apply(lambda g: (list(map(tuple, g.values.tolist())), {}) )
+		g = a.head(200).groupby('n')[cols].apply(lambda g: g.values.tolist()).reset_index()
+		g = a.head(200).to_dict('records')
+		sorted(a.collection.unique())
+		g = a[a.collection == 'Jungle Cats'].head(20000).to_dict('records')
+		txt  = [
+			{
+				"model": {
+					"blockchain": "solana",
+					"sinks": [
+						{
+							"destination": "{database_name}.silver.nft_metadata",
+							"type": "snowflake",
+							"unique_key": "blockchain || contract_address || token_id"
+						}
+					],
+				},
+				"results": g[i:i+50]
 			}
-			results.append(d)
+			for i in range(0, len(g), 50)
+		]
+		w = pd.DataFrame({'ind': range(len(txt)), 'results':[json.dumps(x) for x in txt] })
+		# w['results'] = w.results.apply(lambda x: x[1:-1] )
+		w.to_csv('./data/metadata/results.csv', index=False)
+		with open('./data/metadata/results.txt', 'w') as outfile:
+			outfile.write(json.dumps(txt))
+		g = list(a.head(200).values)
+		results = a.to_dict('records')
+		for i in range(0, len(results), 100000):
+			print(i)
+			with open('./data/metadata/results/{}.json'.format(i), 'w') as outfile:
+				json.dump(results[i:i+100000], outfile)
+
+		n = 50
+		r = math.ceil(len(results) / n)
+		for i in range(r):
+			print('#{} / {}'.format(i, r))
+			newd = {
+				"model": {
+					"blockchain": "solana",
+					"sinks": [
+						{
+							"destination": "{database_name}.silver.nft_metadata",
+							"type": "snowflake",
+							"unique_key": "blockchain || contract_address || token_id"
+						}
+					],
+				},
+				"results": results[(i * n):((i * n)+r)]
+			}
+			data += [ json.dumps(newd) ]
+			with open('./data/metadata/results/{}.txt'.format(collection, i), 'w') as outfile:
+				outfile.write(json.dumps(newd))
+
+
+		# results = []
+		# for token_id in sorted(mdf.token_id.unique()):
+		# 	if token_id % 1000 == 1:
+		# 		print(token_id, len(results))
+		# 	cur = mdf[mdf.token_id == token_id]
+		# 	token_metadata = {}
+		# 	# m = mints[(mints.collection == collection) & (mints.token_id == token_id) ]
+		# 	m = metadata[(metadata.collection == collection) & (metadata.token_id == token_id) ]
+		# 	m = m.fillna('None')
+		# 	if not len(m):
+		# 		print(token_id)
+		# 		continue
+		# 	# mint_address = m.mint_address.values[0] if 'mint_address' in m.columns else ''
+		# 	mint_address = m.mint_address.values[0]
+		# 	for row in cur.iterrows():
+		# 		row = row[1]
+		# 		token_metadata[row['feature_name']] = row['feature_value']
+
+		# 	d = {
+		# 		'commission_rate': None
+		# 		, 'mint_address': mint_address
+		# 		, 'token_id': token_id
+		# 		, 'contract_address': mint_address
+		# 		, 'contract_name': row['collection']
+		# 		, 'created_at_block_id': 0
+		# 		, 'created_at_timestamp': str('2021-01-01')
+		# 		, 'created_at_tx_id': ''
+		# 		, 'creator_address': mint_address
+		# 		, 'creator_name': row['collection']
+		# 		, 'image_url': row['image_url']
+		# 		, 'project_name': row['collection']
+		# 		, 'token_id': int(token_id)
+		# 		, 'token_metadata': token_metadata
+		# 		, 'token_metadata_uri': row['image_url']
+		# 		, 'token_name': row['collection']
+		# 	}
+		# 	results.append(d)
 		print('Uploading {} results'.format(len(results)))
 
 		dir = './data/metadata/{}/'.format(collection)
@@ -466,6 +618,7 @@ def solana():
 				},
 				"results": results[(i * n):((i * n)+r)]
 			}
+			data += [ json.dumps(newd) ]
 			with open('./data/metadata/{}/{}.txt'.format(collection, i), 'w') as outfile:
 				outfile.write(json.dumps(newd))
 

@@ -75,13 +75,10 @@ base_dir <- ifelse(
 )
 
 if(isRstudio) {
-	print('74')
 	source('/home/data-science/data_science/util/util_functions.R')
 	source('/home/data-science/data_science/util/kafka_utils.R')
-	# source_python('/home/data-science/data_science/viz/nft-deal-score/scrape_terra_nfts.py')
 	source_python('/home/data-science/data_science/viz/nft-deal-score/add_sales.py')
-	# source_python('~/data_science/viz/nft-deal-score/scrape_terra_nfts.py')
-	# source_python('~/data_science/viz/nft-deal-score/add_sales.py')
+	source_python('~/upload_solana_nft_labels.py')
 } else {
 	source('~/data_science/util/util_functions.R')
 	source('~/data_science/util/kafka_utils.R')

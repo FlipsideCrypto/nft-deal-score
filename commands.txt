@@ -9,6 +9,7 @@ sudo cp ~/nft-deal-score/viz/nft_deal_score_data.RData /srv/shiny-server/nft-dea
 
 sudo cp ~/nft_deal_score_listings_data.RData /rstudio-data
 sudo cp ~/nft_deal_score_sales_data.RData /rstudio-data
+sudo cp ~/nft_deal_score_sales.csv /rstudio-data
 sudo cp ~/nft_deal_score_data.RData /rstudio-data
 sudo cp ~/nft_deal_score_listings.csv /rstudio-data
 sudo cp ~/nft_deal_score_sales.csv /rstudio-data

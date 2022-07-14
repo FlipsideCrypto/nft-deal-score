@@ -23,7 +23,7 @@ import cloudscraper
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 os.environ['PATH'] += os.pathsep + '/Users/kellenblumberg/shared/'
 
-from utils import clean_token_id, merge, clean_name
+from utils import clean_token_id, get_ctx, merge, clean_name
 
 # howrare.is api
 # https://api.howrare.is/v0.1/collections/smb/only_rarity
@@ -34,66 +34,28 @@ from utils import clean_token_id, merge, clean_name
 # old = pd.read_csv('./data/tokens.csv')
 # metadata[(metadata.collection == 'Galactic Punks') & (metadata.feature_name=='attribute_count')].drop_duplicates(subset=['feature_value']).merge(old)
 
+# url = 'https://api.solscan.io/collection/nft?sortBy=nameDec&collectionId=f046bec0889c9d431ce124a626237e2236bc2527051d32ed31f6b5e6dc230669&offset=0&limit=500'
+# r = requests.get(url)
+# j = r.json()
+# j.keys()
+# len(j['data'])
+# j['data'][0]
 
-def how_rare_is_api():
-	url = 'https://api.howrare.is/v0.1/collections'
-	r = requests.get(url)
-	j = r.json()
-	j['result'].keys()
-	j['result']['data'][:10]
-	c_df = pd.DataFrame(j['result']['data']).sort_values('floor_marketcap', ascending=0)
-	c_df.head(16)
-	seen = [ 'smb','aurory','degenapes','thugbirdz','degods','okay_bears','catalinawhalemixer','cetsoncreck','stonedapecrew','solgods' ]
-	len(j['result']['data'])
-	t_data = []
-	metadata = pd.DataFrame()
-	d = {
-		'Degen Apes': 'degenapes'
-		, 'Pesky Penguins': 'peskypenguinclub'
-		, 'Aurory': 'aurory'
-		, 'Solana Monkey Business': 'smb'
-		, 'Thugbirdz': 'thugbirdz'
-	}
-	# for collection, url in d.items():
-	# redo trippin ape tribe
-	for row in c_df.iterrows():
-		row = row[1]
-		collection = row['name']
-		url = row['url'][1:]
-		print('Working on collection {}, {}, {}'.format(collection, len(t_data), len(metadata)))
-		if url in seen or (len(metadata) and collection in metadata.collection.unique()):
-			print('Seen!')
-			continue
-		# collection = 'Cets on Creck'
-		# collection = 'SOLGods'
-		# collection = 'Meerkat Millionaires'
-		# collection = d['url'][1:]
-		# url = 'https://api.howrare.is/v0.1/collections'+d['url']
-		# url = 'https://api.howrare.is/v0.1/collections/meerkatmillionaires'
-		url = 'https://api.howrare.is/v0.1/collections/'+url
-		r = requests.get(url)
-		j = r.json()
-		for i in j['result']['data']['items']:
-			token_id = int(i['id'])
-			nft_rank = int(i['rank'])
-			mint = i['mint']
-			image = i['image']
-			t_data += [[ collection, token_id, nft_rank, mint, image ]]
-			# m_data += [[ collection, token_id, nft_rank ]]
-			m = pd.DataFrame(i['attributes'])
-			m['token_id'] = token_id
-			m['collection'] = collection
-			# metadata = metadata.append(m)
-			metadata = pd.concat([metadata, m])
-	old = pd.read_csv('./data/tokens.csv')
+
+def add_to_df(t_data):
+	old = pd.read_csv('./data/tokens_2.csv')
 	sorted(old.collection.unique())
 	l0 = len(old)
 	do_merge = False
 	tokens = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
+	len(tokens)
+	tokens[tokens.nft_rank.isnull()]
 	tokens['collection'] = tokens.collection.apply(lambda x: 'Catalina Whale Mixer' if x == 'Catalina Whales' else x )
-	metadata['collection'] = metadata.collection.apply(lambda x: 'Catalina Whale Mixer' if x == 'Catalina Whales' else x )
+	rem = [ 'Jikan Studios','Fine Fillies' ]
+	print(tokens.groupby('collection').token_id.count())
 	tokens['clean_token_id'] = tokens.token_id
 	tokens['chain'] = 'Solana'
+	tokens = tokens[-tokens.collection.isin(rem)]
 	if do_merge:
 		old['token_id'] = old.token_id.astype(str)
 		tokens['token_id'] = tokens.token_id.astype(str)
@@ -106,42 +68,230 @@ def how_rare_is_api():
 		old['clean_token_id'] = old.clean_token_id.fillna(old.token_id)
 		old['chain'] = old.chain.fillna('Solana')
 	else:
-		old = old.append(tokens)
+		# old = old.append(tokens)
+		old = pd.concat( [old, tokens] )
 		old['token_id'] = old.token_id.astype(str)
 		old = old.drop_duplicates(subset=['collection','token_id'], keep='last')
 	print('Adding {} rows'.format(len(old) - l0))
 	old[old.collection.isin(tokens.collection.unique())]
 	old[(old.collection.isin(tokens.collection.unique())) & (old.token_id == '6437')]
 	old[old.nft_rank.isnull()].groupby('collection').token_id.count()
+	old = old[-old.collection.isin(['Astrals','Dazedducks','Nyanheroes','Shadowysupercoder','Taiyorobotics'])]
+	old.to_csv('./data/tokens_2.csv', index=False)
+	# tokens.to_csv('./data/tokens_2.csv', index=False)
+
+def compile():
+	ctx = get_ctx()
+	query = 'SELECT DISTINCT address FROM silver_CROSSCHAIN.ADDRESS_LABELS'
+	seen = ctx.cursor().execute(query)
+	seen = pd.DataFrame.from_records(iter(seen), columns=[x[0] for x in seen.description])
+	seen = sorted(list(seen.ADDRESS.unique()))
+
+	tokens = pd.read_csv('./data/tokens.csv')
+	tokens = tokens[tokens.chain == 'Solana']
+	single_update_auth_labels = pd.read_csv('./data/single_update_auth_labels.csv')
+	mult_update_auth_labels = pd.read_csv('./data/mult_update_auth_labels.csv')
+	df = tokens.append(single_update_auth_labels).append(mult_update_auth_labels)
+	df = df[ (df.collection != 'Nan') & (df.collection != 'nan') & (df.collection.notnull()) ]
+	df = df[-(df.mint_address.isin(seen))]
+	df = df.drop_duplicates(subset=['mint_address'], keep='first')
+	# len(df)
+	# len(df.collection.unique())
+	# df.head()
+	# df.mint_address.tail(11000).head(5)
+	# df[df.mint_address == '2GgPNKGyzAQL4mriuH4kBpntYCNVSM2pQfzdsu3p8du5']
+	# df['seen'] = df.mint_address.isin(seen).astype(int)
+	# tmp = df[df.seen == 0].groupby('collection').mint_address.count().reset_index().sort_values('mint_address', ascending=0)
+	# tmp.head(40)
+	# tmp.mint_address.sum()
+	df[df.mint_address.isnull()]
+	df[['mint_address','collection']].to_csv('~/Downloads/solana-nft-labels-06-29.csv', index=False)
+
+
+def add_to_df(t_data, metadata, exclude_new = False):
+	old = pd.read_csv('./data/tokens.csv')
+	g0 = old.groupby('collection').token_id.count().reset_index()
+	sorted(old.collection.unique())
+	l0 = len(old)
+	do_merge = False
+	tokens = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
+	len(tokens)
+	tokens[tokens.nft_rank.isnull()]
+	tokens['collection'] = tokens.collection.apply(lambda x: 'Catalina Whale Mixer' if x == 'Catalina Whales' else x )
+	# rem = [ 'Jikan Studios','Fine Fillies' ]
+	# print(tokens.groupby('collection').token_id.count())
+	metadata['collection'] = metadata.collection.apply(lambda x: 'Catalina Whale Mixer' if x == 'Catalina Whales' else x )
+	tokens['clean_token_id'] = tokens.token_id
+	tokens['chain'] = 'Solana'
+	# tokens = tokens[-tokens.collection.isin(rem)]
+	# metadata = metadata[-metadata.collection.isin(rem)]
+	if do_merge:
+		old['token_id'] = old.token_id.astype(str)
+		tokens['token_id'] = tokens.token_id.astype(str)
+		old = old.merge(tokens, how='left', on=['collection','token_id'])
+		old[old.collection == 'Solana Monkey Business']
+		for c in [ 'nft_rank','mint_address','image_url' ]:
+			old[c] = old[c+'_x'].fillna(old[c+'_y'])
+			del old[c+'_x']
+			del old[c+'_y']
+		old['clean_token_id'] = old.clean_token_id.fillna(old.token_id)
+		old['chain'] = old.chain.fillna('Solana')
+	else:
+		# old = old.append(tokens)
+		old['collection'] = old.collection.apply(lambda x: clean_name(x))
+		tokens['collection'] = tokens.collection.apply(lambda x: clean_name(x))
+		if exclude_new:
+			rem = tokens.collection.unique()
+			old = old[-(old.collection.isin(rem))]
+		old = pd.concat( [old, tokens] )
+		old['token_id'] = old.token_id.astype(str)
+		old = old.drop_duplicates(subset=['collection','token_id'], keep='last')
+	g1 = old.groupby('collection').token_id.count().reset_index()
+	g = g0.merge(g1, how='outer', on=['collection']).fillna(0)
+	g['dff'] = g.token_id_y - g.token_id_x
+	print(g[g.dff != 0].sort_values('dff', ascending=0))
+	g[g.dff != 0].sort_values('dff', ascending=0).to_csv('~/Downloads/tmp.csv', index=False)
+	print('Adding {} rows'.format(len(old) - l0))
+	old = old[old.collection != 'Solanamonkeybusiness (Smb)']
+	# old[old.collection.isin(tokens.collection.unique())]
+	# old[(old.collection.isin(tokens.collection.unique())) & (old.token_id == '6437')]
+	old[old.nft_rank.isnull()].groupby('collection').token_id.count()
+	# old = old[-old.collection.isin(['Astrals','Dazedducks','Nyanheroes','Shadowysupercoder','Taiyorobotics'])]
 	old.to_csv('./data/tokens.csv', index=False)
+	# tokens.to_csv('./data/tokens_2.csv', index=False)
 
 	old = pd.read_csv('./data/metadata.csv')
-	a = old[['collection','token_id']].drop_duplicates()
-	a['exclude'] = 0
-	a['token_id'] = a.token_id.astype(str)
-	metadata['token_id'] = metadata.token_id.astype(str)
-	m = metadata.merge(a, how='left')
-	m = m[m.exclude.isnull()]
-	len(m[m.exclude.isnull()].token_id.unique())
-	del m['exclude']
-	# old = old[-(old.collection == 'Meerkat Millionaires Cc')]
-	print(sorted(old.collection.unique()))
+	g0 = old.groupby('collection').token_id.count().reset_index()
 	l0 = len(old)
-	metadata.collection.unique()
+	old['collection'] = old.collection.apply(lambda x: clean_name(x))
+	metadata['collection'] = metadata.collection.apply(lambda x: clean_name(x))
+	if exclude_new:
+		rem = metadata.collection.unique()
+		old = old[-(old.collection.isin(rem))]
+	# old = old[-old.collection.isin(['Astrals','Dazedducks','Nyanheroes','Shadowysupercoder','Taiyorobotics'])]
+	# a = old[['collection','token_id']].drop_duplicates()
+	# a['exclude'] = 0
+	# a['token_id'] = a.token_id.astype(str)
+	# metadata['token_id'] = metadata.token_id.astype(str)
+	# m = metadata.merge(a, how='left')
+	# m = m[m.exclude.isnull()]
+	# len(m[m.exclude.isnull()].token_id.unique())
+	# del m['exclude']
+	# old = old[-(old.collection == 'Meerkat Millionaires Cc')]
+	# print(sorted(old.collection.unique()))
+	# metadata.collection.unique()
 	# metadata = pd.DataFrame(t_data, columns=['collection','token_id','nft_rank','mint_address','image_url'])
 	# old = old.merge(tokens, how='left', on=['collection','token_id'])
-	old = old.append(m[['collection','token_id','name','value']].rename(columns={'name':'feature_name','value':'feature_value'}) )
+	# old = old.append(m[['collection','token_id','name','value']].rename(columns={'name':'feature_name','value':'feature_value'}) )
+	old = pd.concat( [old, metadata[['collection','token_id','name','value']].rename(columns={'name':'feature_name','value':'feature_value'})] )
 	old['token_id'] = old.token_id.astype(str)
-	old = old.drop_duplicates(subset=['collection','token_id','feature_name'])
+	old = old.drop_duplicates(subset=['collection','token_id','feature_name'], keep='last')
 	# old['nft_rank'] = old.nft_rank_y.fillna(old.nft_rank_y)
 	# del old['nft_rank_x']
+	g1 = old.groupby('collection').token_id.count().reset_index()
+	g = g0.merge(g1, how='outer', on=['collection']).fillna(0)
+	g['dff'] = g.token_id_y - g.token_id_x
+	print(g[g.dff != 0].sort_values('dff', ascending=0))
 	# del old['nft_rank_y']
 	print('Adding {} rows'.format(len(old) - l0))
-	print(old.groupby('collection').token_id.count())
-	old[old.collection.isin(metadata.collection.unique())]
-	old[(old.collection == 'Catalina Whale Mixer') & (old.token_id == '1206')]
+	# print(old.groupby('collection').token_id.count())
+	# old[old.collection.isin(metadata.collection.unique())]
+	# old[(old.collection == 'Catalina Whale Mixer') & (old.token_id == '1206')]
 	old.to_csv('./data/metadata.csv', index=False)
+	# metadata.to_csv('./data/metadata_2.csv', index=False)
 
+def how_rare_is_api():
+	ctx = get_ctx()
+	query = '''
+		SELECT DISTINCT LOWER(project_name) AS lower_collection
+		FROM solana.core.dim_nft_metadata
+	'''
+	df = ctx.cursor().execute(query)
+	df = pd.DataFrame.from_records(iter(df), columns=[x[0] for x in df.description])
+
+	url = 'https://api.howrare.is/v0.1/collections'
+	r = requests.get(url)
+	j = r.json()
+	j['result'].keys()
+	j['result']['data'][:10]
+	c_df = pd.DataFrame(j['result']['data']).sort_values('floor_marketcap', ascending=0)
+	c_df['lower_collection'] = c_df.url.apply(lambda x: x.lower().strip() )
+	seen = sorted(df.LOWER_COLLECTION.apply(lambda x: re.sub(' |_|\'', '', x) ).values)
+	# seen[:300]
+	# x = 590
+	# seen[x:x+50]
+	c_df['seen_1'] = c_df.url.apply(lambda x: re.sub(' |_|\'', '', x[1:]).lower() in seen ).astype(int)
+	c_df['seen_2'] = c_df.name.apply(lambda x: re.sub(' |_|\'', '', x).lower() in seen ).astype(int)
+	c_df['seen'] = (c_df.seen_1 + c_df.seen_2 > 0).astype(int)
+	c_df.head()
+	c_df.seen.sum()
+	c_df[c_df.seen == 0].head(10)
+	# c_df.head(16)
+	seen = [ 'smb','aurory','degenapes','thugbirdz','degods','okay_bears','catalinawhalemixer','cetsoncreck','stonedapecrew','solgods' ]
+	c_df = c_df[-(c_df.url.isin([ '/'+x for x in seen]))]
+	# rem = [ 'kaiju','jikanstudios' ]
+	# c_df = c_df[-(c_df.url.isin([ '/'+x for x in rem]))]
+	# seen = list(pd.read_csv('./data/tokens.csv').collection.unique())
+	# c_df = c_df[-(c_df.name.isin(seen))]
+	# len(j['result']['data'])
+	# c_df = c_df[c_df.url.isin(['/blocksmithlabs'])]
+	# c_df = c_df[c_df.url.isin(['/generousrobotsdao','/thestonedfrogs'])]
+	c_df = c_df[c_df.seen == 0]
+	sorted(c_df.url.unique())
+	it = 0
+	tot = len(c_df)
+	# c_df.head()
+	# c_df = c_df[c_df.url != '/midnightpanthers']
+	t_data = []
+	m_data = []
+	# metadata = pd.DataFrame()
+	for row in c_df.iterrows():
+		it += 1
+		row = row[1]
+		collection = row['name']
+		print('#{} / {}: {}'.format(it, tot, collection))
+		url = row['url'][1:]
+		if it > 1:
+			assert(len(t_data))
+			assert(len(m_data))
+		print('Working on collection {}, {}, {}'.format(collection, len(t_data), len(m_data)))
+		# if url in seen or (len(metadata) and collection in metadata.collection.unique()):
+		# 	print('Seen!')
+		# 	continue
+		# collection = 'Cets on Creck'
+		# collection = 'SOLGods'
+		# collection = 'Meerkat Millionaires'
+		# collection = d['url'][1:]
+		# url = 'https://api.howrare.is/v0.1/collections'+d['url']
+		# url = 'https://api.howrare.is/v0.1/collections/meerkatmillionaires'
+		# url = 'https://api.howrare.is/v0.1/collections/'+url+'/only_rarity'
+		url = 'https://api.howrare.is/v0.1/collections/'+url
+		r = requests.get(url)
+		j = r.json()
+		for i in j['result']['data']['items']:
+			try:
+				token_id = int(i['id'])
+				if True:
+					nft_rank = int(i['rank'])
+					mint = i['mint']
+					image = i['image']
+					t_data += [[ collection, token_id, nft_rank, mint, image ]]
+				if False:
+					for d in i['attributes']:
+						d['token_id'] = token_id
+						d['collection'] = collection
+						m_data += [ d ]
+				# metadata = metadata.append(m)
+				# metadata = pd.concat([metadata, m])
+			except:
+				print('Error')
+		# add_to_df(t_data)
+	metadata = pd.DataFrame(m_data)
+	metadata
+
+	add_to_df(t_data, metadata, True)
+	metadata.head()
+	metadata.value.unique()
 
 def convert_collection_names():
 	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:

@@ -47,6 +47,7 @@ def clean_name(name):
 	name = re.sub('-', ' ', name)
 	name = re.sub(' On ', ' on ', name)
 	name = re.sub('Defi ', 'DeFi ', name)
+	# name = re.sub(r'[^a-zA-Z0-9\s]', '', name)
 	return(name)
 
 def scrape_randomearth(data_folder = '/rstudio-data/'):

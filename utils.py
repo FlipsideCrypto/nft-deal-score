@@ -1,5 +1,7 @@
+import os
 import re
 import pandas as pd
+import snowflake.connector
 
 
 clean_names = {
@@ -20,8 +22,25 @@ clean_names = {
 	,'mayc': 'MAYC'
 	,'solgods': 'SOLGods'
 	,'meerkatmillionairescc': 'Meerkat Millionaires'
+	,'ggsg:galacticgeckos': 'Galactic Geckos'
+	,'solstein': 'SolStein'
 	# ,'stonedapecrew': 'Stoned Ape Crew'
 }
+
+def get_ctx():
+	usr = os.getenv('SNOWFLAKE_USR')
+	pwd = os.getenv('SNOWFLAKE_PWD')
+	# with open('snowflake.pwd', 'r') as f:
+	# 	pwd = f.readlines()[0].strip()
+	# with open('snowflake.usr', 'r') as f:
+	# 	usr = f.readlines()[0].strip()
+
+	ctx = snowflake.connector.connect(
+		user=usr,
+		password=pwd,
+		account='vna27887.us-east-1'
+	)
+	return(ctx)
 
 def format_num(x):
 	return('{:,}'.format(round(x, 2)))
@@ -48,6 +67,7 @@ def clean_name(name):
 	name = re.sub('-', ' ', name)
 	name = re.sub(' On ', ' on ', name)
 	name = re.sub('Defi ', 'DeFi ', name)
+	# name = re.sub(r'[^a-zA-Z0-9\s]', '', name)
 	return(name)
 
 

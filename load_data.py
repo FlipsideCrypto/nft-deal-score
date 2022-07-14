@@ -1,9 +1,8 @@
-import collections
 import re
 import os
 import json
+import time
 import math
-from tkinter import SEL
 import requests
 import pandas as pd
 import urllib.request
@@ -11,11 +10,24 @@ import snowflake.connector
 from bs4 import BeautifulSoup
 from time import sleep
 
+import cloudscraper
+
+from theblockchainapi import SolanaAPIResource, SolanaNetwork, SearchMethod
+
+# Get an API key pair for free here: https://dashboard.blockchainapi.com/api-keys
+MY_API_KEY_ID = 'sLbjx8YFYdTtUuH'
+MY_API_SECRET_KEY = 'p24pFaM9lLbWscN'
+BLOCKCHAIN_API_RESOURCE = SolanaAPIResource(
+    api_key_id=MY_API_KEY_ID,
+    api_secret_key=MY_API_SECRET_KEY
+)
 
 os.chdir('/Users/kellenblumberg/git/nft-deal-score')
 
 from solana_model import just_float
-from utils import clean_name, clean_token_id, format_num
+from utils import clean_name, clean_token_id, format_num, merge
+
+
 
 #########################
 #     Connect to DB     #
@@ -100,6 +112,19 @@ def add_collection_steps():
 	# 5. run model
 	pass
 
+def create_upload_file():
+	cols = [ 'collection','mint_address' ]
+	a = pd.read_csv('./data/mints-2022-06-13-2pm.csv')[cols]
+	b = pd.read_csv('~/Downloads/manual_labels.csv')
+	b.columns = cols
+	c = pd.read_csv('~/Downloads/solscan_collections.csv')[cols]
+	d = pd.read_csv('./data/tokens.csv')[cols]
+	df = pd.concat([a, b, c, d]).drop_duplicates(subset=['mint_address'], keep='last')
+	df.to_csv('~/Downloads/mints-2022-06-13-5pm.csv', index=False)
+	tmp = pd.read_csv('~/Downloads/mints-2022-06-13-5pm.csv')
+	tmp[tmp.mint_address == 'EhuVN896QVypRreAt6mcJr6eKkKunVzsgSRz7qt4oeBr']
+	
+
 def manual_clean():
 	for c in [ 'pred_price', 'attributes', 'feature_values', 'model_sales', 'listings', 'coefsdf', 'tokens' ]:
 		df = pd.read_csv('./data/{}.csv'.format(c))
@@ -108,7 +133,149 @@ def manual_clean():
 			df['clean_token_id'] = df.token_id
 		df.to_csv('./data/{}.csv'.format(c), index=False)
 
+
+def pull_from_solscan():
+
+	todo = [
+		['50a75e6d3d0b6d4a72b2f745fdba4b1c28bc774ca9629fe8e36053ae2fb396f8','Degen Egg']
+		, ['45e3f45d695e9e8775eed480cb0f5a6a957d47dcb3ed3800e454846dca9ab7fc','Genopets']
+		, ['a437071c6f9679e8431a072ae39421262bf289cc6ead21e38190d5b7b409e7f7','Shin Sengoku']
+		, ['d38349f2704e8cd1c538cc48fbea4b3e2596ac8da14b62c0eb3c07aeda7ae75e','SolStein']
+		, ['9e0593a4842ceb9ccdc510e6ffdf0d84f736bff2b58d5803c5002ace17df9fe0','Zillaz NFT']
+		, ['895d8f01108fbb6b28c5e32027c9c98e3054241927c8e59c304fa4763c5c88ea','enviroPass Tier 02']
+		, ['59c2a35d902f85feec4c774df503a0df2be263f763dcbcb73bce50c999fc2c78','The Fracture']
+		, ['e8dfb059b1dfc71cf97342a1c46793bc5e154909416a93a155929da5bba44a57','Suteki']
+		, ['271e0d68d069d80afbcb916e877831b060933b97e7b02e1cfb77e74b228b4745','Chillchat']
+	]
+	start = time.time()
+	data = []
+	meta = []
+	it = 0
+	tot = len(todo)
+	for collectionId, collection in todo:
+		it += 1
+		print('#{} / {}'.format(it, tot))
+		# collectionId = j['data']['collectionId']
+		# collection = j['data']['collection']
+		offset = 0
+		limit = 500
+		while True:
+			print(offset)
+			url = 'https://api.solscan.io/collection/nft?sortBy=nameDec&collectionId={}&offset={}&limit={}'.format(collectionId, offset, limit)
+			r = requests.get(url)
+			js = r.json()['data']
+			offset += limit
+			if len(js) == 0:
+				break
+			for j in js:
+				data += [[ collectionId, collection, j['info']['mint'] ]]
+				m = j['info']['meta']
+				m['mint_address'] = j['info']['mint']
+				# m['name'] = row['name']
+				# m['update_authority'] = update_authority
+				meta += [ m ]
+		it += 1
+		end = time.time()
+		print('Finished {} / {} in {} minutes'.format(it, tot, round((end - start) / 60.0, 1)))
+	df = pd.DataFrame(data, columns=['collection_id','collection','mint_address'])
+	df.to_csv('~/Downloads/solscan_collections.csv', index=False)
+	df[['collection','mint_address']].to_csv('~/Downloads/mints-2022-06-14-8am.csv', index=False)
+	df.groupby('collection').mint_address.count()
+
+def collecitons_from_missing_tokens():
+	query = '''
+		WITH base AS (
+			SELECT block_timestamp::date AS date
+			, s.*
+			, ROW_NUMBER() OVER (ORDER BY sales_amount DESC) AS rn
+			FROM solana.fact_nft_sales s
+			LEFT JOIN solana.dim_labels l on s.mint = l.address
+			WHERE marketplace in ('magic eden v1', 'magic eden v2') 
+			AND block_timestamp >= '2022-01-01' 
+			AND l.address IS NULL
+			AND sales_amount >= 10
+		)
+		SELECT *
+		FROM base
+		WHERE rn % 20 = 0
+		ORDER BY sales_amount DESC
+		LIMIT 500
+	'''
+	missing = ctx.cursor().execute(query)
+	missing = pd.DataFrame.from_records(iter(missing), columns=[x[0] for x in missing.description])
+	missing = clean_colnames(missing)
+	missing.head()
+
+	headers = {
+		'Authorization': 'Bearer 9c39e05c-db3c-4f3f-ac48-84099111b813'
+	}
+	it = 0
+	tot = len(missing)
+	data = []
+	for m in missing.mint.unique():
+		it += 1
+		if it % 10 == 0:
+			print('#{} / {} ({})'.format(it, tot, len(data)))
+		url = 'https://api-mainnet.magiceden.dev/v2/tokens/{}'.format(m)
+		r = requests.get(url, headers=headers)
+		j = r.json()
+		data.append(j)
+		pass
+	df = pd.DataFrame(data)
+	df.head()[['collection','mintAddress']]
+	df.to_csv('~/Downloads/tmp.csv', index=False)
+	need = df.groupby(['collection','updateAuthority']).mintAddress.count().reset_index().sort_values('mintAddress', ascending=0)
+	need = need[need.mintAddress > 1].rename(columns={'updateAuthority':'update_authority'})
+	need.to_csv('~/Downloads/missing.csv', index=False)
+	need.head()
+	sorted(need.collection.unique())
+	need['collection'] = need.collection.apply(lambda x: re.sub('_', ' ', x.title()).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\|', '-', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\)', '', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\(', '', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\'', '', x).strip() )
+
+	us = sorted(g[g.mintAddress > 1].updateAuthority.unique())
+	tot = len(us)
+	it = 0
+	for u in us:
+		it += 1
+		print('#{} / {} ({})'.format(it, tot, len(data)))
+
+		nfts = BLOCKCHAIN_API_RESOURCE.search_nfts(
+			update_authority = u
+			, update_authority_search_method = SearchMethod.EXACT_MATCH
+		)
+		print(u, len(nfts))
+		for n in nfts:
+			m = n['nft_metadata']
+			data += [[ m['update_authority'], m['mint'], m['data']['symbol'], m['data']['name'] ]]
+
+def manual_tags():
+	d = {
+		'daaLrDfvcT4joui5axwR2gCkGAroruJFzyVsacU926g': 'Degenerate Ape Kindergarten'
+		, 'FbfGrZ3LKuGSsayK57DetzzyN7qKeNnDuLMu5bBSocwF': 'Botheads'
+	}
+	a = 'FbfGrZ3LKuGSsayK57DetzzyN7qKeNnDuLMu5bBSocwF'
+	c = 'Botheads'
+	labels = pd.DataFrame()
+	for a, c in d.items():
+		query = '''
+			SELECT DISTINCT instructions[1]:parsed:info:mint::string AS mint_address
+			FROM solana.fact_transactions
+			WHERE instructions[1]:parsed:info:mintAuthority = '{}'
+		'''.format(a)
+		df = ctx.cursor().execute(query)
+		df = pd.DataFrame.from_records(iter(df), columns=[x[0] for x in df.description])
+		df = clean_colnames(df)
+		df['collection'] = c
+		labels = labels.append(df)
+	labels.to_csv('~/Downloads/manual_labels.csv', index=False)
+
 def mints_from_me():
+	##################################
+	#     Get All ME Collections     #
+	##################################
 	headers = {
 		'Authorization': 'Bearer 9c39e05c-db3c-4f3f-ac48-84099111b813'
 	}
@@ -144,6 +311,9 @@ def mints_from_me():
 	# lp_df.to_csv('./data/me_lp_collections.csv', index=False)
 	# lp_df = pd.read_csv('./data/me_lp_collections.csv')
 
+	###########################################
+	#     Get 1 Mint From Each Collection     #
+	###########################################
 	it = 0
 	l_data = []
 	old_l_df = pd.read_csv('./data/me_mints.csv')
@@ -154,7 +324,7 @@ def mints_from_me():
 		it += 1
 		row = row[1]
 		print('Listings on {}...'.format(row['symbol']))
-		url = 'https://api-mainnet.magiceden.dev/v2/collections/{}/listings?offset=0&limit=1'.format(row['symbol'])
+		url = 'https://api-mainnet.magiceden.dev/v2/collections/{}/activities?offset=0&limit=1'.format(row['symbol'])
 		if row['symbol'] in seen:
 			print('Seen')
 			continue
@@ -218,9 +388,38 @@ def mints_from_me():
 	# l_df = pd.DataFrame(l_data, columns=['symbol','name','mint_address'])
 	# l_df.to_csv('./data/me_mints.csv', index=False)
 
+	# get missing collections
+	query = '''
+		WITH base AS (
+			SELECT block_timestamp::date AS date
+			, s.*
+			, ROW_NUMBER() OVER (ORDER BY sales_amount DESC) AS rn
+			FROM solana.fact_nft_sales s
+			LEFT JOIN solana.dim_labels l on s.mint = l.address
+			WHERE marketplace in ('magic eden v1', 'magic eden v2') 
+			AND block_timestamp >= '2022-01-01' 
+			AND block_timestamp <= '2022-05-20' 
+			AND l.address IS NULL
+			AND sales_amount > 20
+		)
+		SELECT *
+		FROM base
+		WHERE rn % 50 = 1
+		LIMIT 100
+	'''
+	missing = ctx.cursor().execute(query)
+	missing = pd.DataFrame.from_records(iter(missing), columns=[x[0] for x in missing.description])
+	missing = clean_colnames(missing)
+
+	######################################################
+	#     Get Update Authorities For All Collections     #
+	######################################################
 	l_df = pd.read_csv('./data/me_mints.csv')
+	len(l_df)
+	l_df.head()
 	m_old = pd.read_csv('./data/me_update_authorities.csv')
-	m_data = list(m_old.values)
+	m_old['seen'] = 1
+	m_data = list(m_old[['symbol','name','update_authority']].values)
 	seen = [ x[0] for x in m_data ]
 	print('Seen {} m_data'.format(len(seen)))
 	l_df = l_df[-l_df.symbol.isin(seen)]
@@ -258,19 +457,583 @@ def mints_from_me():
 			m_df.to_csv('./data/me_update_authorities.csv', index=False)
 	m_df = pd.DataFrame(m_data, columns=['symbol','name','update_authority'])
 	m_df = m_df.drop_duplicates()
-	print('Adding {} rows to me_mints'.format(len(m_df) - len(m_old)))
+	print('Adding {} rows to me_update_authorities'.format(len(m_df) - len(m_old)))
 	m_df.to_csv('./data/me_update_authorities.csv', index=False)
+	m_df.tail(134).head(20)
+	m_df = m_df.tail(134)
 
+
+	query = '''
+		SELECT DISTINCT project_name, LOWER(project_name) AS lower_name
+		FROM crosschain.address_labels
+		WHERE blockchain = 'solana'
+		AND label_subtype = 'nf_token_contract'
+		AND project_name IS NOT NULL
+	'''
+
+	labels = ctx.cursor().execute(query)
+	labels = pd.DataFrame.from_records(iter(labels), columns=[x[0] for x in labels.description])
+	labels = clean_colnames(labels)
+	labels.to_csv('~/Downloads/tmp-la.csv', index=False)
+
+	######################################################
+	#     Get Update Authorities For All Collections     #
+	######################################################
 	m_df = pd.read_csv('./data/me_update_authorities.csv')
-	def f(x):
-		x = re.sub('\(|\)', '', x)
-		x = re.sub(' ', '_', x)
-		x = re.sub('\'', '', x)
-		return(x)
-	m_df['collection'] = m_df.name.apply(lambda x: f(x) )
+	m_df['seen'] = (-m_df.name.isin(m_df.name.tail(134).values)).astype(int)
+	m_df['lower_name'] = m_df.name.apply(lambda x: x.lower() )
+	seen = list(labels.lower_name.unique())
+	m_df['seen'] = m_df.lower_name.isin(seen).astype(int)
+	n_auth = m_df.groupby('update_authority').name.count().reset_index().rename(columns={'name':'n_auth'})
+	m_df = m_df.merge(n_auth)
+	len(m_df[m_df.seen == 0])
+	len(m_df[ (m_df.seen == 0) & (m_df.n_auth == 1)])
+	len(m_df[ (m_df.seen == 0) & (m_df.n_auth > 1)])
 
-	x = 'asf (asf)'
-	f(x)
+	m_df.to_csv('~/Downloads/tmp-m_df.csv', index=False)
+	len(m_df.name.unique())
+
+	need = list(m_df[m_df.seen == 0].update_authority.unique())
+	need = list(m_df[ (m_df.seen == 0) & (m_df.n_auth == 1) ].update_authority.unique())
+	len(need)
+	# need = need + [
+	# need = [
+	# 	'CDgbhX61QFADQAeeYKP5BQ7nnzDyMkkR3NEhYF2ETn1k' # taiyo
+	# 	, 'DC2mkgwhy56w3viNtHDjJQmc7SGu2QX785bS4aexojwX' # DAA
+	# 	, 'daaLrDfvcT4joui5axwR2gCkGAroruJFzyVsacU926g' # Degen Egg
+	# 	, 'BL5U8CoFPewr9jFcKf3kE1BhdFS1J59cwGpeZrm7ZTeP' # Skullbot
+	# 	, 'DRGNjvBvnXNiQz9dTppGk1tAsVxtJsvhEmojEfBU3ezf' # Boryoku
+	# 	, '7hYkx2CNGRB8JE7X7GefX1ak1dqe7GxgYKbpfj9moE9D' # mindfolk
+	# 	, 'CjwNEVQFKk8YzZLCvvw6sNrjxiQW8dYDSzhTph18T7g5' # jelly rascals
+	# 	, 'EcxEqUj4RNgdGJwPE3ktsM99Ea9ThPmXHUV5g37Qm4ju' # women monkey
+	# 	, 'EQSoRhbN9fEEYXKEE5Lg63Mqf17P3JydcWTvDhdMJW1N' # hydrascripts
+	# 	, '75CPiM9ywLgxhii9SQsNoA1SH3h66o5EhrYsazHR5Tqk' # hydrascripts
+	# 	, 'aury7LJUae7a92PBo35vVbP61GX8VbyxFKausvUtBrt' # aurory
+	# 	, 'ET3LWbEL6q4aUSjsX5xLyWktCwqKh6qsQE5j6TDZtZBY' # enviropass
+	# 	, '8ERR2gYrvXcJFuoNAbPRvHXtrJnAXXHgXKkVviwz9R6C' # enviroPass
+	# 	, 'GRDCbZBP1x2JxYf3rQQoPFGzF57LDPy7XtB1gEMaCqGV' # Space Robots
+	# 	, 'GenoS3ck8xbDvYEZ8RxMG3Ln2qcyoAN8CTeZuaWgAoEA' # Genopet
+	# 	, 'STEPNq2UGeGSzCyGVr2nMQAzf8xuejwqebd84wcksCK' # stepn
+	# 	, 'HcS8iaEHwUino8wKzcgC16hxHodnPCyacVYUdBaSZULP' # BASC
+	# 	, 'AvkbtawpmMSy571f71WsWEn41ATHg5iHw27LoYJdk8QA' # THUG
+	# 	, 'GH4QhJznKEHHv44AqEH5SUohkUauWyAFtu5u8zUWUKL4' # StepN Shoebox
+	# 	, 'FTQmhcD7SNBWrVxTgQMFr7xL2aA6adfAJJPBxGKU4VsZ' # Solstien
+	# ]
+	need = m_df[m_df.update_authority.isin(need)]
+
+	# m_df[m_df.lower_name.isin(seen)]
+	# m_df[-m_df.lower_name.isin(seen)]
+	# tmp = m_df[['update_authority','collection']].drop_duplicates().groupby(['update_authority']).collection.count().reset_index().rename(columns={'collection':'n_collection'})
+	# tmp = tmp.sort_values('n_collection', ascending=0)
+	# m_df = m_df.merge(tmp)
+	# m_df = m_df.sort_values(by=['n_collection','update_authority','collection'], ascending=[0,0,0])
+	l_df = pd.read_csv('./data/me_mints.csv')
+	fix = need.merge(l_df[[ 'name','mint_address' ]])
+	# len(need.name.unique())
+	# len(fix.name.unique())
+	# fix = fix.sort_values(by=['update_authority','collection'], ascending=[0,0])
+	# fix.head()
+
+
+	# seen = []
+	# data = []
+	# meta = []
+
+	# fix = fix[-(fix.name.isin(seen))]
+	# start = time.time()
+	# it = 0
+	# tot = len(fix)
+	# scraper = cloudscraper.create_scraper()
+	# # for each collection
+	# for row in fix.iterrows():
+	# 	row = row[1]
+	# 	print(row['name'])
+	# 	if row['name'] in seen:
+	# 		print('Seen')
+	# 		continue
+	# 	url = 'https://api.solscan.io/nft/detail?mint={}'.format(row['mint_address'])
+	# 	t = scraper.get(url).text
+	# 	j = json.loads(t)
+	# 	# r = requests.get(url)
+	# 	# j = r.json()
+	# 	j['data']
+	# 	if not j['success']:
+	# 		print('Error')
+	# 		print(r)
+	# 		print(j)
+	# 		sleep(1)
+	# 		continue
+	# 	update_authority = j['data']['updateAuthority']
+	# 	collectionId = j['data']['collectionId']
+	# 	collection = j['data']['collection']
+	# 	offset = 0
+	# 	limit = 500
+	# 	while True:
+	# 		print(offset)
+	# 		url = 'https://api.solscan.io/collection/nft?sortBy=nameDec&collectionId={}&offset={}&limit={}'.format(collectionId, offset, limit)
+	# 		r = requests.get(url)
+	# 		js = r.json()['data']
+	# 		offset += limit
+	# 		if len(js) == 0:
+	# 			break
+	# 		for j in js:
+	# 			data += [[ update_authority, collectionId, collection, row['symbol'], row['name'], row['collection'], j['info']['mint'] ]]
+	# 			m = j['info']['meta']
+	# 			m['mint_address'] = j['info']['mint']
+	# 			m['name'] = row['name']
+	# 			m['update_authority'] = update_authority
+	# 			meta += [ m ]
+	# 	it += 1
+	# 	end = time.time()
+	# 	print('Finished {} / {} in {} minutes'.format(it, tot, round((end - start) / 60.0, 1)))
+	
+	# old = pd.read_csv('./data/nft_label_tokens.csv')
+	# token_df = pd.DataFrame(data, columns=['update_authority','collectionId','solscan_collection','symbol','name','collection','mint'])
+	# token_df = token_df.append(old).drop_duplicates()
+	# token_df.to_csv('./data/nft_label_tokens.csv', index=False)
+
+	# old = pd.read_csv('./data/nft_label_metadata.csv')
+	# meta_df = pd.DataFrame(meta)
+	# meta_df = meta_df.append(old).drop_duplicates()
+	# meta_df.to_csv('./data/nft_label_metadata.csv', index=False)
+	# seen = list(token_df.name.unique())
+
+	# m_df.to_csv('~/Downloads/tmp.csv', index=False)
+	# tmp[tmp.collection > 1]
+	# m_df.head()
+	# def f(x):
+	# 	x = re.sub('\(|\)', '', x)
+	# 	x = re.sub(' ', '_', x)
+	# 	x = re.sub('\'', '', x)
+	# 	return(x)
+	# m_df['collection'] = m_df.name.apply(lambda x: f(x) )
+
+	# x = 'asf (asf)'
+	# f(x)
+
+	# query = '''
+	# 	WITH base AS (
+	# 	SELECT *
+	# 	, ROW_NUMBER() OVER (PARTITION BY project_name ORDER BY insert_date DESC) AS rn
+	# 	FROM crosschain.address_labels
+	# 	WHERE blockchain = 'solana'
+	# 	AND label_subtype = 'nf_token_contract'
+	# 	)
+	# 	SELECT *
+	# 	FROM base
+	# '''
+
+	# examples = ctx.cursor().execute(query)
+	# examples = pd.DataFrame.from_records(iter(examples), columns=[x[0] for x in examples.description])
+	# examples = clean_colnames(examples)
+	# examples.head()
+	# examples[examples.address_name == 'paradisedao'].head()
+	# examples[examples.address == 'GUXSatf5AAFKmuQgSgn4GoGzBEhwJ9WAQRxeVt1vZvkb'].head()
+	# # m_df = pd.read_csv('./data/me_update_authorities.csv')
+	# # fix = m_df[m_df.n_collection > 1].merge(examples[[ 'address','address_name' ]].rename(columns={'address_name':'name'}) )
+	# fix = m_df[m_df.n_collection > 1].merge(examples[[ 'address','address_name' ]].rename(columns={'address_name':'name'}) )
+	# len(m_df[m_df.n_collection > 1].name.unique())
+	# len(fix.name.unique())
+
+	# j = list(fix.address.unique())
+	# with open('./data/fix_mints.json', 'w') as f:
+	# 	json.dump(j, f)
+	
+	# seen = list(examples.address.unique())
+	# seen = []
+	# need = df[-df.mint_address.isin(seen)].sort_values(['collection','mint_address'])
+	# CDgbhX61QFADQAeeYKP5BQ7nnzDyMkkR3NEhYF2ETn1k - taiyo
+	# DC2mkgwhy56w3viNtHDjJQmc7SGu2QX785bS4aexojwX - DAA
+	# DRGNjvBvnXNiQz9dTppGk1tAsVxtJsvhEmojEfBU3ezf - Boryoku
+	# 7hYkx2CNGRB8JE7X7GefX1ak1dqe7GxgYKbpfj9moE9D - mindfolk
+	# CjwNEVQFKk8YzZLCvvw6sNrjxiQW8dYDSzhTph18T7g5 - mindfolk
+	need = fix.copy().rename(columns={'name':'collection'})
+	# need = need.drop_duplicates(subset=['update_authority']).sort_values('collection').head(7).tail(1)
+	need = need.drop_duplicates(subset=['update_authority']).sort_values('collection')
+	need['collection'] = need.collection.apply(lambda x: re.sub('\|', '-', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\)', '', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\(', '', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\'', '', x).strip() )
+	need.collection.unique()
+	# need = need.drop_duplicates(subset=['collection']).sort_values('collection')
+	n = 0
+	# 1310 - 310
+	# need = need.tail(n).head(300).tail(25)
+	# need = need.tail(1009).head(17)
+	# need = need.tail(1009 - 17).head(17)
+	# 1-285, 1310-975
+	len(need)
+	# print(n)
+
+	mfiles = ['/data/mints/{}/{}_mint_accounts.json'.format(re.sub(' |-', '_', collection), update_authority) for collection, update_authority in zip(need.collection.values, need.update_authority.values) ]
+	seen = [ x for x in mfiles if os.path.exists(x) ]
+	seen = []
+
+	# for update authorities that have only 1 collection, we can just check metaboss once
+	rpc = 'https://red-cool-wildflower.solana-mainnet.quiknode.pro/a1674d4ab875dd3f89b34863a86c0f1931f57090/'
+	# need = need.tail(400)
+	it = 0
+	tot = len(need)
+	for row in need.iterrows():
+		it += 1
+		row = row[1]
+		collection = row['collection']
+		print('#{} / {}: {}'.format(it, tot, collection))
+		# if collection in seen:
+		# 	continue
+		update_authority = row['update_authority']
+		# print('Working on {}...'.format(collection))
+		collection_dir = re.sub(' |-', '_', collection)
+
+		dir = './data/mints/{}/'.format(collection_dir)
+		mfile = '{}{}_mint_accounts.json'.format(dir, update_authority)
+		if not os.path.exists(dir):
+			print(collection)
+			os.makedirs(dir)
+		# elif len(os.listdir(dir)) and os.path.exists(mfile):
+		# 	print('Already have {}.'.format(collection))
+		# 	print('Seen')
+		# 	continue
+		seen.append(update_authority)
+		os.system('metaboss -r {} -t 300 snapshot mints --update-authority {} --output {}'.format(rpc, update_authority, dir))
+
+	# write the mints to csv
+	data = []
+	for path in os.listdir('./data/mints/'):
+		if os.path.isdir('./data/mints/'+path):
+			collection = re.sub('_', ' ', path).strip()
+			for fname in os.listdir('./data/mints/'+path):
+				f = './data/mints/'+path+'/'+fname
+				if os.path.isfile(f) and '.json' in f:
+					with open(f) as file:
+						j = json.load(file)
+						for m in j:
+							data += [[ collection, m ]]
+	df = pd.DataFrame(data, columns=['collection','mint_address'])
+	df.collection.unique()
+	df.to_csv('./data/single_update_auth_labels.csv', index=False)
+
+	################################
+	#     Multiple Authorities     #
+	################################
+	rpc = 'https://red-cool-wildflower.solana-mainnet.quiknode.pro/a1674d4ab875dd3f89b34863a86c0f1931f57090/'
+	need = list(m_df[ (m_df.seen == 0) & (m_df.n_auth > 1) ].update_authority.unique())
+	need = m_df[m_df.update_authority.isin(need)]
+	fix = need.merge(l_df[[ 'name','mint_address' ]])
+	need = fix.copy().rename(columns={'name':'collection'})
+	need = need.sort_values('collection').drop_duplicates(subset=['update_authority'], keep='first')
+	i = 5
+	sz = 112
+	t = len(need) - (sz * (i - 1)) if sz * i > len(need) else sz
+	print(t)
+	need = need.head(sz * i).tail(t)
+	# need = need.head(150 * 2).tail(150)
+	# need = need.head(150 * 3).tail(150)
+	# need = need.head(150 * 4).tail(150)
+	need['collection'] = need.collection.apply(lambda x: re.sub('\|', '-', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\)', '', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\(', '', x).strip() )
+	need['collection'] = need.collection.apply(lambda x: re.sub('\'', '', x).strip() )
+	need.collection.unique()
+	it = 0
+	a = []
+	print(i)
+	for row in need.iterrows():
+		it += 1
+		# if it < 20:
+		# 	continue
+		# if it % 100 == 0:
+		# 	print('#{}/{}'.format(it, len(m_df)))
+		print('#{}/{}'.format(it, len(need)))
+		row = row[1]
+		collection = row['collection']
+		if collection in seen:
+			continue
+		update_authority = row['update_authority']
+		print('Working on {}...'.format(collection))
+		collection_dir = re.sub(' |-', '_', collection)
+
+		dir = './data/mints/{}/'.format(collection_dir)
+		mfile = '{}{}_mint_accounts.json'.format(dir, update_authority)
+		if not os.path.exists(dir):
+			print(collection)
+			os.makedirs(dir)
+		# elif len(os.listdir(dir)) and os.path.exists(mfile):
+		# 	print('Already have {}.'.format(collection))
+		# 	print('Seen')
+		# 	continue
+		print('LETS GOOO')
+		a.append(update_authority)
+		os.system('metaboss -r {} -t 300 snapshot mints --update-authority {} --output {}'.format(rpc, update_authority, dir))
+
+		# len(need)
+		# len(need.drop_duplicates(subset=['mint_address']))
+		# len(need.collection.unique())
+		# tot = len(need.collection.unique())
+		# it = 0
+		# # for each collection, get all the mints from metaboss
+		# for c in need.collection.unique():
+		# it += 1
+		# print('#{} / {}: {}'.format(it, tot, c))
+		# dir = './data/fix_labels_1/{}/'.format(re.sub(' ', '_', c))
+		odir = dir+'output/'
+		# if not os.path.exists(dir):
+		# 	print('Making dir {}'.format(dir))
+		# 	os.makedirs(dir)
+		if not os.path.exists(odir):
+			print('Making dir {}'.format(odir))
+			os.makedirs(odir)
+		# elif os.path.exists(dir+'mints.json'):
+		# 	print('Already Seen')
+		# 	continue
+		# ms = list(need[need.collection == c].mint_address.unique())
+		# with open(dir+'mints.json', 'w') as f:
+		# 	json.dump(ms, f)
+		os.system('metaboss -r {} -t 300 decode mint --list-file {} --output {}'.format(rpc, mfile, odir ))
+
+	##################################################
+	#     Load All The Mints for Each Collection     #
+	##################################################
+	# now that we have the mints, create a data frame with the info for each mint in each collection
+	data = []
+	seen = [ x[1] for x in data ]
+	it = 0
+	dirs = os.listdir('./data/mints/')
+	for path in dirs:
+		print(it)
+		it += 1
+		if os.path.isdir('./data/mints/'+path):
+			collection = re.sub('_', ' ', path).strip()
+			if not os.path.exists('./data/mints/'+path+'/output/'):
+				continue
+			fnames = os.listdir('./data/mints/'+path+'/output/')
+			print(collection, len(fnames))
+			for fname in fnames:
+				f = './data/mints/'+path+'/output/'+fname
+				if fname[:-5] in seen:
+					continue
+				if os.path.isfile(f) and '.json' in f:
+					try:
+						with open(f) as file:
+							j = json.load(file)
+							data += [[ collection, fname, j['name'], j['symbol'], j['uri'] ]]
+					except:
+						print('Error {}'.format(fname[:-5]))
+	
+	##################################################
+	#     Load All The Mints for Each Collection     #
+	##################################################
+	new_mints = pd.DataFrame(data, columns=['collection','mint_address','name','symbol','uri'])
+	# tmp = tmp[-(tmp.collection.isin(['Dskullys','Decimusdynamics']))]
+	n = len(new_mints[(new_mints.uri.isnull()) | (new_mints.uri == '')])
+	tot = len(new_mints)
+	pct = round(n * 100 / tot, 1)
+	print('{} ({}%) rows have no uri'.format(n, pct))
+	new_mints = new_mints[new_mints.uri != '']
+
+	# function to clean the name of each NFT (remove the number)
+	def f_cn(x):
+		if not x or x != x:
+			return(x)
+		if '#' in x[-6:]:
+			x = ''.join(re.split('#', x)[:-1]).strip()
+		elif bool(re.match('.+\s+[0-9]+', x)):
+			x = ' '.join(re.split(' ', x)[:-1]).strip()
+		return(x)
+	new_mints['clean_name'] = new_mints.name.apply(lambda x: f_cn(x) )
+
+	# determine for each collection if we should look at collection-name-symbol, collection-symbol, or just collection to determine what collection it actuallly belongs to
+	# this logic is because e.g. some only have a few names in the collection so we can iterate, but some have a different name for each NFT, so we assume its the same collection for all
+	a = new_mints.drop_duplicates(subset=['collection','clean_name','symbol']).groupby(['collection']).uri.count().reset_index().sort_values('uri', ascending=0)
+	symbol_only = a[a.uri > 10].collection.unique()
+	b = new_mints[new_mints.collection.isin(symbol_only)].drop_duplicates(subset=['collection','symbol']).groupby(['collection']).uri.count().reset_index().sort_values('uri', ascending=0)
+	collection_only = b[b.uri > 10].collection.unique()
+
+	# now get the info for each collection-name-symbol combo
+	g1 = new_mints[ (-(new_mints.collection.isin(symbol_only))) & (-(new_mints.collection.isin(collection_only))) ].groupby(['collection','clean_name','symbol']).head(1).reset_index()
+	g2 = new_mints[ ((new_mints.collection.isin(symbol_only))) & (-(new_mints.collection.isin(collection_only))) ].groupby(['collection','symbol']).head(1).reset_index()
+	g3 = new_mints[ (-(new_mints.collection.isin(symbol_only))) & ((new_mints.collection.isin(collection_only))) ].groupby(['collection']).head(1).reset_index()
+	g = g1.append(g2).append(g3).drop_duplicates(subset=['mint_address'])
+	print('{} Total: {} all, {} collection-symbol {} collection'.format(len(g), len(g1), len(g2), len(g3)))
+	g.to_csv('~/Downloads/tmp-g.csv', index=False)
+
+	# iterate over each row to get what collection they are actually in
+	# by pulling data from the uri
+	uri_data = []
+	it = 0
+	tot = len(g)
+	print(tot)
+	errs = []
+	seen = [ x['uri'] for x in uri_data ]
+	# for row in g.iterrows():
+	for row in g[ -(g.uri.isin(seen)) ].iterrows():
+		row = row[1]
+		it += 1
+		if it % 100 == 0:
+			uri_df = pd.DataFrame(uri_data)[[ 'collection','name','symbol','row_symbol','row_collection','uri','row_clean_name','mint_address' ]]
+			uri_df.to_csv('~/Downloads/uri_df.csv', index=False)
+		print('#{} / {}: {}'.format(it, tot, row['collection']))
+		try:
+			r = requests.get(row['uri'])
+			j = r.json()
+			j['uri'] = row['uri']
+			j['row_collection'] = row['collection']
+			j['row_clean_name'] = row['clean_name']
+			j['row_symbol'] = row['symbol']
+			j['mint_address'] = row['mint_address']
+			uri_data += [j]
+		except:
+			print('Error')
+			errs.append(row)
+	uri_df = pd.DataFrame(uri_data)[[ 'collection','name','symbol','row_symbol','row_collection','uri','row_clean_name','mint_address' ]]
+	uri_df.to_csv('~/Downloads/uri_df.csv', index=False)
+
+	# for each row, parse the json from the uri
+	uri_df = pd.read_csv('~/Downloads/uri_df.csv')
+	def f(x, c):
+		x = str(x)
+		try:
+			n = json.loads(re.sub("'", "\"", x))[c]
+			if type(n) == list:
+				return(n[0])
+			return(n)
+		except:
+			try:
+				return(json.loads(re.sub("'", "\"", x))[c])
+			except:
+				try:
+					return(json.loads(re.sub("'", "\"", x))[0][c])
+				except:
+					try:
+						return(json.loads(re.sub("'", "\"", x))[0])
+					except:
+						return(x)
+	# parse the json more
+	uri_df['parsed_collection'] = uri_df.collection.apply(lambda x: f(x, 'name') )
+	uri_df['parsed_family'] = uri_df.collection.apply(lambda x: f(x, 'family') )
+	uri_df['clean_name'] = uri_df.name.apply( lambda x: f_cn(x) )
+	# calculate what the collection name is
+	uri_df['use_collection'] = uri_df.parsed_collection.replace('', None).fillna( uri_df.clean_name )#.fillna( uri_df.row_symbol )
+	uri_df[uri_df.use_collection == 'nan'][['use_collection','parsed_collection','parsed_family','clean_name','name','collection','symbol','row_symbol','row_collection']].head()
+	uri_df[uri_df.use_collection == 'nan'][['use_collection','parsed_collection','parsed_family','clean_name','name','collection','symbol','row_symbol','row_collection']].to_csv('~/Downloads/tmp.csv', index=False)
+	len(uri_df)
+
+	# clean the collection name
+	def f1(x):
+		try:
+			if len(x['use_collection']) == 1:
+				return(x['clean_name'])
+			if bool(re.match('.+\s+#[0-9]+', x['use_collection'])):
+				return(''.join(re.split('#', x['use_collection'])[:-1]).strip())
+			if '{' in x['use_collection']:
+				return(x['clean_name'])
+			return(x['use_collection'].strip().title())
+		except:
+			return(x['use_collection'].strip().title())
+	uri_df['tmp'] = uri_df.apply(lambda x: f1(x), 1 )
+	uri_df[uri_df.tmp == 'Nan']['use_collection','tmp']
+	uri_df['use_collection'] = uri_df.apply(lambda x: f1(x), 1 )
+	sorted(uri_df.use_collection.unique())[:20]
+	sorted(uri_df.use_collection.unique())[-20:]
+
+	# clean the mint_address
+	uri_df['mint_address'] = uri_df.mint_address.apply(lambda x: re.sub('.json','', x))
+	uri_df.head()
+	uri_df = uri_df.fillna('None')
+
+	for i in range(2):
+		# for each collection-name-symbol combo, see how many have multiple mappings
+		a = uri_df.copy().fillna('None')
+		a = a[['row_collection','row_clean_name','row_symbol','use_collection']].drop_duplicates().groupby(['row_collection','row_clean_name','row_symbol']).use_collection.count().reset_index().rename(columns={'use_collection':'n_1'})
+		uri_df = merge(uri_df, a, ensure=True)
+
+		# for each collection-symbol combo, see how many have multiple mappings
+		a = uri_df.copy().fillna('None')
+		a = a[['row_collection','row_symbol','use_collection']].drop_duplicates().groupby(['row_collection','row_symbol']).use_collection.count().reset_index().rename(columns={'use_collection':'n_2'})
+		uri_df = merge(uri_df, a, ensure=True)
+
+		# for each collection combo, see how many have multiple mappings
+		a = uri_df.copy().fillna('None')
+		a = a[['row_collection','use_collection']].drop_duplicates().groupby(['row_collection']).use_collection.count().reset_index().rename(columns={'use_collection':'n_3'})
+		uri_df = merge(uri_df, a, ensure=True)
+
+		uri_df['n'] = uri_df.apply(lambda x: x['n_3'] if x['row_collection'] in collection_only else x['n_2'] if x['row_collection'] in symbol_only else x['n_1'], 1 )
+		print('{} / {} ({}%) have multiple collection-name-symbol mappings'.format(len(uri_df[uri_df.n > 1]), len(uri_df), round( 100.0 * len(uri_df[uri_df.n > 1]) / len(uri_df))))
+
+		# if there is multiple, use the parsed_family instead of the use_collection
+		uri_df['use_collection'] = uri_df.apply(lambda x: x['use_collection'] if x['n'] == 1 else x['parsed_family'], 1 )
+		del uri_df['n_1']
+		del uri_df['n_2']
+		del uri_df['n_3']
+
+	# only take rows where there is a single mapping
+	m = uri_df[uri_df.n==1][[ 'use_collection','row_collection','row_clean_name','row_symbol' ]].dropna().drop_duplicates()
+	m.columns = [ 'use_collection','collection','clean_name','symbol' ]
+
+	m_1 = new_mints[ (-(new_mints.collection.isin(symbol_only))) & (-(new_mints.collection.isin(collection_only)))  ].fillna('').merge(m.fillna(''), how='left')
+	m_2 = new_mints[ ((new_mints.collection.isin(symbol_only))) & (-(new_mints.collection.isin(collection_only)))  ][[ 'collection','mint_address','symbol' ]].fillna('').merge(m.fillna(''), how='left')
+	m_3 = new_mints[ (-(new_mints.collection.isin(symbol_only))) & ((new_mints.collection.isin(collection_only)))  ][[ 'collection','mint_address' ]].fillna('').merge(m.fillna(''), how='left')
+	len(m_1) + len(m_2) + len(m_3)
+	len(new_mints)
+	# m = new_mints.fillna('').merge(m.fillna(''), how='left')
+	m = m_1.append(m_2).append(m_3)
+	print('After all this, we have {}% of the mints'.format( round(len(m) * 100 / len(new_mints)) ))
+	len(new_mints)
+	len(m)
+	m['mint_address'] = m.mint_address.apply(lambda x: re.sub('.json', '', x) )
+	m = m[['mint_address','use_collection']].dropna().drop_duplicates()
+	m.columns = ['mint_address','collection']
+
+	m[m.collection.isnull()].head()
+	m[m.collection=='Nan'].head()
+
+	m = m[m.collection != 'Nan']
+
+	tmp = m.groupby('collection').mint_address.count().reset_index().sort_values('mint_address', ascending=0)
+	tmp.head()
+
+	m.to_csv('./data/mult_update_auth_labels.csv', index=False)
+	################
+	#     DONE     #
+	################
+
+
+
+	tokens = m.append(pd.read_csv('./data/tokens.csv')[['collection','mint_address']]).drop_duplicates(subset=['mint_address'], keep='last')
+	tokens.to_csv('./data/mints-2022-06-13-2pm.csv', index=False)
+
+	tokens.head()
+		
+	m.to_csv('./data/mints-2022-06-09.csv', index=False)
+	m = pd.read_csv('./data/mints-2022-06-09.csv')
+	m.groupby('collection').head(1).to_csv('~/Downloads/tmp.csv', index=False)
+	len(m)
+	len(m.mint_address.unique())
+	m.head()
+	m.head()
+	# m = m.merge(symbol_map, how='left', on='symbol')
+	# m['use_collection'] = m.use_collection_x.fillna(m.use_collection_y)
+	len(new_mints)
+	len(m)
+	len(m[m.use_collection.isnull()])
+	len(m[m.use_collection.isnull()]) / len(m)
+	len(m[m.use_collection_x.isnull()]) / len(m)
+	m[m.use_collection.isnull()].fillna('').drop_duplicates(subset=['collection','clean_name','symbol']).to_csv('~/Downloads/tmp-3.csv', index=False)
+	m[m.use_collection.isnull()].drop_duplicates(subset=['collection']).to_csv('~/Downloads/tmp-3.csv', index=False)
+
+	a = uri_df[(uri_df.parsed_collection.isnull()) | (uri_df.parsed_collection == '')].groupby('row_clean_name').uri.count().reset_index()
+	a = uri_df[(uri_df.parsed_collection.isnull()) | (uri_df.parsed_collection == '')]
+	uri_df.head()
+	uri_df['row_clean_name'] = uri_df.row_clean_name.apply(lambda x: f_cn(x) )
+	id_map = uri_df
+	a.to_csv('~/Downloads/tmp-1.csv', index=False)
+	len(uri_df)
+	n = uri_df.groupby()
+	uri_df
+	uri_df
+	uri_df.head()
+	uri_df[['symbol','collection','']]
+	uri_df.head()
 
 	query = '''
 		SELECT DISTINCT project_name
@@ -294,6 +1057,26 @@ def mints_from_me():
 	[x for x in seen if not x in m_df.tmp.unique()][:11]
 	m_df[m_df.symbol == 'apesquad']
 	m_df[m_df.symbol == 'chimp_frens']
+	url = 'https://api.solscan.io/nft/detail?mint=D5pT5HYPeQkHD6ryoHxnc2jdcUMYmjs6sS6LswbSDsuy'
+	us = sorted(m_df[m_df.n_collection > 1].update_authority.unique())
+	u = us[1]
+	m_df[m_df.update_authority == u]
+	m_df[m_df.mint == 'G3xiAFZEp49BJc8nNrDJxwTXZ34teKH7CRf5KTGakxte']
+	data = []
+	for u in us[:10]:
+		nfts = BLOCKCHAIN_API_RESOURCE.search_nfts(
+			update_authority = u
+			, update_authority_search_method = SearchMethod.EXACT_MATCH
+		)
+		print(u, len(nfts))
+		for n in nfts:
+			m = n['nft_metadata']
+			data += [[ m['update_authority'], m['mint'], m['data']['symbol'], m['data']['name'] ]]
+	nft_df = pd.DataFrame(data, columns=['update_authority','mint','symbol','name'])
+	len(nft_df.update_authority.unique())
+	nft_df['collection'] = nft_df.name.apply(lambda x: re.split('#', x)[0].strip() )
+	nft_df.groupby(['symbol','collection']).mint.count()
+	nft_df.groupby(['symbol','name']).mint.count()
 	print(len(seen))
 	# m_df = m_df.merge(lp_df)
 	len(m_df)
@@ -334,7 +1117,6 @@ def mints_from_me():
 		# 	if not os.path.exists(dir_mints):
 		# 		os.makedirs(dir_mints)
 		# 	os.system('metaboss -r {} -t 300 decode mint --list-file {} --output {}'.format(rpc, fname, dir_mints))
-
 
 	data = []
 	for path in os.listdir('./data/mints/'):
