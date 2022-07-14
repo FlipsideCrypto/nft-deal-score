@@ -644,8 +644,8 @@ def compile():
 	howrare_labels = read_csv(DATA_FOLDER, 'howrare_labels')
 	df = pd.concat([howrare_labels, single_update_auth_labels, mult_update_auth_labels])
 	df = df[ (df.collection != 'Nan') & (df.collection != 'nan') & (df.collection.notnull()) ]
+	df = df[ (df.mint_address != 'Nan') & (df.mint_address != 'nan') & (df.mint_address.notnull()) ]
 	df = df.drop_duplicates(subset=['mint_address'], keep='first')
-	print(len(df[df.collection == 'DegenTown']))
 	write_csv(DATA_FOLDER, 'solana_nft_labels', df[['mint_address','collection']])
 
 # print('Loaded!')

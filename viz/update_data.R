@@ -32,6 +32,7 @@ if(isRstudio) {
 mints_from_me()
 pull_from_metaboss()
 how_rare_is_api()
+# saves labels to '/rstudio-data/nft_labels/solana_nft_labels.csv'
 compile()
 
 
