@@ -16,9 +16,12 @@ clean_names = {
 	,'boredapeyachtclub': 'BAYC'
 	,'mutantapeyachtclub': 'MAYC'
 	,'bayc': 'BAYC'
+	,'bakc': 'BAKC'
 	,'mayc': 'MAYC'
 	,'solgods': 'SOLGods'
 	,'meerkatmillionairescc': 'Meerkat Millionaires'
+	,'ggsg:galacticgeckos': 'Galactic Geckos'
+	,'solstein': 'SolStein'
 	# ,'stonedapecrew': 'Stoned Ape Crew'
 }
 
@@ -47,6 +50,7 @@ def clean_name(name):
 	name = re.sub('-', ' ', name)
 	name = re.sub(' On ', ' on ', name)
 	name = re.sub('Defi ', 'DeFi ', name)
+	# name = re.sub(r'[^a-zA-Z0-9\s]', '', name)
 	return(name)
 
 

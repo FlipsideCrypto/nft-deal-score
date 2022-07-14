@@ -1,6 +1,6 @@
 import os
 import json
-# import psycopg2
+import psycopg2
 import pandas as pd
 import requests
 
@@ -26,6 +26,49 @@ def thorchain():
 
 def f():
 	conn = psycopg2.connect("dbname=suppliers user=postgres password=postgres")
+	conn = psycopg2.connect("dbname=suppliers user=postgres password=postgres")
+	conn = psycopg2.connect(
+		host="vic5o0tw1w-repl.twtim97jsb.tsdb.cloud.timescale.com",
+		user="tsdbadmin",
+		password="yP4wU5bL0tI0kP3k"
+	)
+
+query = '''
+	SELECT from_addr
+	, to_addr
+	, asset
+	, amount_e8
+	, block_timestamp
+	, COUNT(1) AS n
+	FROM midgard.transfer_events
+	WHERE block_timestamp < 1650000000000000000
+	AND block_timestamp >=  1640000000000000000
+	GROUP BY 1, 2, 3, 4, 5
+	HAVING COUNT(1) > 1
+'''
+df = pd.read_sql_query(query, conn)
+cur.execute(query)
+
+it = 0
+qs = []
+for i in range(1618000000000000000, 1657000000000000000, 3000000000000000):
+	print(i)
+	it += 1
+	query = '''
+		SELECT from_addr
+		, to_addr
+		, asset
+		, amount_e8
+		, block_timestamp
+		, COUNT(1) AS n
+		FROM midgard.transfer_events
+		WHERE block_timestamp >= {}
+		AND block_timestamp <  {}
+		GROUP BY 1, 2, 3, 4, 5
+		HAVING COUNT(1) > 1
+	'''.format(i, i + 3000000000000000)
+	with open('/Users/kellenblumberg/Downloads/query_{}.txt'.format(it), 'w') as f:
+		f.write(query)
 
 
 def read_tokenlist():

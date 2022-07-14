@@ -30,9 +30,9 @@ fluidPage(
 			class="hero"
 			, fluidRow(
 				class = "header-images",
-				column(4, uiOutput("solanaimg")),
-				column(4, uiOutput("terraimg")),
-				column(4, uiOutput("ethereumimg"))
+				column(6, uiOutput("solanaimg")),
+				# column(4, uiOutput("terraimg")),
+				column(6, uiOutput("ethereumimg"))
 			)
 			, h1(
 				class="header", 

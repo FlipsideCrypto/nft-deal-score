@@ -27,7 +27,7 @@ attributes[, feature_name := trimws(feature_name) ]
 attributes[, feature_value := trimws(as.character(feature_value)) ]
 feature_values <- read_csv('feature_values.csv')
 sales <- read_csv('model_sales.csv')
-listings <- read_csv('listings.csv')
+listings <- read.csv('/Users/kellenblumberg/git/nft-deal-score/viz/nft_deal_score_listings.csv') %>% as.data.table()
 coefsdf <- read_csv('coefsdf.csv')
 tokens <- read_csv('tokens.csv')
 tokens[, token_id := clean_token_id]
@@ -39,18 +39,25 @@ listings <- listings[ !(collection == 'Solana Monkey Business' & token_id == 953
 tokens[, token_id := as.numeric(token_id)]
 
 # manual adjustments to price
-ids_1 <- attributes[ (collection == 'Aurory') & (feature_value == 'Solana Blob') ]$token_id
-pred_price[  collection == 'Aurory' & token_id %in% eval(ids_1), pred_price := (pred_price * 0.8) ]
+# ids_1 <- attributes[ (collection == 'Aurory') & (feature_value == 'Solana Blob') ]$token_id
+# pred_price[  collection == 'Aurory' & token_id %in% eval(ids_1), pred_price := (pred_price * 0.8) ]
 
-ids_2 <- attributes[ (collection == 'Aurory') & (feature_value == 'Long Blob Hair ') ]$token_id
-pred_price[  collection == 'Aurory' & token_id %in% eval(ids_2), pred_price := (pred_price * 0.90) ]
+# ids_2 <- attributes[ (collection == 'Aurory') & (feature_value == 'Long Blob Hair ') ]$token_id
+# pred_price[  collection == 'Aurory' & token_id %in% eval(ids_2), pred_price := (pred_price * 0.90) ]
 
-ids_3 <- attributes[ (collection == 'Aurory') & (grepl( 'Mask', feature_value, fixed = TRUE)) ]$token_id
-pred_price[  collection == 'Aurory' & token_id %in% eval(ids_3), pred_price := (pred_price * 0.975) ]
+# ids_3 <- attributes[ (collection == 'Aurory') & (grepl( 'Mask', feature_value, fixed = TRUE)) ]$token_id
+# pred_price[  collection == 'Aurory' & token_id %in% eval(ids_3), pred_price := (pred_price * 0.975) ]
 
-sales[collection == 'Cets On Creck', collection := 'Cets on Creck']
-pred_price[collection == 'Cets On Creck', collection := 'Cets on Creck']
+# sales[collection == 'Cets On Creck', collection := 'Cets on Creck']
+# pred_price[collection == 'Cets On Creck', collection := 'Cets on Creck']
 listings[collection == 'Cets On Creck', collection := 'Cets on Creck']
+cols <- c( 'Citizens By Solsteads' )
+# sales[, tmp := tolower(coll)]
+for (col in cols) {
+	sales[ tolower(collection) == eval(tolower(col)), collection := eval(col) ]
+	pred_price[ tolower(collection) == eval(tolower(col)), collection := eval(col) ]
+	listings[ tolower(collection) == eval(tolower(col)), collection := eval(col) ]
+}
 
 
 sort(unique(listings$collection))
@@ -58,10 +65,13 @@ sort(unique(pred_price$collection))
 sort(unique(sales$collection))
 
 # filter for only collections that have all data
-a <- unique(pred_price[, list(collection)])
-b <- unique(sales[, list(collection)])
-c <- unique(listings[, list(collection)])
+a <- unique(pred_price[, list(collection)][order(collection)])
+b <- unique(sales[, list(collection)][order(collection)])
+c <- unique(listings[, list(collection)][order(collection)])
 d <- merge(merge(a, b), c)
+d <- d[order(collection)]
+d <- d[ collection %in% c('Aurory','Bubblegoose Ballers','Catalina Whale Mixer','Cets on Creck','DeGods','Degen Apes','Famous Fox Federation','Meerkat Millionaires','Okay Bears','Pesky Penguins','Primates','SOLGods','Solana Monkey Business','Stoned Ape Crew','ThugbirdzcMAYC') ]
+write.csv(d, '~/Downloads/tmp.csv', row.names=F)
 
 pred_price <- merge(pred_price, d, by=c('collection'))
 attributes <- merge(attributes, d, by=c('collection'))
@@ -91,6 +101,7 @@ save(
 	, tokens
 	, file = paste0(file.location,'nft_deal_score_data.Rdata')
 )
+
 # save(
 # 	listings
 # 	, file = paste0(file.location,'nft_deal_score_listings_data.Rdata')

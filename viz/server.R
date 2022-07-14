@@ -3,8 +3,10 @@ server <- function(input, output, session) {
 	user <- Sys.info()[['user']]
 	# options(warn=-1)
 
+	isRstudio <- user != 'kellenblumberg'
+	# isRstudio <- TRUE
 	base_dir <- ifelse(
-		user == 'rstudio-connect'
+		isRstudio
 		, '/rstudio-data/'
 		, ifelse(user == 'fcaster'
 			, '/srv/shiny-server/nft-deal-score/'
@@ -472,7 +474,7 @@ server <- function(input, output, session) {
 		selectInput(
 			inputId = 'collectionname'
 			, label = NULL
-			, selected = 'Catalina Whale Mixer'
+			, selected = 'Famous Fox Federation'
 			, choices = choices
 			, width = "100%"
 		)
@@ -561,7 +563,7 @@ updateSelectizeInput(session, 'tokenid', choices = choices, server = TRUE)
 						selected %in% c('Cets on Creck')
 						, strsplit(selected, ' |s ')[[1]][1]
 						, ifelse(
-							selected %in% c('Stoned Ape Crew', 'Catalina Whale Mixer')
+							selected %in% c('Stoned Ape Crew', 'Catalina Whale Mixer','Famous Fox Federation')
 							, paste(strsplit(selected, ' ')[[1]][1], strsplit(selected, ' ')[[1]][2], sep = ' ')
 							, substr(selected, 1, nchar(selected) - 1)
 						)

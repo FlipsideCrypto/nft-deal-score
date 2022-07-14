@@ -1,14 +1,14 @@
-name: nft-deal-score2
-title: nft-deal-score
+name: update_nft_deal_score_data4
+title:
 username: kellen
 account: kellen
 server: science.flipsidecrypto.xyz
 hostUrl: https://science.flipsidecrypto.xyz/__api__
-appId: 93
-bundleId: 435
-url: https://science.flipsidecrypto.xyz/nft-deal-score/
-when: 1656375887.36944
-lastSyncTime: 1656375887.36945
+appId: 114
+bundleId: 430
+url: https://science.flipsidecrypto.xyz/content/67141ada-46fd-4750-a690-0be248c461f3/
+when: 1656200355.03703
+lastSyncTime: 1656200355.03704
 asMultiple: FALSE
 asStatic: FALSE
 ignoredFiles: add_sales.py|data (2).Rdata|data copy 2.Rdata|data copy.Rdata|data.Rdata|exploration.R|loan_score_model.py|nft_deal_score_data.RData|nft_deal_score_listings_data.RData|nft_deal_score_listings.csv|nft_deal_score_sales_data.RData|nft_deal_score_sales.csv|nft_deal_score_tokens.csv|scrape_eth_nfts.py|scrape_terra_nfts.py|update_data.R|update_nft_deal_score_data.RMD|upload_data.R|utils.py

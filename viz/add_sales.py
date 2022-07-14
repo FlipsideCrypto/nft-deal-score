@@ -33,6 +33,7 @@ clean_names = {
 	,'solgods': 'SOLGods'
 	,'meerkatmillionairescc': 'Meerkat Millionaires'
 	,'stonedapecrew': 'Stoned Ape Crew'
+	,'stonedapecrew': 'Stoned Ape Crew'
 }
 
 def clean_name(name):
@@ -44,6 +45,7 @@ def clean_name(name):
 	name = re.sub('-', ' ', name)
 	name = re.sub(' On ', ' on ', name)
 	name = re.sub('Defi ', 'DeFi ', name)
+	# name = re.sub(r'[^a-zA-Z0-9\s]', '', name)
 	return(name)
 
 #########################
@@ -80,6 +82,7 @@ def clean_token_id(df, data_folder):
 	del df['clean_token_id']
 	return(df)
 
+# '~/git/nft-deal-score/viz/'
 def add_sales(query, usr, pwd, do_clean_token_id = False, data_folder = '/rstudio-data/'):
 	fname = data_folder+'nft_deal_score_sales.csv'
 	ctx = get_ctx(usr, pwd)
@@ -104,7 +107,7 @@ def add_sales(query, usr, pwd, do_clean_token_id = False, data_folder = '/rstudi
 	old[old.token_id.isnull()].groupby('collection').sale_date.count()
 	go = old.groupby('collection').token_id.count().reset_index().rename(columns={'token_id':'n_old'})
 	l0 = len(old)
-	app = old[old.collection.isin(m.collection.unique())].append(m)
+	app = pd.concat([old[old.collection.isin(m.collection.unique())], m])
 	app = app[ app.price > 0 ]
 	app['tmp'] = app.apply(lambda x: x['collection']+str(int(float(x['token_id'])))+x['sale_date'][:10], 1 )
 	if len(app[app.tx_id.isnull()]):
@@ -115,7 +118,7 @@ def add_sales(query, usr, pwd, do_clean_token_id = False, data_folder = '/rstudi
 	else:
 		app = app.drop_duplicates(subset=['tx_id'])
 	old = old[-old.collection.isin(app.collection.unique())]
-	old = old.append(app)
+	old = pd.concat([old, app])
 
 	old = old[[ 'collection','token_id','sale_date','price','tx_id' ]]
 
@@ -142,22 +145,43 @@ def add_solana_sales(usr, pwd, data_folder = '/rstudio-data/'):
 		, sales_amount AS price
 		FROM solana.fact_nft_sales s
 		JOIN solana.dim_nft_metadata m ON LOWER(m.mint) = LOWER(s.mint)
-		WHERE block_timestamp >= CURRENT_DATE - 14
+		WHERE block_timestamp >= CURRENT_DATE - 7
 		AND m.project_name IN (
 			'Astrals',
 			'Aurory',
-			'Cets On Creck',
+			'Blocksmith Labs',
+			'Bohemia',
+			'Bot Head',
+			'Bubblegoose Ballers',
+			'Cat Cartel',
 			'Catalina Whale Mixer',
+			'Cets On Creck',
+			'Citizens by Solsteads',
+			'Communi3: Mad Scientists',
+			'DeFi Pirates',
 			'DeFi Pirates',
 			'DeGods',
 			'Degen Apes',
+			'Degen Dojo',
+			'Doge Capital',
+			'Famous Fox Federation',
+			'GGSG: Galactic Geckos',
+			'Just Ape.',
+			'Looties',
 			'Meerkat Millionaires',
+			'Monkey Baby Business',
 			'Okay Bears',
 			'Pesky Penguins',
+			'Primates',
+			'Quantum Traders',
 			'SOLGods',
+			'SolStein',
+			'Solana Monke Rejects',
 			'Solana Monkey Business',
+			'Solanauts',
 			'Stoned Ape Crew',
-			'Thugbirdz'
+			'Thugbirdz',
+			'Trippin Ape Tribe'
 		)
 	'''
 	add_sales(query, usr, pwd, False, data_folder)
@@ -172,10 +196,10 @@ def add_ethereum_sales(usr, pwd, data_folder = '/rstudio-data/'):
 		, price
 		, tx_id
 		FROM ethereum.nft_events
-		WHERE project_name IN (
-			'BoredApeYachtClub'
-			, 'MutantApeYachtClub'
-			, 'BoredApeKennelClub'
+		WHERE LOWER(project_name) IN (
+			'boredapeyachtclub'
+			, 'mutantapeyachtclub'
+			, 'boredapekennelclub'
 		)
 		AND price IS NOT NULL
 		AND block_timestamp >= CURRENT_DATE - 14
